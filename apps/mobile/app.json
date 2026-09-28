@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "tinyPet",
+    "slug": "tinypet",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "tinypet",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "backgroundColor": "#ffffff",
+    "ios": {
+      "bundleIdentifier": "br.com.tinypet.app",
+      "supportsTablet": false,
+      "associatedDomains": ["applinks:tinypet.com.br"],
+      "infoPlist": {
+        "NSCameraUsageDescription": "Usamos a câmera para fotos e vídeos dos seus pets.",
+        "NSPhotoLibraryUsageDescription": "Usamos sua galeria para enviar fotos e vídeos dos seus pets.",
+        "NSLocationWhenInUseUsageDescription": "Usamos sua localização para encontrar parceiros perto de você.",
+        "LSApplicationQueriesSchemes": ["comgooglemaps", "waze", "maps"]
+      }
+    },
+    "android": {
+      "package": "br.com.tinypet.app",
+      "adaptiveIcon": { "backgroundColor": "#f95d16" },
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "tinypet.com.br", "pathPrefix": "/convite" },
+            { "scheme": "https", "host": "tinypet.com.br", "pathPrefix": "/p" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Usamos sua galeria para enviar fotos e vídeos dos seus pets.",
+          "cameraPermission": "Usamos a câmera para fotos e vídeos dos seus pets."
+        }
+      ],
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "Usamos sua localização para encontrar parceiros perto de você." }
+      ],
+      ["expo-notifications", { "color": "#f95d16" }]
+    ],
+    "experiments": { "typedRoutes": false },
+    "extra": { "router": { "origin": false } }
+  }
+}

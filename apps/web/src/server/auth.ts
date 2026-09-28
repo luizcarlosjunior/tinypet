@@ -167,6 +167,8 @@ export async function sessionContext(user: AuthUser) {
       plan: dbUser?.subscription?.plan.key ?? "owner_free",
       marketingConsent: dbUser?.marketingConsent ?? false,
       statsConsent: dbUser?.statsConsent ?? true,
+      publicPhotosConsent: dbUser?.publicPhotosConsent ?? false,
+      birthDate: dbUser?.birthDate ? dbUser.birthDate.toISOString().slice(0, 10) : null,
     },
     memberships: memberships.map((m) => ({
       membershipId: m.id,
