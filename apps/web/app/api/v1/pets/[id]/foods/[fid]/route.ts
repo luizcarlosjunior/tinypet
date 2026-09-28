@@ -6,7 +6,8 @@ import { petActor, dateOnly } from "@/server/pets";
 const include = { brand: { select: { id: true, name: true, status: true } }, productLine: { select: { id: true, name: true } } };
 
 export const PATCH = handler<{ id: string; fid: string }>(async (req, { params }) => {
-  await petActor(req, params.id, "EDIT");
+  const actor = await petActor(req, params.id, "EDIT");
+  if (actor.via === "partner") throw Errors.forbidden("Apenas o tutor ou a família podem alterar a alimentação");
   const row = await prisma.petFood.findFirst({ where: { id: params.fid, petId: params.id } });
   if (!row) throw Errors.notFound("Alimento não encontrado");
   const body = await parseBody(req, petFoodSchema.partial());
@@ -14,7 +15,8 @@ export const PATCH = handler<{ id: string; fid: string }>(async (req, { params }
 });
 
 export const DELETE = handler<{ id: string; fid: string }>(async (req, { params }) => {
-  await petActor(req, params.id, "EDIT");
+  const actor = await petActor(req, params.id, "EDIT");
+  if (actor.via === "partner") throw Errors.forbidden("Apenas o tutor ou a família podem alterar a alimentação");
   const row = await prisma.petFood.findFirst({ where: { id: params.fid, petId: params.id } });
   if (!row) throw Errors.notFound("Alimento não encontrado");
   await prisma.petFood.delete({ where: { id: row.id } });

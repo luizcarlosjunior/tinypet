@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.br.com.tinypet.app"],
+        "components": [
+          { "/": "/p/*", "comment": "Partner public pages" },
+          { "/": "/convite/*", "comment": "Client invites" }
+        ]
+      }
+    ]
+  }
+}

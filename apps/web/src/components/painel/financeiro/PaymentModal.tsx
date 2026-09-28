@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { paymentSchema, PAYMENT_METHOD_LABEL, formatBRL } from "@tinypet/shared";
+import { paymentSchema, PAYMENT_METHOD_LABEL, formatBRL, safeHref } from "@tinypet/shared";
 import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { UploadButton } from "@/components/media/UploadButton";
 import { useRegisterPayment } from "@/hooks/use-finance";
@@ -53,7 +53,7 @@ export function PaymentModal({ installment, onClose, partnerId }: { installment:
             <UploadButton purpose="RECEIPT" partnerId={partnerId} accept="image/*,application/pdf" label={receiptUrl ? "Trocar comprovante" : "Enviar comprovante"} onUploaded={(m) => setValue("receiptUrl", m.url)} />
             {receiptUrl && (
               <>
-                <a href={receiptUrl} target="_blank" rel="noreferrer" className="text-sm text-brand-600 underline dark:text-brand-300">
+                <a href={safeHref(receiptUrl)} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 underline dark:text-brand-300">
                   Ver arquivo
                 </a>
                 <button type="button" className="text-xs text-red-600 hover:underline" onClick={() => setValue("receiptUrl", null)}>

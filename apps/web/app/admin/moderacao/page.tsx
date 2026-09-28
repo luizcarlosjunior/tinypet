@@ -5,6 +5,7 @@ import { QueryState, Tabs, Table, td, th } from "@/components/painel/ui";
 import { useAdminFlaggedMedia, useAdminReports, useModerate, type AdminReport } from "@/hooks/use-admin";
 import { fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { safeHref } from "@tinypet/shared";
 
 type Tab = "reports" | "media";
 type RStatus = "OPEN" | "RESOLVED" | "DISMISSED";
@@ -81,7 +82,7 @@ function Reports() {
                     </div>
                   ) : r.mediaAsset ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.mediaAsset.thumbUrl || r.mediaAsset.url} alt="Mídia denunciada" className="h-16 w-16 rounded-lg object-cover" />
+                    <img src={safeHref(r.mediaAsset.thumbUrl || r.mediaAsset.url)} alt="Mídia denunciada" className="h-16 w-16 rounded-lg object-cover" />
                   ) : (
                     <span className="text-xs text-[var(--muted)]">{r.mediaAssetId ? `Mídia ${r.mediaAssetId}` : "—"}</span>
                   )}
@@ -127,10 +128,10 @@ function FlaggedMedia() {
           <li key={m.id} className="overflow-hidden rounded-xl border bg-[var(--card)]">
             <div className="aspect-square bg-ink-100 dark:bg-ink-900">
               {m.kind === "VIDEO" ? (
-                <video src={m.url} controls muted className="h-full w-full object-cover" aria-label="Vídeo sinalizado" />
+                <video src={safeHref(m.url)} controls muted className="h-full w-full object-cover" aria-label="Vídeo sinalizado" />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.thumbUrl || m.url} alt="Mídia sinalizada" className="h-full w-full object-cover" />
+                <img src={safeHref(m.thumbUrl || m.url)} alt="Mídia sinalizada" className="h-full w-full object-cover" />
               )}
             </div>
             <div className="space-y-1 p-2 text-xs">

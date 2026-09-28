@@ -3,5 +3,5 @@ import { listStudents } from "@/server/courses";
 
 export const GET = handler<{ id: string }>(async (req, { params }) => {
   const ctx = await requirePartner(req);
-  return ok(serialize(await listStudents(ctx.partnerId, params.id)));
+  return ok(serialize(await listStudents(ctx.partnerId, params.id, ctx.canSeeFinance)));
 });

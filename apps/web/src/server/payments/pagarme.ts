@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { PaymentProvider, CreateOrderInput, CreateOrderResult, CreateRecipientInput, SubscriptionInput, WebhookEventInput } from "./provider";
 
 const BASE = "https://api.pagar.me/core/v5";
@@ -5,6 +6,12 @@ const BASE = "https://api.pagar.me/core/v5";
 function authHeader() {
   const key = process.env.PAGARME_SECRET_KEY ?? "";
   return `Basic ${Buffer.from(`${key}:`).toString("base64")}`;
+}
+
+function safeEqual(a: string, b: string) {
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ha, hb) && a.length === b.length;
 }
 
 async function call<T>(path: string, body?: unknown, method = "POST"): Promise<T> {
@@ -64,13 +71,37 @@ export const pagarme: PaymentProvider = {
     await call(`/subscriptions/${id}`, undefined, "DELETE");
   },
 
-  verifyWebhook(_rawBody: string, _signature: string | null) {
-    // Pagar.me webhooks authenticate via basic auth configured in the dashboard; we also accept a shared secret header.
-    return true;
+  /**
+   * Pagar.me webhooks authenticate with HTTP Basic credentials configured in the dashboard
+   * (PAGARME_WEBHOOK_USER / PAGARME_WEBHOOK_PASSWORD). Fails closed when not configured.
+   */
+  verifyWebhook(headers: Headers) {
+    const user = process.env.PAGARME_WEBHOOK_USER ?? "";
+    const pass = process.env.PAGARME_WEBHOOK_PASSWORD ?? "";
+    if (!user || !pass) return false;
+    const h = headers.get("authorization") ?? "";
+    if (!h.startsWith("Basic ")) return false;
+    let decoded = "";
+    try {
+      decoded = Buffer.from(h.slice(6).trim(), "base64").toString("utf8");
+    } catch {
+      return false;
+    }
+    const i = decoded.indexOf(":");
+    if (i < 0) return false;
+    const okUser = safeEqual(decoded.slice(0, i), user);
+    const okPass = safeEqual(decoded.slice(i + 1), pass);
+    return okUser && okPass;
+  },
+
+  async getOrder(gatewayOrderId: string) {
+    const o = await call<{ id: string; status: string; amount: number }>(`/orders/${encodeURIComponent(gatewayOrderId)}`, undefined, "GET");
+    return { id: o.id, status: o.status, amount: o.amount };
   },
 
   parseWebhook(rawBody: string): WebhookEventInput {
-    const j = JSON.parse(rawBody) as { id: string; type: string; data: unknown };
+    const j = JSON.parse(rawBody) as { id?: unknown; type?: unknown; data?: unknown };
+    if (typeof j?.id !== "string" || typeof j.type !== "string") throw new Error("Webhook malformado");
     return { id: j.id, type: j.type, payload: j };
   },
 };

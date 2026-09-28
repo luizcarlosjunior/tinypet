@@ -1,6 +1,7 @@
 "use client";
 import { CrudPage } from "@/components/admin/CrudPage";
 import type { FieldDef, Row } from "@/components/admin/AdminTable";
+import { safeHref } from "@tinypet/shared";
 
 type Badge = Row & { key: string; name: string; description?: string | null; iconUrl?: string | null; partnerId?: string | null };
 const fields: FieldDef[] = [
@@ -25,7 +26,7 @@ export default function BadgesPage() {
             <span className="flex items-center gap-2">
               {r.iconUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.iconUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+                <img src={safeHref(r.iconUrl)} alt="" className="h-6 w-6 rounded-full object-cover" />
               ) : (
                 <span className="h-6 w-6 rounded-full bg-brand-100 dark:bg-brand-900/40" aria-hidden />
               )}

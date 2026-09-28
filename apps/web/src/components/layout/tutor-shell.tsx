@@ -8,6 +8,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { NotificationsBell } from "./notifications-bell";
 import { UserMenu } from "./user-menu";
 import { useOwnerTerm } from "@/hooks/use-owner-term";
+import { TermsGate } from "./terms-gate";
 
 const TABS = [
   { href: "/inicio", label: "Início", icon: Home },
@@ -62,6 +63,7 @@ export function TutorShell({ children }: { children: React.ReactNode }) {
           ))}
         </ul>
       </nav>
+      <TermsGate />
     </div>
   );
 }

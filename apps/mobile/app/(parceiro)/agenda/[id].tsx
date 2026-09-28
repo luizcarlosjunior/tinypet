@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, Linking, View } from "react-native";
+import { Alert, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { APPOINTMENT_STATUS_LABEL } from "@tinypet/shared";
@@ -12,6 +12,7 @@ import { Avatar, Badge, Button, Card, ErrorState, Input, KeyValue, ListItem, Loa
 import { statusTone } from "@/components/ui/Badge";
 import { AddressBlock, LocationBadge, MapsButtons } from "@/components/appointments/AppointmentCard";
 import { BackHeader } from "@/components/BackHeader";
+import { openLocal, whatsappUrl } from "@/lib/links";
 
 export default function PartnerAppointmentDetail() {
   const t = useTheme();
@@ -71,7 +72,7 @@ export default function PartnerAppointmentDetail() {
               ))}
               <KeyValue k="Profissional" v={a.membership?.user?.name ?? a.membership?.name} />
               <KeyValue k="Observações" v={a.notes} />
-              {a.client?.phone ? <Button title="Ligar / WhatsApp" size="sm" variant="ghost" icon="call-outline" style={{ alignSelf: "flex-start" }} onPress={() => Linking.openURL(`https://wa.me/${a.client!.phone!.replace(/\D/g, "")}`)} /> : null}
+              {a.client?.phone ? <Button title="Ligar / WhatsApp" size="sm" variant="ghost" icon="call-outline" style={{ alignSelf: "flex-start" }} onPress={() => openLocal(whatsappUrl(a.client!.phone!))} /> : null}
             </Card>
             {a.locationType !== "ONLINE" ? (
               <Card>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, Linking, View } from "react-native";
+import { Alert, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ageInMonths, formatAge } from "@tinypet/shared";
 import { useClient, useClientInvites, useClientMutations } from "@/hooks/use-partner";
@@ -11,6 +11,7 @@ import { spacing } from "@/lib/theme";
 import { Avatar, Badge, Button, Card, ErrorState, Input, ListItem, Loading, Screen, Section, Sheet, Text } from "@/components/ui";
 import { AddressForm } from "@/components/AddressForm";
 import { BackHeader } from "@/components/BackHeader";
+import { mailtoUrl, openLocal, telUrl, whatsappUrl } from "@/lib/links";
 
 const PHONE_TYPE = { MOBILE: "Celular", LANDLINE: "Fixo", WHATSAPP: "WhatsApp" } as const;
 
@@ -88,10 +89,10 @@ export default function ClientDetail() {
 
             <Section title="Contatos">
               {(c.phones ?? []).map((ph) => (
-                <ListItem key={ph.id} title={ph.number} subtitle={PHONE_TYPE[ph.type]} chevron={false} onPress={() => Linking.openURL(ph.type === "WHATSAPP" ? `https://wa.me/${ph.number.replace(/\D/g, "")}` : `tel:${ph.number}`)} accessibilityLabel={`Ligar para ${ph.number}`} />
+                <ListItem key={ph.id} title={ph.number} subtitle={PHONE_TYPE[ph.type]} chevron={false} onPress={() => openLocal(ph.type === "WHATSAPP" ? whatsappUrl(ph.number) : telUrl(ph.number))} accessibilityLabel={`Ligar para ${ph.number}`} />
               ))}
               {(c.emails ?? []).map((e) => (
-                <ListItem key={e.id} title={e.address} subtitle="E-mail" chevron={false} onPress={() => Linking.openURL(`mailto:${e.address}`)} />
+                <ListItem key={e.id} title={e.address} subtitle="E-mail" chevron={false} onPress={() => { const m = mailtoUrl(e.address); if (m) void openLocal(m); }} />
               ))}
               {!c.phones?.length && !c.emails?.length ? (
                 <Text variant="small" tone="muted">

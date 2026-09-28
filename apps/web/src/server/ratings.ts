@@ -81,7 +81,7 @@ export const reviewInclude = {
 
 /** One review per user per item; upsert (editable). */
 export async function upsertItemReview(userId: string, itemId: string, input: { rating: number; comment?: string | null }) {
-  const item = await prisma.catalogItem.findFirst({ where: { id: itemId, deletedAt: null, partner: { deletedAt: null } }, select: { id: true, partnerId: true, name: true } });
+  const item = await prisma.catalogItem.findFirst({ where: { id: itemId, deletedAt: null, status: "PUBLISHED", partner: { deletedAt: null } }, select: { id: true, partnerId: true, name: true } });
   if (!item) throw Errors.notFound("Item não encontrado");
   const member = await prisma.membership.findUnique({ where: { userId_partnerId: { userId, partnerId: item.partnerId } } });
   if (member) throw Errors.forbidden("Você não pode avaliar o próprio parceiro");
@@ -99,7 +99,7 @@ export async function upsertItemReview(userId: string, itemId: string, input: { 
 }
 
 export async function upsertCourseReview(userId: string, courseId: string, input: { rating: number; comment?: string | null }) {
-  const course = await prisma.course.findFirst({ where: { id: courseId, partner: { deletedAt: null } }, select: { id: true, partnerId: true, title: true } });
+  const course = await prisma.course.findFirst({ where: { id: courseId, status: "PUBLISHED", partner: { deletedAt: null } }, select: { id: true, partnerId: true, title: true } });
   if (!course) throw Errors.notFound("Curso não encontrado");
   const enrolled = await prisma.enrollment.findUnique({ where: { courseId_userId: { courseId, userId } } });
   if (!enrolled) throw Errors.forbidden("Só alunos matriculados podem avaliar o curso");
@@ -122,6 +122,8 @@ export async function listMyReviews(userId: string) {
 export async function deleteOwnReview(userId: string, reviewId: string) {
   const review = await prisma.review.findFirst({ where: { id: reviewId, userId } });
   if (!review) throw Errors.notFound("Avaliação não encontrada");
+  // a moderated (HIDDEN) review cannot be deleted and re-posted to escape moderation
+  if (review.status === "HIDDEN") throw Errors.forbidden("Avaliação em moderação");
   await prisma.review.delete({ where: { id: reviewId } });
   await recomputeForReview(review);
 }

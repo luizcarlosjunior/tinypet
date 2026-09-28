@@ -13,7 +13,7 @@ export type Pet = {
   breed?: { id: string; name: string } | null;
   breedOther: string | null;
   color: string | null;
-  sex: "MALE" | "FEMALE" | "UNKNOWN" | null;
+  sex: "MALE" | "FEMALE" | null;
   size: "SMALL" | "MEDIUM" | "LARGE" | "GIANT" | null;
   birthDate: string | null;
   approxAgeMonths: number | null;

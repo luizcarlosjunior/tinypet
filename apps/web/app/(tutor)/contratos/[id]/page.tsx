@@ -8,7 +8,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 import { fmtDate, fmtDateTime } from "@/lib/format";
-import { formatBRL, INSTALLMENT_STATUS_LABEL } from "@tinypet/shared";
+import { formatBRL, INSTALLMENT_STATUS_LABEL, safeHref } from "@tinypet/shared";
 import { CONTRACT_STATUS_LABEL, CONTRACT_TYPE_LABEL } from "@/components/tutor/contract-labels";
 
 const PERIOD = { WEEKLY: "semanal", BIWEEKLY: "quinzenal", MONTHLY: "mensal" } as const;
@@ -48,7 +48,7 @@ export default function ContratoPage({ params }: { params: { id: string } }) {
         </div>
         <div className="flex gap-2 print:hidden">
           {pdfHref ? (
-            <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="btn-secondary">
+            <a href={safeHref(pdfHref)} target="_blank" rel="noopener noreferrer" className="btn-secondary">
               <Printer className="h-4 w-4" aria-hidden /> PDF
             </a>
           ) : (

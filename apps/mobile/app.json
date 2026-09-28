@@ -28,8 +28,8 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "tinypet.com.br", "pathPrefix": "/convite" },
-            { "scheme": "https", "host": "tinypet.com.br", "pathPrefix": "/p" }
+            { "scheme": "https", "host": "tinypet.com.br", "pathPattern": "/convite/.*" },
+            { "scheme": "https", "host": "tinypet.com.br", "pathPattern": "/p/.*" }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
         }

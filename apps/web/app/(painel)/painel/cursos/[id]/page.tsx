@@ -6,7 +6,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
-import { courseSchema } from "@tinypet/shared";
+import { courseSchema, safeHref } from "@tinypet/shared";
 import { Badge, Button, Empty, Input, Modal, PageHeader, Select, Textarea } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { Checkbox, ChipSelect, ConfirmDialog, FieldGroup, QueryState, Table, Tabs, td, th } from "@/components/painel/ui";
@@ -107,7 +107,7 @@ function CourseForm({ id }: { id: string | null }) {
             <div className="flex flex-wrap items-center gap-3">
               {coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={coverUrl} alt="Capa do curso" className="h-24 w-40 rounded-xl object-cover" />
+                <img src={safeHref(coverUrl)} alt="Capa do curso" className="h-24 w-40 rounded-xl object-cover" />
               ) : (
                 <div className="flex h-24 w-40 items-center justify-center rounded-xl bg-ink-100 text-xs text-[var(--muted)] dark:bg-ink-900">Sem capa</div>
               )}

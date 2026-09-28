@@ -10,8 +10,10 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
   return ok(await prisma.petFood.findMany({ where: { petId: params.id }, include, orderBy: { type: "asc" } }));
 });
 
+/** Owner / family only (foods are owner data; partners read them). */
 export const POST = handler<{ id: string }>(async (req, { params }) => {
-  await petActor(req, params.id, "EDIT");
+  const actor = await petActor(req, params.id, "EDIT");
+  if (actor.via === "partner") throw Errors.forbidden("Apenas o tutor ou a família podem alterar a alimentação");
   const body = await parseBody(req, petFoodSchema);
   if (body.productLineId) {
     const line = await prisma.productLine.findUnique({ where: { id: body.productLineId } });

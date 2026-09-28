@@ -10,6 +10,7 @@ import { useActivePartner } from "@/hooks/use-partner";
 import { useAppointment, useAppointmentStatus, useDeleteAppointment } from "@/hooks/use-schedule";
 import type { Appointment, TeamMember } from "@/types/api";
 import { LocationChip, NavLinks, StatusBadge, apptPets, apptTitle, memberName, RECURRENCE_LABEL } from "./shared";
+import { safeHref } from "@tinypet/shared";
 
 export function AppointmentDrawer({ appointment, onClose, onEdit, members }: { appointment: Appointment | null; onClose: () => void; onEdit: (a: Appointment) => void; members: TeamMember[] }) {
   const { partnerId } = useActivePartner();
@@ -125,7 +126,7 @@ export function AppointmentDrawer({ appointment, onClose, onEdit, members }: { a
               <div className="mt-2 grid grid-cols-4 gap-2">
                 {a.reportPhotos.map((u) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={u} src={u} alt="Foto do atendimento" className="aspect-square rounded-lg object-cover" />
+                  <img key={u} src={safeHref(u)} alt="Foto do atendimento" className="aspect-square rounded-lg object-cover" />
                 ))}
               </div>
             )}
@@ -144,7 +145,7 @@ export function AppointmentDrawer({ appointment, onClose, onEdit, members }: { a
                   {photos.map((u) => (
                     <div key={u} className="relative">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={u} alt="" className="aspect-square rounded-lg object-cover" />
+                      <img src={safeHref(u)} alt="" className="aspect-square rounded-lg object-cover" />
                       <button type="button" className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white" aria-label="Remover foto" onClick={() => setPhotos((p) => p.filter((x) => x !== u))}>
                         <XCircle className="h-4 w-4" />
                       </button>

@@ -41,6 +41,9 @@ export interface PaymentProvider {
   createRecipient(input: CreateRecipientInput): Promise<{ gatewayRecipientId: string; status: string }>;
   createSubscription(input: SubscriptionInput): Promise<{ gatewaySubscriptionId: string; status: string }>;
   cancelSubscription(gatewaySubscriptionId: string): Promise<void>;
-  verifyWebhook(rawBody: string, signature: string | null): boolean;
+  /** Authenticates a webhook request from its headers. Must fail closed when not configured. */
+  verifyWebhook(headers: Headers, rawBody: string): boolean;
   parseWebhook(rawBody: string): WebhookEventInput;
+  /** Authoritative order state from the gateway API (used before applying `order.paid`). */
+  getOrder(gatewayOrderId: string): Promise<{ id: string; status: string; amount: Cents }>;
 }

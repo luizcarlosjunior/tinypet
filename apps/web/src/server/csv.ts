@@ -2,9 +2,15 @@
 
 export type CsvColumn<T> = { key: string; label: string; get?: (row: T) => unknown };
 
+/** Neutralizes spreadsheet formula injection: text cells starting with = + - @ TAB or CR get a leading `'`. Numbers are untouched. */
+export function neutralizeFormula(s: string): string {
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
 function escapeCell(v: unknown): string {
   if (v == null) return "";
-  const s = v instanceof Date ? v.toISOString().slice(0, 10) : Array.isArray(v) ? v.join(" | ") : String(v);
+  let s = v instanceof Date ? v.toISOString().slice(0, 10) : Array.isArray(v) ? v.map((x) => neutralizeFormula(String(x))).join(" | ") : String(v);
+  if (typeof v === "string") s = neutralizeFormula(s);
   return /[",;\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

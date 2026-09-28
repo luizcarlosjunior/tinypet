@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 import type { Pet } from "@/types/api";
 
-export const SEX_LABEL = { MALE: "Macho", FEMALE: "Fêmea", UNKNOWN: "Não sei" };
+export const SEX_LABEL = { MALE: "Macho", FEMALE: "Fêmea" };
 export const SIZE_LABEL = { SMALL: "Pequeno", MEDIUM: "Médio", LARGE: "Grande", GIANT: "Gigante" };
 
 export function PetForm({ initial, partnerId, onSubmit, submitting, submitLabel = "Salvar" }: { initial?: Pet | null; partnerId: string | null; onSubmit: (v: PetInput) => void; submitting?: boolean; submitLabel?: string }) {
@@ -117,7 +117,7 @@ export function PetForm({ initial, partnerId, onSubmit, submitting, submitLabel 
         {breedId === "__other" && <Input id="pet-breed-other" label="Qual raça?" {...register("breedOther")} />}
         <Input id="pet-color" label="Cor" {...register("color")} />
         <Select id="pet-sex" label="Sexo" {...register("sex")}>
-          <option value="">—</option>
+          <option value="">Não informado</option>
           {Object.entries(SEX_LABEL).map(([k, l]) => (
             <option key={k} value={k}>
               {l}

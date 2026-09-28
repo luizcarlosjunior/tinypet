@@ -1,5 +1,5 @@
 import React from "react";
-import { Linking, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { usePetHistory } from "@/hooks/use-pets";
@@ -7,6 +7,7 @@ import { fmtDate } from "@/lib/format";
 import { radius, spacing, useTheme } from "@/lib/theme";
 import type { HistoryEvent } from "@/lib/types";
 import { Empty, ErrorState, Loading, Text } from "@/components/ui";
+import { openExternal } from "@/lib/links";
 
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = { VISIT: "calendar", VACCINE: "medkit", DEWORMING: "bug", WEIGHT: "scale", ACHIEVEMENT: "trophy", MILESTONE: "flag", SKILL: "school", NOTE: "document-text", ATTACHMENT: "attach", BADGE: "ribbon" };
 const LABEL: Record<string, string> = { VISIT: "Atendimento", VACCINE: "Vacina", DEWORMING: "Vermífugo", WEIGHT: "Pesagem", ACHIEVEMENT: "Conquista", MILESTONE: "Marco", SKILL: "Comando", NOTE: "Anotação", ATTACHMENT: "Anexo", BADGE: "Conquista" };
@@ -57,7 +58,7 @@ function TimelineItem({ ev, last, color }: { ev: HistoryEvent; last: boolean; co
           </View>
         ) : null}
         {ev.attachments?.map((a) => (
-          <Pressable key={a.url} onPress={() => Linking.openURL(a.url)} accessibilityRole="link" accessibilityLabel={`Abrir anexo ${a.name}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+          <Pressable key={a.url} onPress={() => openExternal(a.url)} accessibilityRole="link" accessibilityLabel={`Abrir anexo ${a.name}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
             <Ionicons name="document-attach-outline" size={16} color={t.primary} />
             <Text variant="small" tone="primary">
               {a.name}

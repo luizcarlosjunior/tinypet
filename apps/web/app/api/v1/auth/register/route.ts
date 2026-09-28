@@ -5,7 +5,7 @@ import { handler, ok, parseBody, rateLimit, clientIp, issueMobileToken, ensureDe
 import { sendVerificationCode } from "@/server/verification";
 
 export const POST = handler(async (req) => {
-  rateLimit(`register:${clientIp(req)}`, 10, 60 * 60 * 1000);
+  await rateLimit(`register:ip:${clientIp(req)}`, 10, 60 * 60 * 1000);
   const body = await parseBody(req, registerSchema);
   const exists = await prisma.user.findUnique({ where: { email: body.email } });
   if (exists) throw Errors.conflict("Já existe uma conta com este e-mail");

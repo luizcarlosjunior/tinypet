@@ -1,8 +1,7 @@
-import { handler, ok } from "@/server";
-import { requireCron } from "@/server/jobs";
+import { cronRoute } from "@/server/jobs";
 import { recomputeSkillStats } from "@/server/skills";
 
-export const POST = handler(async (req) => {
-  requireCron(req);
-  return ok(await recomputeSkillStats());
-});
+export const { GET, POST } = cronRoute(() => recomputeSkillStats());
+
+/** Never statically cached: must run on every cron hit. */
+export const dynamic = "force-dynamic";

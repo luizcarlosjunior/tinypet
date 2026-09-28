@@ -4,7 +4,7 @@ import { taskSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, parseQuery, notify } from "@/server";
 import { petActor, jsonInput, tasksForDate, todaySP } from "@/server/pets";
 
-const query = z.object({ status: z.enum(["PROPOSED", "ACTIVE", "PAUSED", "DONE"]).optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
+const query = z.object({ status: z.enum(["PROPOSED", "ACTIVE", "PAUSED", "DONE"]).optional(), date: z.string().max(10).regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
 
 /** All tasks of the pet (optionally by status) plus `today`: the ones due on `date` (default today) with completion state. */
 export const GET = handler<{ id: string }>(async (req, { params }) => {

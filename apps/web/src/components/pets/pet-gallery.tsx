@@ -8,7 +8,7 @@ import { fmtDate, fmtDateTime, toDateKey } from "@/lib/format";
 import { Button, Empty, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { PlanLimitNotice } from "./plan-limit-notice";
-import { MEDIA_MAX_BYTES } from "@tinypet/shared";
+import { MEDIA_MAX_BYTES, safeHref } from "@tinypet/shared";
 import type { PlanLimitError } from "@tinypet/shared";
 import { cn } from "@/lib/utils";
 
@@ -90,8 +90,8 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
           <ul className="flex gap-3 overflow-x-auto pb-2">
             {activeStories.map((s) => (
               <li key={s.id} className="shrink-0">
-                <a href={s.url} target="_blank" rel="noopener noreferrer" className="block h-20 w-20 overflow-hidden rounded-full border-2 border-brand-500 p-0.5">
-                  {s.kind === "VIDEO" ? <video src={s.url} muted className="h-full w-full rounded-full object-cover" /> : /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.thumbUrl ?? s.url} alt={s.title ?? "Story"} className="h-full w-full rounded-full object-cover" />}
+                <a href={safeHref(s.url)} target="_blank" rel="noopener noreferrer" className="block h-20 w-20 overflow-hidden rounded-full border-2 border-brand-500 p-0.5">
+                  {s.kind === "VIDEO" ? <video src={safeHref(s.url)} muted className="h-full w-full rounded-full object-cover" /> : /* eslint-disable-next-line @next/next/no-img-element */ <img src={safeHref(s.thumbUrl ?? s.url)} alt={s.title ?? "Story"} className="h-full w-full rounded-full object-cover" />}
                 </a>
               </li>
             ))}
@@ -108,8 +108,8 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {items.map((m) => (
               <li key={m.id} className="card overflow-hidden p-0">
-                <a href={m.url} target="_blank" rel="noopener noreferrer" className="relative block aspect-square bg-ink-100 dark:bg-ink-800">
-                  {m.kind === "VIDEO" ? <video src={m.url} muted className="h-full w-full object-cover" /> : /* eslint-disable-next-line @next/next/no-img-element */ <img src={m.thumbUrl ?? m.url} alt={m.title ?? ""} loading="lazy" className="h-full w-full object-cover" />}
+                <a href={safeHref(m.url)} target="_blank" rel="noopener noreferrer" className="relative block aspect-square bg-ink-100 dark:bg-ink-800">
+                  {m.kind === "VIDEO" ? <video src={safeHref(m.url)} muted className="h-full w-full object-cover" /> : /* eslint-disable-next-line @next/next/no-img-element */ <img src={safeHref(m.thumbUrl ?? m.url)} alt={m.title ?? ""} loading="lazy" className="h-full w-full object-cover" />}
                   <span className="absolute left-2 top-2 rounded-full bg-black/50 p-1 text-white">{m.kind === "VIDEO" ? <Video className="h-3.5 w-3.5" aria-label="Vídeo" /> : <ImageIcon className="h-3.5 w-3.5" aria-label="Foto" />}</span>
                 </a>
                 <div className="p-3">

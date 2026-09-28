@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type ZodType } from "zod";
-import { Prisma } from "@tinypet/db";
+import { Prisma, prisma } from "@tinypet/db";
 import { ApiError } from "./errors";
 
 export type Ctx<P = Record<string, string>> = { params: P };
@@ -56,21 +56,59 @@ export function paginate(page: number, pageSize: number) {
   return { skip: (page - 1) * pageSize, take: pageSize };
 }
 
+/**
+ * Client IP for rate limiting / audit.
+ * - `TRUST_PROXY=1`: trust the first hop of `x-forwarded-for` (only behind a proxy you control that overwrites it).
+ * - On Vercel, `x-vercel-forwarded-for` / `x-real-ip` are set by the platform and cannot be spoofed by clients.
+ * - Otherwise returns a constant, so IP-keyed limits degrade to a global per-key limit instead of being bypassable
+ *   by sending a fake `X-Forwarded-For`.
+ */
 export function clientIp(req: NextRequest) {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "0.0.0.0";
+  return clientIpFromHeaders(req.headers);
 }
 
-/** Tiny in-memory rate limiter (per process). Good enough for MVP; swap for Redis later. */
-const buckets = new Map<string, { count: number; resetAt: number }>();
-export function rateLimit(key: string, limit: number, windowMs: number) {
-  const now = Date.now();
-  const b = buckets.get(key);
-  if (!b || b.resetAt < now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return;
+/** Same as clientIp() for a `Headers` or a plain header object (NextAuth `authorize(creds, req)`). */
+export function clientIpFromHeaders(headers: Headers | Record<string, string | string[] | undefined>) {
+  const get = (name: string): string | undefined => {
+    if (typeof (headers as Headers).get === "function") return (headers as Headers).get(name) ?? undefined;
+    const v = (headers as Record<string, string | string[] | undefined>)[name];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const first = (v?: string) => v?.split(",")[0]?.trim() || undefined;
+  if (process.env.VERCEL) {
+    const v = first(get("x-vercel-forwarded-for")) ?? first(get("x-real-ip"));
+    if (v) return v;
   }
-  b.count += 1;
-  if (b.count > limit) throw new ApiError(429, "RATE_LIMITED", "Muitas tentativas. Tente novamente em instantes.");
+  if (process.env.TRUST_PROXY === "1") {
+    const v = first(get("x-forwarded-for")) ?? first(get("x-real-ip"));
+    if (v) return v;
+  }
+  return "0.0.0.0";
+}
+
+let lastCleanup = 0;
+
+/**
+ * DB-backed fixed-window rate limiter (table `rate_limits`), shared across instances/serverless invocations.
+ * Atomic via `INSERT ... ON DUPLICATE KEY UPDATE`; the window restarts once `reset_at` has passed.
+ * Throws 429 RATE_LIMITED when the count in the current window exceeds `limit`.
+ */
+export async function rateLimit(key: string, limit: number, windowMs: number): Promise<void> {
+  const now = new Date();
+  const resetAt = new Date(now.getTime() + windowMs);
+  const k = key.slice(0, 191);
+  await prisma.$executeRaw`INSERT INTO rate_limits (\`key\`, \`count\`, reset_at) VALUES (${k}, 1, ${resetAt})
+    ON DUPLICATE KEY UPDATE \`count\` = IF(reset_at <= ${now}, 1, \`count\` + 1), reset_at = IF(reset_at <= ${now}, ${resetAt}, reset_at)`;
+  const row = await prisma.rateLimit.findUnique({ where: { key: k }, select: { count: true, resetAt: true } });
+  // Opportunistic cleanup of expired windows (at most once a minute per process, ~2% of calls).
+  if (now.getTime() - lastCleanup > 60_000 && Math.random() < 0.02) {
+    lastCleanup = now.getTime();
+    prisma.rateLimit.deleteMany({ where: { resetAt: { lt: now } } }).catch(() => undefined);
+  }
+  if (row && row.count > limit) {
+    const retryAfter = Math.max(1, Math.ceil((row.resetAt.getTime() - now.getTime()) / 1000));
+    throw new ApiError(429, "RATE_LIMITED", "Muitas tentativas. Tente novamente em instantes.", { retryAfter });
+  }
 }
 
 /** Converts Prisma Decimal/Date values to JSON-friendly primitives. */

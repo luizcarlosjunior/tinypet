@@ -3,7 +3,7 @@ import { Award, Lock } from "lucide-react";
 import { usePetResource } from "@/hooks/use-pets";
 import { Spinner } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { SYSTEM_BADGES } from "@tinypet/shared";
+import { SYSTEM_BADGES, safeHref } from "@tinypet/shared";
 import { cn } from "@/lib/utils";
 
 type Earned = { id?: string; badgeId?: string; earnedAt?: string | null; badge?: { key: string; name: string; description: string | null; iconUrl: string | null; partner?: { tradeName: string } | null } | null; key?: string; name?: string; description?: string | null; iconUrl?: string | null; earned?: boolean };
@@ -22,7 +22,7 @@ export function PetBadges({ petId }: { petId: string }) {
           <span className={cn("inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full", b.earned ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200" : "bg-ink-100 text-ink-500 dark:bg-ink-800")}>
             {b.iconUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={b.iconUrl} alt="" className="h-8 w-8" />
+              <img src={safeHref(b.iconUrl)} alt="" className="h-8 w-8" />
             ) : b.earned ? (
               <Award className="h-6 w-6" aria-hidden />
             ) : (

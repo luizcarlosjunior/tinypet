@@ -56,7 +56,7 @@ function EntrarForm() {
       <SocialButtons callbackUrl={next} />
       <p className="mt-6 text-center text-sm text-[var(--muted)]">
         Ainda não tem conta?{" "}
-        <Link href={`/cadastro${sp.get("next") ? `?next=${encodeURIComponent(sp.get("next")!)}` : ""}`} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+        <Link href={`/cadastro${sp.get("next") ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
           Cadastre-se
         </Link>
       </p>

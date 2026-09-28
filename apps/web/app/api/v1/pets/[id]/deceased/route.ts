@@ -2,10 +2,14 @@ import { markDeceasedSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, Errors } from "@/server";
 import { petActor, markDeceased, undoDeceased, petWithAge } from "@/server/pets";
 
-/** Owner or linked partner: cancels future appointments (notifies partners), pauses tasks, status DECEASED. */
+/**
+ * Owner (or a linked partner, only when the pet has no owner yet — otherwise the tutor decides):
+ * cancels future appointments (notifies partners), pauses tasks, status DECEASED.
+ */
 export const POST = handler<{ id: string }>(async (req, { params }) => {
   const actor = await petActor(req, params.id, "EDIT");
   if (actor.via === "family") throw Errors.forbidden("Apenas o tutor principal ou o parceiro podem marcar o falecimento");
+  if (actor.via === "partner" && actor.pet.ownerId !== null) throw Errors.forbidden("Este pet tem tutor: apenas o tutor pode marcar o falecimento");
   if (actor.pet.status === "DECEASED") throw Errors.conflict("Pet já marcado como falecido");
   const body = await parseBody(req, markDeceasedSchema);
   const result = await markDeceased(params.id, body, actor.via === "partner" ? "PARTNER" : "OWNER");

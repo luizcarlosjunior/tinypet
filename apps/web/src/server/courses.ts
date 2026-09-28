@@ -173,7 +173,8 @@ export async function deleteLesson(partnerId: string, courseId: string, lid: str
   for (const e of enrollments) await refreshProgress(e.id);
 }
 
-export async function listStudents(partnerId: string, courseId: string) {
+/** Contract status is finance data: only returned to members with `canSeeFinance`. */
+export async function listStudents(partnerId: string, courseId: string, canSeeFinance = false) {
   await getCourse(partnerId, courseId);
   const enrollments = await prisma.enrollment.findMany({
     where: { courseId },
@@ -185,8 +186,9 @@ export async function listStudents(partnerId: string, courseId: string) {
       certificate: true,
     },
   });
+  if (!canSeeFinance) return enrollments.map(({ contractId: _c, ...e }) => e);
   const contractIds = enrollments.map((e) => e.contractId).filter((id): id is string => !!id);
-  const contracts = contractIds.length ? await prisma.contract.findMany({ where: { id: { in: contractIds } }, select: { id: true, status: true } }) : [];
+  const contracts = contractIds.length ? await prisma.contract.findMany({ where: { id: { in: contractIds }, partnerId }, select: { id: true, status: true } }) : [];
   const byId = new Map(contracts.map((c) => [c.id, c]));
   return enrollments.map((e) => ({ ...e, contract: e.contractId ? byId.get(e.contractId) ?? null : null }));
 }
@@ -206,14 +208,35 @@ const enrollmentInclude = {
   certificate: true,
 } satisfies Prisma.EnrollmentInclude;
 
-/** Enrollment + the COURSE contract (with installments) when the course was paid. */
-async function withContract<T extends { contractId: string | null }>(e: T) {
-  const contract = e.contractId ? await prisma.contract.findUnique({ where: { id: e.contractId }, include: { installments: { orderBy: { number: "asc" } } } }) : null;
-  return { ...e, contract };
+/**
+ * Paid courses stay locked until the enrollment's contract installments are PAID. Free courses (and enrollments made
+ * while the course was free, without contract) are unlocked.
+ */
+async function enrollmentLocked(e: { contractId: string | null }): Promise<boolean> {
+  if (!e.contractId) return false;
+  const installments = await prisma.installment.findMany({ where: { contractId: e.contractId }, select: { status: true } });
+  return !installments.length || installments.some((i) => i.status !== "PAID");
 }
 
+type LessonLike = { videoUrl: string | null; body: string | null; attachments: unknown[] };
+function lockLesson<L extends LessonLike>(l: L) {
+  return { ...l, videoUrl: null, body: null, attachments: [], locked: true as const };
+}
+
+type EnrollmentWithCourse = Prisma.EnrollmentGetPayload<{ include: typeof enrollmentInclude }>;
+
+/** Enrollment + the COURSE contract (with installments) when the course was paid; lesson content hidden while locked. */
+async function withContract(e: EnrollmentWithCourse) {
+  const contract = e.contractId ? await prisma.contract.findUnique({ where: { id: e.contractId }, include: { installments: { orderBy: { number: "asc" } } } }) : null;
+  const locked = await enrollmentLocked(e);
+  if (!locked) return { ...e, contract, locked: false };
+  const course = { ...e.course, lessons: e.course.lessons.map(lockLesson), modules: e.course.modules.map((m) => ({ ...m, lessons: m.lessons.map(lockLesson) })) };
+  return { ...e, course, contract, locked: true };
+}
+
+/** Pets the user may enroll: owned, or shared with EDIT. */
 async function assertOwnedPets(userId: string, petIds: string[]) {
-  const pets = await prisma.pet.findMany({ where: { id: { in: petIds }, deletedAt: null, status: "ACTIVE", OR: [{ ownerId: userId }, { accesses: { some: { userId } } }] }, select: { id: true } });
+  const pets = await prisma.pet.findMany({ where: { id: { in: petIds }, deletedAt: null, status: "ACTIVE", OR: [{ ownerId: userId }, { accesses: { some: { userId, level: "EDIT" } } }] }, select: { id: true } });
   if (pets.length !== new Set(petIds).size) throw Errors.forbidden("Um dos pets não está na sua conta");
 }
 
@@ -318,6 +341,7 @@ export async function updateLessonProgress(user: { id: string; name: string }, e
   if (!e) throw Errors.notFound("Matrícula não encontrada");
   const lesson = await prisma.lesson.findFirst({ where: { id: lessonId, courseId: e.courseId } });
   if (!lesson) throw Errors.notFound("Aula não encontrada");
+  if (await enrollmentLocked(e)) throw Errors.forbidden("Conclua o pagamento do curso para acessar as aulas");
 
   const existing = await prisma.lessonProgress.findUnique({ where: { enrollmentId_lessonId: { enrollmentId, lessonId } } });
   const data: Prisma.LessonProgressUncheckedUpdateInput = {};

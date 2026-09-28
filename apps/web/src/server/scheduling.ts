@@ -15,7 +15,7 @@ import { notify, notifyPartner } from "./notify";
  * ensureTravelLeg / recomputeDayLegs, dayRoute, transitionAppointment and owner-side helpers.
  *
  * Reschedule flow: the owner calls POST /me/appointments/:id/reschedule → a NEW appointment is created with
- * status REQUESTED and `notes = "reschedule:<oldId>"`. When the partner confirms that new appointment
+ * status REQUESTED and `rescheduleOfId = <oldId>` (server-side only). When the partner confirms that new appointment
  * (POST /schedule/appointments/:id/status {status:"CONFIRMED"}), the old one is canceled with reason
  * "Remarcação solicitada" (canceledBy OWNER). Until then the old appointment stays as it was.
  */
@@ -268,7 +268,7 @@ export async function checkConflicts(input: ConflictCheck) {
 
 // ───────── validation of references ─────────
 
-type Refs = { clientId?: string | null; petIds?: string[]; membershipId?: string | null; itemId?: string | null; locationType?: LocationType; addressId?: string | null };
+type Refs = { clientId?: string | null; petIds?: string[]; membershipId?: string | null; itemId?: string | null; locationType?: LocationType; addressId?: string | null; contractId?: string | null };
 
 async function resolveRefs(partnerId: string, refs: Refs, ownerUserId?: string | null) {
   const client = refs.clientId ? await prisma.client.findFirst({ where: { id: refs.clientId, partnerId, deletedAt: null }, select: { id: true, userId: true } }) : null;
@@ -279,11 +279,10 @@ async function resolveRefs(partnerId: string, refs: Refs, ownerUserId?: string |
       where: {
         id: { in: refs.petIds },
         deletedAt: null,
-        OR: [
-          client ? { clients: { some: { clientId: client.id } } } : { clients: { some: { client: { partnerId, deletedAt: null } } } },
-          ...(ownerUserId ? [{ ownerId: ownerUserId }, { accesses: { some: { userId: ownerUserId } } }] : []),
-          { createdByPartnerId: partnerId },
-        ],
+        // owner-side requests: only pets the user owns or has EDIT on
+        OR: ownerUserId
+          ? editablePetOr(ownerUserId)
+          : [client ? { clients: { some: { clientId: client.id } } } : { clients: { some: { client: { partnerId, deletedAt: null } } } }, { createdByPartnerId: partnerId }],
       },
       select: { id: true },
     });
@@ -318,7 +317,16 @@ async function resolveRefs(partnerId: string, refs: Refs, ownerUserId?: string |
     const addr = await prisma.address.findFirst({ where: { id: addressId, OR: [{ partnerId }, ...(client ? [{ clientId: client.id }] : []), ...(client?.userId ? [{ userId: client.userId }] : []), ...(ownerUserId ? [{ userId: ownerUserId }] : [])] }, select: { id: true } });
     if (!addr) throw Errors.badRequest("Endereço inválido");
   }
+  if (refs.contractId) {
+    const contract = await prisma.contract.findFirst({ where: { id: refs.contractId, partnerId, ...(client ? { clientId: client.id } : {}) }, select: { id: true } });
+    if (!contract) throw Errors.badRequest("Contrato não pertence a este parceiro/cliente");
+  }
   return { client, addressId };
+}
+
+/** Pets a user may act on (book, cancel, reschedule): owned, or shared with EDIT. */
+export function editablePetOr(userId: string): Prisma.PetWhereInput[] {
+  return [{ ownerId: userId }, { accesses: { some: { userId, level: "EDIT" } } }];
 }
 
 // ───────── create / update ─────────
@@ -337,6 +345,8 @@ export type CreateInput = AppointmentInput & {
   status?: AppointmentStatus;
   requestedByUserId?: string | null;
   packageCadence?: Cadence;
+  /** server-side only (owner reschedule); never taken from request bodies */
+  rescheduleOfId?: string | null;
 };
 
 /** Creates one appointment or a recurring series (WEEKLY/BIWEEKLY/MONTHLY/PACKAGE × occurrences). */
@@ -399,6 +409,7 @@ export async function createAppointments(ctx: CreateCtx, input: CreateInput) {
           seriesId,
           sessionNumber: seriesId ? i + 1 : null,
           notes: input.notes ?? null,
+          rescheduleOfId: input.rescheduleOfId ?? null,
           pets: { create: input.petIds.map((petId) => ({ petId })) },
         },
         select: { id: true, startsAt: true },
@@ -430,6 +441,7 @@ export async function updateAppointment(ctx: CreateCtx, id: string, patch: Updat
     itemId: patch.itemId ?? undefined,
     locationType,
     addressId: patch.addressId === undefined ? current.addressId : patch.addressId,
+    contractId: patch.contractId !== undefined || patch.clientId !== undefined ? (patch.contractId === undefined ? current.contractId : patch.contractId) : undefined,
   });
 
   const membershipId = patch.membershipId === undefined ? current.membershipId : patch.membershipId;
@@ -707,8 +719,6 @@ export function canTransition(from: AppointmentStatus, to: AppointmentStatus) {
   return TRANSITIONS[from].includes(to);
 }
 
-export const RESCHEDULE_PREFIX = "reschedule:";
-
 function ownerUserIdOf(a: { client: { userId: string | null } | null; requestedByUserId: string | null }) {
   return a.client?.userId ?? a.requestedByUserId ?? null;
 }
@@ -742,11 +752,14 @@ export async function transitionAppointment(ctx: { partnerId: string; userId: st
   } else {
     await prisma.appointment.update({ where: { id }, data: { status: body.status } });
     if (body.status === "CONFIRMED") {
-      // reschedule proposal accepted → cancel the original appointment
-      if (a.notes?.startsWith(RESCHEDULE_PREFIX)) {
-        const oldId = a.notes.slice(RESCHEDULE_PREFIX.length).split(/\s/)[0];
-        const old = oldId ? await prisma.appointment.findFirst({ where: { id: oldId, partnerId: ctx.partnerId, status: { in: ["REQUESTED", "CONFIRMED"] } } }) : null;
-        if (old) {
+      // reschedule proposal accepted → cancel the original appointment (same partner AND same client/owner only)
+      if (a.rescheduleOfId) {
+        const old = await prisma.appointment.findFirst({
+          where: { id: a.rescheduleOfId, partnerId: ctx.partnerId, status: { in: ["REQUESTED", "CONFIRMED"] } },
+          include: { client: { select: { userId: true } } },
+        });
+        const sameClient = !!old && (a.clientId ? old.clientId === a.clientId : !!ownerId && ownerUserIdOf(old) === ownerId);
+        if (old && sameClient) {
           await prisma.appointment.update({ where: { id: old.id }, data: { status: "CANCELED", cancelReason: "Remarcação solicitada", canceledBy: "OWNER" } });
           await recomputeDayLegs(ctx.partnerId, old.membershipId, localDateStr(old.startsAt));
         }
@@ -775,7 +788,7 @@ export async function deleteAppointment(ctx: { partnerId: string }, id: string) 
 
 // ───────── owner side ─────────
 
-/** Appointments visible to an owner: their pets (own or shared), their linked clients, or requested by them. */
+/** Appointments visible to an owner (read-only listing): their pets (own or shared, any level), their linked clients, or requested by them. */
 export function ownerAppointmentWhere(userId: string): Prisma.AppointmentWhereInput {
   return {
     OR: [
@@ -784,6 +797,14 @@ export function ownerAppointmentWhere(userId: string): Prisma.AppointmentWhereIn
       { pets: { some: { pet: { OR: [{ ownerId: userId }, { accesses: { some: { userId } } }] } } } },
     ],
   };
+}
+
+/**
+ * Appointments an owner may ACT on (cancel / reschedule): visible to them AND every pet on it is owned by the user
+ * or shared with EDIT (VIEW-shared pets are read-only).
+ */
+export function ownerActionAppointmentWhere(userId: string): Prisma.AppointmentWhereInput {
+  return { AND: [ownerAppointmentWhere(userId), { pets: { every: { pet: { OR: editablePetOr(userId) } } } }] };
 }
 
 export const ownerAppointmentInclude = {
@@ -811,8 +832,12 @@ export async function listOwnerAppointments(userId: string, from: Date, to: Date
 }
 
 async function ownerAppointmentOrThrow(userId: string, id: string) {
-  const a = await prisma.appointment.findFirst({ where: { id, ...ownerAppointmentWhere(userId) }, include: ownerAppointmentInclude });
-  if (!a) throw Errors.notFound("Agendamento não encontrado");
+  const a = await prisma.appointment.findFirst({ where: { id, ...ownerActionAppointmentWhere(userId) }, include: ownerAppointmentInclude });
+  if (!a) {
+    const visible = await prisma.appointment.findFirst({ where: { id, ...ownerAppointmentWhere(userId) }, select: { id: true } });
+    if (visible) throw Errors.forbidden("Você só pode visualizar este agendamento");
+    throw Errors.notFound("Agendamento não encontrado");
+  }
   return a;
 }
 
@@ -834,7 +859,7 @@ export async function ownerCancelAppointment(user: { id: string; name: string },
   return decorateOwnerAppointment(row);
 }
 
-/** Creates a REQUESTED proposal linked to the original via `notes = "reschedule:<id>"`. */
+/** Creates a REQUESTED proposal linked to the original via `rescheduleOfId` (server-side). */
 export async function ownerRescheduleAppointment(user: { id: string; name: string }, id: string, startsAt: string) {
   const a = await ownerAppointmentOrThrow(user.id, id);
   assertCancellationWindow(a);
@@ -851,7 +876,8 @@ export async function ownerRescheduleAppointment(user: { id: string; name: strin
       locationType: a.locationType,
       addressId: a.addressId,
       locationNotes: a.locationNotes,
-      notes: `${RESCHEDULE_PREFIX}${a.id}`,
+      notes: a.notes,
+      rescheduleOfId: a.id,
       recurrence: "NONE",
       contractId: a.contractId,
       status: "REQUESTED",
@@ -871,6 +897,8 @@ export async function ownerRescheduleAppointment(user: { id: string; name: strin
 
 /** Resolves (or creates) the partner's Client record for an owner making a booking and links the pets. */
 export async function resolveOwnerClient(partnerId: string, user: { id: string; name: string }, petIds: string[]) {
+  const editable = await prisma.pet.count({ where: { id: { in: petIds }, deletedAt: null, OR: editablePetOr(user.id) } });
+  if (editable !== new Set(petIds).size) throw Errors.forbidden("Escolha apenas pets seus");
   let client = await prisma.client.findFirst({ where: { partnerId, userId: user.id, deletedAt: null } });
   if (!client) client = await prisma.client.create({ data: { partnerId, userId: user.id, name: user.name, source: "booking" } });
   const existing = await prisma.clientPet.findMany({ where: { clientId: client.id, petId: { in: petIds } }, select: { petId: true } });

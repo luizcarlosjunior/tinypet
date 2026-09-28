@@ -81,7 +81,9 @@ export function toCsv(headers: string[], rows: (string | number | Date | null | 
     if (v == null) return "";
     if (typeof v === "number") return formatNumberBR(v);
     if (v instanceof Date) return formatDateBR(v);
-    const s = String(v);
+    const raw = String(v);
+    // formula injection: text starting with = + - @ TAB CR is prefixed with ' (numbers are formatted above, untouched)
+    const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
     return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return "﻿" + [headers, ...rows].map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";
@@ -194,11 +196,14 @@ export async function createContract(ctx: FinanceCtx, input: ContractInput) {
 const updatableContractFields = ["title", "description", "terms", "sessionsCount"] as const;
 
 export async function updateContract(ctx: FinanceCtx, id: string, patch: Partial<Pick<ContractInput, "title" | "description" | "terms" | "sessionsCount" | "petIds">>) {
-  const c = await prisma.contract.findFirst({ where: { id, partnerId: ctx.partnerId }, select: { id: true, status: true, clientId: true } });
+  const c = await prisma.contract.findFirst({ where: { id, partnerId: ctx.partnerId }, select: { id: true, status: true, clientId: true, acceptedAt: true } });
   if (!c) throw Errors.notFound("Contrato não encontrado");
   if (c.status === "CANCELED") throw Errors.badRequest("Contrato cancelado não pode ser alterado");
   const data: Prisma.ContractUpdateInput = {};
   for (const k of updatableContractFields) if (patch[k] !== undefined) (data as Record<string, unknown>)[k] = patch[k];
+  const changed = [...Object.keys(data), ...(patch.petIds !== undefined ? ["petIds"] : [])];
+  // after the tutor accepted, the content is frozen (status transitions go through setContractStatus)
+  if (c.acceptedAt && changed.length) throw Errors.conflict("Contrato já aceito: crie um aditivo ou novo contrato");
   await prisma.$transaction(async (tx) => {
     await tx.contract.update({ where: { id }, data });
     if (patch.petIds) {
@@ -209,6 +214,7 @@ export async function updateContract(ctx: FinanceCtx, id: string, patch: Partial
       await tx.contractPet.createMany({ data: petIds.map((petId) => ({ contractId: id, petId })) });
     }
   });
+  await audit({ userId: ctx.userId, partnerId: ctx.partnerId, action: "contract.update", entity: "Contract", entityId: id, data: { fields: changed, ...data, ...(patch.petIds ? { petIds: patch.petIds } : {}) }, ip: ctx.ip });
   return getContract(ctx.partnerId, id);
 }
 
@@ -439,7 +445,7 @@ function esc(s: string | null | undefined) {
 
 export async function contractHtml(contractId: string, scope: { partnerId?: string; userId?: string }) {
   const c = await prisma.contract.findFirst({
-    where: { id: contractId, ...(scope.partnerId ? { partnerId: scope.partnerId } : {}), ...(scope.userId ? { client: { userId: scope.userId } } : {}) },
+    where: { id: contractId, ...(scope.partnerId ? { partnerId: scope.partnerId } : {}), ...(scope.userId ? { client: { userId: scope.userId }, ...ownerVisibleContract } : {}) },
     include: { ...contractInclude, partner: { select: { tradeName: true, legalName: true, document: true, documentType: true, addresses: { orderBy: { isPrimary: "desc" }, take: 1 } } } },
   });
   if (!c) throw Errors.notFound("Contrato não encontrado");
@@ -479,24 +485,60 @@ export const ownerContractInclude = {
   partner: { select: { id: true, tradeName: true, slug: true, logoUrl: true } },
 } satisfies Prisma.ContractInclude;
 
+/** Owners see non-draft contracts, and DRAFT ones only once the partner has written the terms (sent for acceptance). */
+export const ownerVisibleContract = { OR: [{ status: { not: "DRAFT" } }, { terms: { not: null } }] } satisfies Prisma.ContractWhereInput;
+
 export async function listOwnerContracts(userId: string) {
-  const rows = await prisma.contract.findMany({ where: { client: { userId }, status: { not: "DRAFT" } }, include: ownerContractInclude, orderBy: { createdAt: "desc" } });
+  const rows = await prisma.contract.findMany({ where: { client: { userId }, ...ownerVisibleContract }, include: ownerContractInclude, orderBy: { createdAt: "desc" } });
   return rows.map((c) => ({ ...decorateContract(c), partner: c.partner }));
 }
 
 export async function getOwnerContract(userId: string, id: string) {
-  const c = await prisma.contract.findFirst({ where: { id, client: { userId } }, include: ownerContractInclude });
+  const c = await prisma.contract.findFirst({ where: { id, client: { userId }, ...ownerVisibleContract }, include: ownerContractInclude });
   if (!c) throw Errors.notFound("Contrato não encontrado");
   return { ...decorateContract(c), partner: c.partner };
 }
 
 export async function acceptContract(user: { id: string; name: string }, id: string, ip: string) {
-  const c = await prisma.contract.findFirst({ where: { id, client: { userId: user.id } }, select: { id: true, status: true, acceptedAt: true, partnerId: true, title: true } });
+  const c = await prisma.contract.findFirst({
+    where: { id, client: { userId: user.id }, ...ownerVisibleContract },
+    select: {
+      id: true,
+      status: true,
+      acceptedAt: true,
+      partnerId: true,
+      title: true,
+      description: true,
+      terms: true,
+      totalAmount: true,
+      discount: true,
+      sessionsCount: true,
+      installments: { select: { number: true, dueDate: true, amount: true }, orderBy: { number: "asc" } },
+    },
+  });
   if (!c) throw Errors.notFound("Contrato não encontrado");
   if (c.status === "CANCELED") throw Errors.badRequest("Contrato cancelado");
   if (c.acceptedAt) return getOwnerContract(user.id, id);
-  await prisma.contract.update({ where: { id }, data: { acceptedAt: new Date(), acceptedIp: ip } });
-  await audit({ userId: user.id, partnerId: c.partnerId, action: "contract.accept", entity: "Contract", entityId: id, ip });
+  const { count } = await prisma.contract.updateMany({ where: { id, acceptedAt: null }, data: { acceptedAt: new Date(), acceptedIp: ip } });
+  if (!count) return getOwnerContract(user.id, id);
+  // durable record of exactly what was accepted
+  await audit({
+    userId: user.id,
+    partnerId: c.partnerId,
+    action: "contract.accept",
+    entity: "Contract",
+    entityId: id,
+    ip,
+    data: {
+      title: c.title,
+      description: c.description,
+      terms: c.terms,
+      totalAmount: Number(c.totalAmount),
+      discount: Number(c.discount),
+      sessionsCount: c.sessionsCount,
+      installments: c.installments.map((i) => ({ number: i.number, dueDate: i.dueDate.toISOString().slice(0, 10), amount: Number(i.amount) })),
+    },
+  });
   await notifyPartner(c.partnerId, { type: "contract.accepted", title: "Contrato aceito", body: `${user.name} aceitou o contrato "${c.title}".`, data: { contractId: id } });
   return getOwnerContract(user.id, id);
 }

@@ -4,7 +4,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileText, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
-import { lessonSchema } from "@tinypet/shared";
+import { lessonSchema, safeHref } from "@tinypet/shared";
 import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { Checkbox } from "@/components/painel/ui";
@@ -117,7 +117,7 @@ export function LessonModal({ open, onClose, courseId, partnerId, modules, lesso
             {attachments.map((a, i) => (
               <li key={`${a.url}-${i}`} className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-[var(--muted)]" aria-hidden />
-                <a href={a.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">
+                <a href={safeHref(a.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate hover:underline">
                   {a.name}
                 </a>
                 <button type="button" className="btn-ghost h-7 w-7 p-0 text-red-600" aria-label={`Remover ${a.name}`} onClick={() => setValue("attachments", attachments.filter((_, j) => j !== i))}>

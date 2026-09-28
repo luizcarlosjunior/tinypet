@@ -51,7 +51,7 @@ export type PlanInfo = { planKey: string; planName?: string; limits: Record<stri
 export type Phone = { id: string; type: "MOBILE" | "LANDLINE" | "WHATSAPP"; number: string; isPrimary: boolean; verifiedAt: string | null };
 export type EmailRow = { id: string; address: string; isPrimary: boolean; verifiedAt: string | null };
 export type Address = { id: string; label: string | null; zipCode: string; street: string; number: string | null; complement: string | null; reference: string | null; accessNotes: string | null; district: string | null; city: string; state: string; latitude: string | number | null; longitude: string | number | null; isPrimary: boolean };
-export type FamilyMember = { id: string; name: string; relationship: string | null; phone: string | null; email: string | null; canAuthorize: boolean; canPickUp: boolean; linkedUserId?: string | null };
+export type FamilyMember = { id: string; name: string; relationship: string | null; phone: string | null; email: string | null; canAuthorize: boolean; canPickUp: boolean; hasAccount?: boolean };
 
 export const useHome = (enabled = true) => useQuery({ queryKey: ["me", "home"], queryFn: () => api<HomeData>("/me/home"), enabled });
 export const useMyPlan = (enabled = true) => useQuery({ queryKey: ["me", "plan"], queryFn: () => api<PlanInfo>("/me/plan"), enabled });

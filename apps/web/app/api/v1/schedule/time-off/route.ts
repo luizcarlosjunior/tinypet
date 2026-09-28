@@ -3,7 +3,7 @@ import { prisma } from "@tinypet/db";
 import { timeOffSchema, id } from "@tinypet/shared";
 import { handler, ok, parseBody, parseQuery, requirePartner, Errors } from "@/server";
 
-const query = z.object({ membershipId: id.optional(), from: z.string().optional(), to: z.string().optional() });
+const query = z.object({ membershipId: id.optional(), from: z.string().max(40).optional(), to: z.string().max(40).optional() });
 
 /** GET /schedule/time-off?membershipId&from&to */
 export const GET = handler(async (req) => {

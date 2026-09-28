@@ -32,7 +32,7 @@ export function Tabs<K extends string>({ items, value, onChange }: { items: TabI
 }
 
 /** Compact two-to-four-way segmented control. */
-export function Segmented<K extends string>({ items, value, onChange }: { items: TabItem<K>[]; value: K; onChange: (k: K) => void }) {
+export function Segmented<K extends string>({ items, value, onChange }: { items: TabItem<K>[]; value: K | null; onChange: (k: K) => void }) {
   const t = useTheme();
   return (
     <View style={[styles.seg, { backgroundColor: t.surfaceAlt }]} accessibilityRole="tablist">

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { GraduationCap, ImageOff, Plus } from "lucide-react";
-import { formatBRL } from "@tinypet/shared";
+import { formatBRL, safeHref } from "@tinypet/shared";
 import { Badge, Empty, PageHeader } from "@/components/ui";
 import { QueryState, UsageBar } from "@/components/painel/ui";
 import { useActivePartner, usePartnerPlan } from "@/hooks/use-partner";
@@ -44,7 +44,7 @@ export default function CursosPage() {
                 <div className="aspect-video w-full bg-ink-100 dark:bg-ink-900">
                   {c.coverUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.coverUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={safeHref(c.coverUrl)} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="flex h-full w-full items-center justify-center text-[var(--muted)]">
                       <ImageOff className="h-6 w-6" aria-hidden />

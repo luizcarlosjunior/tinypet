@@ -10,6 +10,7 @@ import { PetForm } from "@/components/pets/pet-form";
 import { PetCard } from "@/components/pets/pet-card";
 import { PlanLimitNotice } from "@/components/pets/plan-limit-notice";
 import { errorMessage, planLimitOf } from "@/lib/errors";
+import { safeNext } from "@/lib/safe-next";
 import type { PlanLimitError } from "@tinypet/shared";
 
 export default function PetsPage() {
@@ -76,8 +77,7 @@ function Pets() {
               const created = await create.mutateAsync(v);
               toast(`${v.name} cadastrado(a)!`, "success");
               setOpen(false);
-              const next = sp.get("next");
-              router.push(next && next.startsWith("/") ? next : `/pets/${created.id}`);
+              router.push(safeNext(sp.get("next"), `/pets/${created.id}`));
             } catch (e) {
               const pl = planLimitOf(e);
               if (pl) {

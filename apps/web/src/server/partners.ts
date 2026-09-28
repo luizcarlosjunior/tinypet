@@ -6,7 +6,7 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { Errors } from "./errors";
 import { ensureDefaultSubscription, partnerUsage, assertLimit } from "./plans";
 import { geocode, lookupCnpj } from "./geo";
-import { sendVerificationCode } from "./verification";
+import { sendVerificationCode, consumeVerificationCode } from "./verification";
 
 const TZ = "America/Sao_Paulo";
 
@@ -182,20 +182,16 @@ export async function confirmPartnerVerification(userId: string, partnerId: stri
     channel === "EMAIL"
       ? (await prisma.email.findMany({ where: { partnerId }, select: { address: true } })).map((e) => e.address)
       : (await prisma.phone.findMany({ where: { partnerId }, select: { number: true } })).map((p) => p.number);
-  const row = targets.length
-    ? await prisma.verificationCode.findFirst({ where: { userId, channel, code, target: { in: targets }, usedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" } })
-    : null;
-  if (!row) throw Errors.badRequest("Código inválido ou expirado");
+  const target = await consumeVerificationCode(userId, channel, code, targets);
   const now = new Date();
-  await prisma.verificationCode.update({ where: { id: row.id }, data: { usedAt: now } });
   if (channel === "EMAIL") {
     await prisma.partner.update({ where: { id: partnerId }, data: { emailVerifiedAt: now } });
-    await prisma.email.updateMany({ where: { partnerId, address: row.target }, data: { verifiedAt: now } });
+    await prisma.email.updateMany({ where: { partnerId, address: target }, data: { verifiedAt: now } });
   } else {
     await prisma.partner.update({ where: { id: partnerId }, data: { phoneVerifiedAt: now } });
-    await prisma.phone.updateMany({ where: { partnerId, number: row.target }, data: { verifiedAt: now } });
+    await prisma.phone.updateMany({ where: { partnerId, number: target }, data: { verifiedAt: now } });
   }
-  return { verified: true, channel, target: row.target };
+  return { verified: true, channel, target };
 }
 
 // ───────────────────────────── contacts (phones | emails | addresses) ─────────────────────────────

@@ -20,7 +20,7 @@ export type PetReportQuery = {
   state?: string;
   city?: string;
   district?: string;
-  sex?: "MALE" | "FEMALE" | "UNKNOWN";
+  sex?: "MALE" | "FEMALE";
   size?: "SMALL" | "MEDIUM" | "LARGE" | "GIANT";
   neutered?: boolean;
   status?: "ACTIVE" | "DECEASED";

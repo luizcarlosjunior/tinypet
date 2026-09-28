@@ -12,6 +12,7 @@ import { PartnerContext, usePartnerState } from "@/hooks/use-partner";
 import { useMarkAllRead, useNotifications } from "@/hooks/use-notifications";
 import { fmtRelativeDays } from "@/lib/format";
 import { Avatar } from "./ui";
+import { TermsGate } from "@/components/layout/terms-gate";
 
 const NAV = [
   { href: "/painel", label: "Painel", icon: LayoutDashboard, exact: true },
@@ -98,6 +99,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
 
   return (
     <PartnerContext.Provider value={state}>
+      <TermsGate />
       <div className="flex min-h-screen">
         <aside className="hidden w-64 shrink-0 flex-col border-r bg-[var(--card)] lg:flex" aria-label="Barra lateral">
           <div className="flex h-14 items-center gap-2 border-b px-4">

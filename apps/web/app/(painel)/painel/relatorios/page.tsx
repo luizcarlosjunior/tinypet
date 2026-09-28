@@ -22,7 +22,7 @@ const GROUP_BY = [
   { key: "birthMonth", label: "Mês de nascimento" },
   { key: "createdMonth", label: "Mês de cadastro" },
 ];
-const SEX_LABEL: Record<string, string> = { MALE: "Macho", FEMALE: "Fêmea", UNKNOWN: "Não informado" };
+const SEX_LABEL: Record<string, string> = { MALE: "Macho", FEMALE: "Fêmea" };
 const SIZE_LABEL: Record<string, string> = { SMALL: "Pequeno", MEDIUM: "Médio", LARGE: "Grande", GIANT: "Gigante" };
 
 type Filters = Record<string, string>;
@@ -119,7 +119,6 @@ export default function RelatoriosPage() {
             <option value="">Todos</option>
             <option value="MALE">Macho</option>
             <option value="FEMALE">Fêmea</option>
-            <option value="UNKNOWN">Não informado</option>
           </Select>
           <Select id="f-size" label="Porte" value={draft.size} onChange={set("size")}>
             <option value="">Todos</option>

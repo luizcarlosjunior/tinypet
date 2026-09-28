@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CalendarCheck, Clock, ImageOff, Plus, Trash2 } from "lucide-react";
-import { formatBRL } from "@tinypet/shared";
+import { formatBRL, safeHref } from "@tinypet/shared";
 import { Badge, Empty, PageHeader } from "@/components/ui";
 import { ConfirmDialog, QueryState, SearchInput, UsageBar } from "@/components/painel/ui";
 import { useActivePartner, usePartnerPlan } from "@/hooks/use-partner";
@@ -77,7 +77,7 @@ export default function CatalogoPage() {
                     <Link href={`/painel/catalogo/${item.id}`} className="block h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-ink-100 dark:bg-ink-900" aria-label={`Editar ${item.name}`}>
                       {coverOf(item) ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={coverOf(item)!} alt="" className="h-full w-full object-cover" />
+                        <img src={safeHref(coverOf(item))} alt="" className="h-full w-full object-cover" />
                       ) : (
                         <span className="flex h-full w-full items-center justify-center text-[var(--muted)]">
                           <ImageOff className="h-6 w-6" aria-hidden />

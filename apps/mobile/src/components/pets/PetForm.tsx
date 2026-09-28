@@ -11,7 +11,7 @@ import { spacing, useTheme } from "@/lib/theme";
 import type { Pet } from "@/lib/types";
 import { Avatar, Button, Input, Segmented, Select, Text } from "@/components/ui";
 
-const SEX = [{ key: "MALE", label: "Macho" }, { key: "FEMALE", label: "Fêmea" }, { key: "UNKNOWN", label: "Não sei" }] as const;
+const SEX = [{ key: "MALE", label: "Macho" }, { key: "FEMALE", label: "Fêmea" }] as const;
 const SIZE = [{ value: "SMALL", label: "Pequeno" }, { value: "MEDIUM", label: "Médio" }, { value: "LARGE", label: "Grande" }, { value: "GIANT", label: "Gigante" }] as const;
 
 type Props = { initial?: Partial<Pet>; onSubmit: (values: PetInput) => Promise<void>; submitLabel?: string };
@@ -109,7 +109,7 @@ export function PetForm({ initial, onSubmit, submitLabel = "Salvar" }: Props) {
       <Text variant="small" tone="muted" style={{ marginBottom: 6, fontWeight: "600" }}>
         Sexo
       </Text>
-      <Controller control={control} name="sex" render={({ field }) => <Segmented items={SEX.map((s) => ({ key: s.key, label: s.label }))} value={(field.value ?? "UNKNOWN") as (typeof SEX)[number]["key"]} onChange={field.onChange} />} />
+      <Controller control={control} name="sex" render={({ field }) => <Segmented items={SEX.map((s) => ({ key: s.key, label: s.label }))} value={(field.value ?? null) as (typeof SEX)[number]["key"] | null} onChange={(k) => field.onChange(field.value === k ? null : k)} />} />
       <View style={{ height: spacing.md }} />
       <Controller control={control} name="size" render={({ field }) => <Select label="Porte" value={field.value ?? null} onChange={field.onChange} options={SIZE.map((s) => ({ value: s.value, label: s.label }))} allowClear />} />
 

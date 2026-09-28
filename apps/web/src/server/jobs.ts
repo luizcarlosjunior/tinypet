@@ -1,14 +1,44 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { prisma } from "@tinypet/db";
 import { Errors } from "./errors";
+import { handler, ok } from "./api";
 import { notify, notifyPartner } from "./notify";
 import { awardBadge } from "./badges";
 import { allDueDone, dateOnly, shiftDays, todaySP, weightAlertSetting, weightAlerts, ymd } from "./pets";
 
-/** Jobs are protected by the `x-cron-secret` header (must equal CRON_SECRET). */
+const WEAK_CRON_SECRETS = new Set(["change-me-cron", "dev-cron-secret"]);
+
+function safeEqual(a: string, b: string) {
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ha, hb) && a.length === b.length;
+}
+
+/**
+ * Jobs are protected by CRON_SECRET, sent as `Authorization: Bearer <CRON_SECRET>` (Vercel Cron does this automatically)
+ * or `x-cron-secret: <CRON_SECRET>`. Rejects when the secret is unset and, in production, when it is shorter than
+ * 16 chars or a placeholder (`change-me-cron`, `dev-cron-secret`).
+ */
 export function requireCron(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("x-cron-secret") !== secret) throw Errors.unauthorized("Cron secret inválido");
+  const secret = process.env.CRON_SECRET ?? "";
+  const weak = process.env.NODE_ENV === "production" && (secret.length < 16 || WEAK_CRON_SECRETS.has(secret));
+  if (!secret || weak) {
+    if (secret && weak) console.warn("[cron] CRON_SECRET is too weak; refusing job requests");
+    throw Errors.unauthorized("Cron secret inválido");
+  }
+  const auth = req.headers.get("authorization");
+  const provided = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : (req.headers.get("x-cron-secret") ?? "");
+  if (!provided || !safeEqual(provided, secret)) throw Errors.unauthorized("Cron secret inválido");
+}
+
+/** Builds `{ GET, POST }` route exports for a cron job (Vercel Cron issues GET requests). */
+export function cronRoute(job: () => Promise<unknown>) {
+  const h = handler(async (req) => {
+    requireCron(req);
+    return ok(await job());
+  });
+  return { GET: h, POST: h };
 }
 
 /** PENDING installments past due → OVERDUE. */

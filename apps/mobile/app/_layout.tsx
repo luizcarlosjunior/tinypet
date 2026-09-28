@@ -11,7 +11,7 @@ import * as Notifications from "expo-notifications";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth-store";
 import { queryClient } from "@/lib/query";
-import { registerPushToken, routeFromNotification } from "@/lib/push";
+import { registerPushToken, routeFromNotification, safePushRoute } from "@/lib/push";
 import { brand, useTheme } from "@/lib/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -48,7 +48,9 @@ function usePushNavigation() {
   useEffect(() => {
     if (Platform.OS === "web") return;
     const navigate = (route: string | null) => {
-      if (!route || handled.current === route) return;
+      const safe = safePushRoute(route);
+      if (!safe || handled.current === safe) return;
+      route = safe;
       handled.current = route;
       router.push(route as never);
     };

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Alert, View } from "react-native";
-import * as WebBrowser from "expo-web-browser";
+import * as FileSystem from "expo-file-system";
 import { useMeasurementMutations, useMeasurements, useVaccinationMutations, useVaccinations } from "@/hooks/use-pets";
-import { API_BASE, errorMessage } from "@/lib/api";
+import { API_BASE, errorMessage, getApiContext } from "@/lib/api";
 import { fmtDate, fmtWeight, todayISO } from "@/lib/format";
 import { spacing, useTheme } from "@/lib/theme";
 import type { Measurement, MeasurementsResponse } from "@/lib/types";
@@ -23,6 +23,31 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
   const [measOpen, setMeasOpen] = useState(false);
   const [vf, setVf] = useState({ kind: "VACCINE" as "VACCINE" | "DEWORMING", name: "", appliedAt: todayISO(), nextDueAt: "", notes: "" });
   const [mf, setMf] = useState({ measuredAt: todayISO(), weightG: "", heightCm: "", neckCm: "", chestCm: "", abdomenCm: "", bodyScore: "", notes: "" });
+
+  const [exporting, setExporting] = useState(false);
+  /** Downloads the export with the Bearer header (never put the token in a URL) and saves it to the app's documents. */
+  const exportMeasurements = async () => {
+    const dir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
+    if (!dir) return Alert.alert("Exportação indisponível neste dispositivo");
+    setExporting(true);
+    try {
+      const { token, partnerId } = getApiContext();
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (partnerId) headers["X-Partner-Id"] = partnerId;
+      const dest = `${dir}medidas-${petId.replace(/[^\w-]/g, "")}-${todayISO()}.html`;
+      const res = await FileSystem.downloadAsync(`${API_BASE}/pets/${encodeURIComponent(petId)}/measurements/export`, dest, { headers });
+      if (res.status < 200 || res.status >= 300) {
+        await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => {});
+        throw new Error("Não foi possível exportar o histórico.");
+      }
+      Alert.alert("Histórico exportado", `Arquivo salvo em:\n${res.uri}`);
+    } catch (e) {
+      Alert.alert("Erro ao exportar", errorMessage(e));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const data: MeasurementsResponse = Array.isArray(meas.data) ? { items: meas.data } : (meas.data ?? { items: [] });
   const items = data.items ?? [];
@@ -88,7 +113,7 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
             chevron={false}
           />
         ))}
-        {items.length ? <Button title="Exportar histórico (PDF)" variant="ghost" size="sm" icon="download-outline" style={{ marginTop: spacing.sm }} onPress={() => WebBrowser.openBrowserAsync(`${API_BASE}/pets/${petId}/measurements/export`)} /> : null}
+        {items.length ? <Button title="Exportar histórico" variant="ghost" size="sm" icon="download-outline" style={{ marginTop: spacing.sm }} loading={exporting} onPress={exportMeasurements} /> : null}
       </Section>
 
       <Section title="Vacinas e vermífugos" right={canEdit ? <Button title="Adicionar" size="sm" onPress={() => setVaccOpen(true)} /> : undefined}>

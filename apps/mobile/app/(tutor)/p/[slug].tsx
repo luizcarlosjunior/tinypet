@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Linking, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { formatBRL } from "@tinypet/shared";
@@ -11,6 +11,7 @@ import type { CatalogItem } from "@/lib/types";
 import { Avatar, Badge, Button, ErrorState, ListItem, Loading, Screen, Section, Segmented, Text } from "@/components/ui";
 import { BackHeader } from "@/components/BackHeader";
 import { Stars, ReviewRow } from "@/components/Reviews";
+import { openExternal, openLocal, telUrl, whatsappUrl } from "@/lib/links";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -108,11 +109,11 @@ export default function PartnerPage() {
                 {p.phones?.length || p.website || p.socialLinks?.length ? (
                   <Section title="Contato">
                     {p.phones?.map((ph) => (
-                      <ListItem key={ph.id} title={ph.number} subtitle={ph.type === "WHATSAPP" ? "WhatsApp" : "Telefone"} onPress={() => Linking.openURL(ph.type === "WHATSAPP" ? `https://wa.me/${ph.number.replace(/\D/g, "")}` : `tel:${ph.number}`)} chevron={false} />
+                      <ListItem key={ph.id} title={ph.number} subtitle={ph.type === "WHATSAPP" ? "WhatsApp" : "Telefone"} onPress={() => openLocal(ph.type === "WHATSAPP" ? whatsappUrl(ph.number) : telUrl(ph.number))} chevron={false} />
                     ))}
-                    {p.website ? <ListItem title="Site" subtitle={p.website} onPress={() => Linking.openURL(p.website!)} chevron={false} /> : null}
+                    {p.website ? <ListItem title="Site" subtitle={p.website} onPress={() => openExternal(p.website)} chevron={false} /> : null}
                     {p.socialLinks?.map((s) => (
-                      <ListItem key={s.network} title={s.network.charAt(0) + s.network.slice(1).toLowerCase()} onPress={() => Linking.openURL(s.url)} chevron={false} />
+                      <ListItem key={s.network} title={s.network.charAt(0) + s.network.slice(1).toLowerCase()} onPress={() => openExternal(s.url)} chevron={false} />
                     ))}
                   </Section>
                 ) : null}

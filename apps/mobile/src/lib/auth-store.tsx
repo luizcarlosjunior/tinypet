@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { RegisterInput } from "@tinypet/shared";
-import { api, onUnauthorized, setApiContext } from "./api";
+import { API_BASE, api, getApiContext, onUnauthorized, setApiContext } from "./api";
 import { PARTNER_KEY, getPref, getToken, setPref, setToken } from "./storage";
 import type { AuthPayload, Membership, User } from "./types";
 
@@ -19,6 +19,22 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+
+
+/** POST /auth/logout with the current Bearer token. Raw fetch so a 401 here never re-triggers onUnauthorized. */
+async function revokeServerSession() {
+  const { token } = getApiContext();
+  if (!token) return;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    await fetch(`${API_BASE}/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal: ctrl.signal });
+  } catch {
+    /* ignore */
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -40,6 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (signingOut.current) return;
     signingOut.current = true;
     try {
+      // Revoke the token server-side before forgetting it locally (best effort; ignore failures).
+      await revokeServerSession();
       setApiContext({ token: null, partnerId: null });
       await setToken(null);
       await setPref(PARTNER_KEY, null);

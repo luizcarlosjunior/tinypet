@@ -9,7 +9,7 @@ import type { Pet } from "@/lib/types";
 import { Button, Card, Input, KeyValue, Sheet, Text } from "@/components/ui";
 import { PetForm } from "./PetForm";
 
-const SEX_LABEL = { MALE: "Macho", FEMALE: "Fêmea", UNKNOWN: "Não informado" };
+const SEX_LABEL: Record<string, string> = { MALE: "Macho", FEMALE: "Fêmea" };
 const SIZE_LABEL = { SMALL: "Pequeno", MEDIUM: "Médio", LARGE: "Grande", GIANT: "Gigante" };
 
 /** Ficha: read-only summary, edit sheet, mark deceased (confirm) + undo. */
@@ -64,7 +64,7 @@ export function FichaTab({ pet, canEdit, isOwner }: { pet: Pet; canEdit: boolean
         <KeyValue k="Espécie" v={pet.species?.label ?? pet.speciesKey} />
         <KeyValue k="Raça" v={pet.breed?.name ?? pet.breedOther} />
         <KeyValue k="Cor / pelagem" v={pet.color} />
-        <KeyValue k="Sexo" v={pet.sex ? SEX_LABEL[pet.sex] : null} />
+        <KeyValue k="Sexo" v={(pet.sex && SEX_LABEL[pet.sex]) || "Não informado"} />
         <KeyValue k="Porte" v={pet.size ? SIZE_LABEL[pet.size] : null} />
         <KeyValue k="Nascimento" v={pet.birthDate ? fmtDate(pet.birthDate) : null} />
         <KeyValue k="Idade" v={formatAge(ageInMonths(pet.birthDate, pet.approxAgeMonths))} />

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, ImageIcon, Trash2 } from "lucide-react";
-import { VENUE_PHOTOS_MAX } from "@tinypet/shared";
+import { VENUE_PHOTOS_MAX, safeHref } from "@tinypet/shared";
 import { api } from "@/lib/api-client";
 import { uploadFile } from "@/lib/upload";
 import { Button, Modal } from "@/components/ui";
@@ -48,7 +48,7 @@ export function LogoCard({ partner, onSaved, canEdit }: { partner: Partner; onSa
       <div className="flex items-center gap-4">
         {partner.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={partner.logoUrl} alt={`Logo de ${partner.tradeName}`} className="h-24 w-24 rounded-2xl border object-cover" />
+          <img src={safeHref(partner.logoUrl)} alt={`Logo de ${partner.tradeName}`} className="h-24 w-24 rounded-2xl border object-cover" />
         ) : (
           <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-dashed text-[var(--muted)]">
             <ImageIcon className="h-8 w-8" aria-hidden />
@@ -122,7 +122,7 @@ export function VenuePhotosCard({ partner, onSaved, canEdit }: { partner: Partne
         {photos.map((p, i) => (
           <li key={p.id} className="overflow-hidden rounded-xl border bg-[var(--card)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.thumbUrl || p.url} alt={p.caption ?? `Foto ${i + 1}`} className="aspect-square w-full object-cover" />
+            <img src={safeHref(p.thumbUrl || p.url)} alt={p.caption ?? `Foto ${i + 1}`} className="aspect-square w-full object-cover" />
             {canEdit ? (
               <>
                 <input type="text" aria-label={`Legenda da foto ${i + 1}`} placeholder="Legenda" maxLength={140} defaultValue={p.caption ?? ""} onBlur={(e) => e.target.value !== (p.caption ?? "") && caption.mutate({ id: p.id, caption: e.target.value })} className="w-full border-t bg-transparent px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-brand-400" />

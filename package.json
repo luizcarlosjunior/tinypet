@@ -28,6 +28,9 @@
       "esbuild",
       "sharp",
       "unrs-resolver"
-    ]
+    ],
+    "overrides": {
+      "nodemailer": "^10.0.12"
+    }
   }
 }

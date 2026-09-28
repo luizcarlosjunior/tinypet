@@ -5,6 +5,7 @@ import { errorMessage } from "@/lib/errors";
 import { X, AlertTriangle, Search } from "lucide-react";
 import Link from "next/link";
 import { forwardRef, useEffect, useId, useRef, type InputHTMLAttributes, type ReactNode } from "react";
+import { safeHref } from "@tinypet/shared";
 
 /* ───────── Tabs (URL-less, controlled) ───────── */
 export function Tabs<T extends string>({ value, onChange, items, className }: { value: T; onChange: (v: T) => void; items: { key: T; label: string; count?: number; hidden?: boolean }[]; className?: string }) {
@@ -264,9 +265,10 @@ export function Avatar({ src, name, size = 36, className }: { src?: string | nul
     .slice(0, 2)
     .map((s) => s[0]?.toUpperCase())
     .join("");
-  return src ? (
+  const safeSrc = safeHref(src);
+  return safeSrc ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" width={size} height={size} className={cn("shrink-0 rounded-full object-cover", className)} style={{ width: size, height: size }} />
+    <img src={safeSrc} alt="" width={size} height={size} className={cn("shrink-0 rounded-full object-cover", className)} style={{ width: size, height: size }} />
   ) : (
     <span aria-hidden className={cn("flex shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-brand-900/40 dark:text-brand-200", className)} style={{ width: size, height: size }}>
       {initials || "?"}

@@ -1,7 +1,7 @@
 import { prisma } from "@tinypet/db";
 import { bookingRequestSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, requireUser, serialize, assertFeature, notifyPartner, Errors } from "@/server";
-import { createAppointments, formatLocal, resolveOwnerClient } from "@/server/scheduling";
+import { createAppointments, editablePetOr, formatLocal, resolveOwnerClient } from "@/server/scheduling";
 
 /** POST /bookings (bookingRequestSchema) → REQUESTED appointment for a bookable, published item; partner is notified. */
 export const POST = handler(async (req) => {
@@ -14,8 +14,8 @@ export const POST = handler(async (req) => {
   await assertFeature("PARTNER", partner.id, "online_booking");
 
   const petIds = [...new Set(body.petIds)];
-  const pets = await prisma.pet.count({ where: { id: { in: petIds }, deletedAt: null, status: "ACTIVE", OR: [{ ownerId: user.id }, { accesses: { some: { userId: user.id } } }] } });
-  if (pets !== petIds.length) throw Errors.forbidden("Escolha apenas pets seus");
+  const pets = await prisma.pet.count({ where: { id: { in: petIds }, deletedAt: null, status: "ACTIVE", OR: editablePetOr(user.id) } });
+  if (pets !== petIds.length) throw Errors.forbidden("Escolha apenas pets seus ou compartilhados com permissão de edição");
 
   const allowed = (item.serviceLocations as string[] | null) ?? [];
   const locationType = body.locationType ?? item.defaultLocation ?? "PARTNER_VENUE";
@@ -37,6 +37,7 @@ export const POST = handler(async (req) => {
       recurrence: "NONE",
       status: "REQUESTED",
       requestedByUserId: user.id,
+      rescheduleOfId: null, // server-only field; never taken from the request
     },
   );
   await notifyPartner(partner.id, { type: "appointment.requested", title: "Novo pedido de agendamento", body: `${user.name} pediu "${item.name}" em ${formatLocal(created!.startsAt)}. Confirme na agenda.`, data: { appointmentId: created!.id }, email: true });

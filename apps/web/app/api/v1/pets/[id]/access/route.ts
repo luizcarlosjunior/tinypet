@@ -3,8 +3,10 @@ import { petAccessSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, Errors, notify } from "@/server";
 import { petActor } from "@/server/pets";
 
+/** Owner and family only (partners never see family members' e-mails). */
 export const GET = handler<{ id: string }>(async (req, { params }) => {
-  await petActor(req, params.id, "VIEW");
+  const actor = await petActor(req, params.id, "VIEW");
+  if (actor.via === "partner") throw Errors.forbidden("Apenas o tutor e a família podem ver os acessos");
   return ok(await prisma.petAccess.findMany({ where: { petId: params.id }, include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } }));
 });
 

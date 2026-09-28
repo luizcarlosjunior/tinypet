@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CalendarPlus, Clock, Home, MapPin, Video } from "lucide-react";
-import { formatBRL } from "@tinypet/shared";
+import { formatBRL, safeHref } from "@tinypet/shared";
 import { RatingStars } from "@/components/ui/rating";
 import { fmtDate } from "@/lib/format";
 import { isPromoActive, type PublicItem } from "./types";
@@ -43,7 +43,7 @@ export function ItemCard({ item, slug }: { item: PublicItem; slug: string }) {
     <article className="card flex gap-3 p-3">
       {cover && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={cover.thumbUrl ?? cover.url} alt="" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
+        <img src={safeHref(cover.thumbUrl ?? cover.url)} alt="" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
       )}
       <div className="min-w-0 flex-1">
         <h4 className="font-semibold">

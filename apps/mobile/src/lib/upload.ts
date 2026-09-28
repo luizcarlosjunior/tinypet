@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { AVATAR_PX, GALLERY_MAX_PX, MEDIA_MAX_BYTES } from "@tinypet/shared";
-import { api } from "./api";
+import { API_BASE, api, getApiContext } from "./api";
 
 export type MediaPurpose = "PARTNER_LOGO" | "USER_AVATAR" | "PET_AVATAR" | "VENUE_PHOTO" | "PET_GALLERY" | "CATALOG" | "COURSE" | "ATTACHMENT" | "RECEIPT";
 
@@ -114,22 +114,26 @@ export async function prepareAsset(asset: ImagePicker.ImagePickerAsset, opts: { 
 
 /** 3-step upload: request ticket → PUT bytes → complete. */
 export async function uploadFile(file: LocalFile, purpose: MediaPurpose): Promise<UploadedMedia> {
+  // Read the bytes first so the declared size is exact (S3 presigned PUTs sign Content-Length).
+  const blob = await fetch(file.uri).then((r) => r.blob());
   const ticket = await api<UploadTicket>("/media/upload", {
     method: "POST",
     json: {
       purpose,
       mimeType: file.mimeType,
-      sizeBytes: file.sizeBytes,
+      sizeBytes: blob.size || file.sizeBytes,
       fileName: file.fileName,
       width: file.width,
       height: file.height,
       durationSeconds: file.durationSeconds,
     },
   });
-  const blob = await fetch(file.uri).then((r) => r.blob());
+  // The local-dev sink lives on our API and needs the Bearer token; never send it to third-party (S3) URLs.
+  const { token } = getApiContext();
+  const toOwnApi = ticket.uploadUrl.startsWith(`${API_BASE}/`);
   const put = await fetch(ticket.uploadUrl, {
     method: ticket.method ?? "PUT",
-    headers: { "Content-Type": file.mimeType, ...(ticket.headers ?? {}) },
+    headers: { "Content-Type": file.mimeType, ...(ticket.headers ?? {}), ...(toOwnApi && token ? { Authorization: `Bearer ${token}` } : {}) },
     body: blob,
   });
   if (!put.ok) throw new Error(`Falha ao enviar arquivo (${put.status})`);

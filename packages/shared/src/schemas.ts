@@ -1,13 +1,27 @@
 import { z } from "zod";
 
 // ───────── primitives ─────────
-export const id = z.string().min(1);
+export const id = z.string().min(1).max(64);
 export const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida (AAAA-MM-DD)");
 export const isoDateTime = z.string().datetime({ offset: true }).or(z.string().datetime());
 export const timeString = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida (HH:MM)");
 export const money = z.coerce.number().min(0).multipleOf(0.01);
-export const email = z.string().email("E-mail inválido").toLowerCase();
-export const phone = z.string().min(8, "Telefone inválido");
+export const email = z.string().trim().max(254, "E-mail muito longo").email("E-mail inválido").toLowerCase();
+/** http(s)-only URL. Use for EVERY user-provided URL field (blocks javascript:, data:, etc.). */
+export const httpUrl = z
+  .string()
+  .trim()
+  .max(2048)
+  .url("URL inválida")
+  .refine((u) => {
+    try {
+      const p = new URL(u).protocol;
+      return p === "https:" || p === "http:";
+    } catch {
+      return false;
+    }
+  }, "URL inválida");
+export const phone = z.string().min(8, "Telefone inválido").max(30, "Telefone inválido");
 export const cep = z.string().regex(/^\d{5}-?\d{3}$/, "CEP inválido");
 export const uf = z.string().length(2).toUpperCase();
 
@@ -17,7 +31,7 @@ export const paginationQuery = z.object({
 });
 export type PaginationQuery = z.infer<typeof paginationQuery>;
 
-export const SexEnum = z.enum(["MALE", "FEMALE", "UNKNOWN"]);
+export const SexEnum = z.enum(["MALE", "FEMALE"]);
 export const PetSizeEnum = z.enum(["SMALL", "MEDIUM", "LARGE", "GIANT"]);
 export const PetStatusEnum = z.enum(["ACTIVE", "DECEASED"]);
 export const PhoneTypeEnum = z.enum(["MOBILE", "LANDLINE", "WHATSAPP"]);
@@ -48,16 +62,16 @@ export const VaccinationKindEnum = z.enum(["VACCINE", "DEWORMING"]);
 
 // ───────── auth ─────────
 export const registerSchema = z.object({
-  name: z.string().min(2, "Informe seu nome"),
+  name: z.string().min(2, "Informe seu nome").max(120),
   email,
-  password: z.string().min(8, "Mínimo de 8 caracteres"),
+  password: z.string().min(8, "Mínimo de 8 caracteres").max(200),
   ownerTermId: id.optional(),
   acceptTerms: z.literal(true, { errorMap: () => ({ message: "Aceite os termos para continuar" }) }),
   marketingConsent: z.boolean().optional().default(false),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
-export const loginSchema = z.object({ email, password: z.string().min(1) });
+export const loginSchema = z.object({ email, password: z.string().min(1).max(200) });
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const verifyCodeSchema = z.object({
@@ -66,13 +80,15 @@ export const verifyCodeSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  name: z.string().min(2).optional(),
-  avatarUrl: z.string().url().nullable().optional(),
+  name: z.string().min(2).max(120).optional(),
+  avatarUrl: httpUrl.nullable().optional(),
   birthDate: dateString.nullable().optional(),
   ownerTermId: id.nullable().optional(),
   marketingConsent: z.boolean().optional(),
   publicPhotosConsent: z.boolean().optional(),
   statsConsent: z.boolean().optional(),
+  /** Explicit acceptance of the current terms/privacy (used by OAuth sign-ups). */
+  acceptTerms: z.literal(true).optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
@@ -86,16 +102,16 @@ export const emailSchema = z.object({ address: email, isPrimary: z.boolean().opt
 export const addressSchema = z.object({
   label: z.string().max(40).optional().nullable(),
   zipCode: cep,
-  street: z.string().min(1),
-  number: z.string().optional().nullable(),
-  complement: z.string().optional().nullable(),
-  reference: z.string().optional().nullable(),
-  accessNotes: z.string().optional().nullable(),
-  district: z.string().optional().nullable(),
-  city: z.string().min(1),
+  street: z.string().min(1).max(200),
+  number: z.string().max(20).optional().nullable(),
+  complement: z.string().max(120).optional().nullable(),
+  reference: z.string().max(200).optional().nullable(),
+  accessNotes: z.string().max(1000).optional().nullable(),
+  district: z.string().max(120).optional().nullable(),
+  city: z.string().min(1).max(120),
   state: uf,
-  latitude: z.coerce.number().optional().nullable(),
-  longitude: z.coerce.number().optional().nullable(),
+  latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+  longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
   isPrimary: z.boolean().optional().default(false),
 });
 export type PhoneInput = z.infer<typeof phoneSchema>;
@@ -103,9 +119,9 @@ export type EmailInput = z.infer<typeof emailSchema>;
 export type AddressInput = z.infer<typeof addressSchema>;
 
 export const familyMemberSchema = z.object({
-  name: z.string().min(1),
-  relationship: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
+  name: z.string().min(1).max(120),
+  relationship: z.string().max(60).optional().nullable(),
+  phone: z.string().max(30).optional().nullable(),
   email: email.optional().nullable(),
   canAuthorize: z.boolean().optional().default(false),
   canPickUp: z.boolean().optional().default(false),
@@ -113,45 +129,46 @@ export const familyMemberSchema = z.object({
 
 // ───────── partner ─────────
 export const createPartnerSchema = z.object({
-  tradeName: z.string().min(2),
-  typeKeys: z.array(z.string()).min(1, "Escolha ao menos um tipo"),
+  tradeName: z.string().min(2).max(120),
+  typeKeys: z.array(z.string().max(40)).min(1, "Escolha ao menos um tipo").max(20),
   description: z.string().max(2000).optional().nullable(),
   documentType: z.enum(["CNPJ", "CPF"]).optional().nullable(),
-  document: z.string().optional().nullable(),
+  document: z.string().max(20).optional().nullable(),
 });
 export const updatePartnerSchema = createPartnerSchema.partial().extend({
-  legalName: z.string().optional().nullable(),
-  website: z.string().url().optional().nullable().or(z.literal("")),
-  logoUrl: z.string().url().optional().nullable(),
+  legalName: z.string().max(200).optional().nullable(),
+  website: httpUrl.optional().nullable().or(z.literal("")),
+  logoUrl: httpUrl.optional().nullable(),
   serviceRadiusKm: z.coerce.number().int().min(0).max(500).optional().nullable(),
   cancellationHours: z.coerce.number().int().min(0).max(720).optional(),
   bufferMinutes: z.coerce.number().int().min(0).max(240).optional(),
   travelSlackMinutes: z.coerce.number().int().min(0).max(120).optional(),
-  socialLinks: z.array(z.object({ network: SocialNetworkEnum, url: z.string().min(1) })).optional(),
+  socialLinks: z.array(z.object({ network: SocialNetworkEnum, url: httpUrl })).max(6).optional(),
   businessHours: z
     .array(z.object({ weekday: z.number().int().min(0).max(6), opensAt: timeString, closesAt: timeString, closed: z.boolean().default(false) }))
+    .max(14)
     .optional(),
 });
 export type CreatePartnerInput = z.infer<typeof createPartnerSchema>;
 export type UpdatePartnerInput = z.infer<typeof updatePartnerSchema>;
 
-export const venuePhotoSchema = z.object({ url: z.string().url(), thumbUrl: z.string().url().optional().nullable(), caption: z.string().max(140).optional().nullable(), sortOrder: z.number().int().optional() });
+export const venuePhotoSchema = z.object({ url: httpUrl, thumbUrl: httpUrl.optional().nullable(), caption: z.string().max(140).optional().nullable(), sortOrder: z.number().int().optional() });
 
 export const inviteMemberSchema = z.object({
   email,
   role: MembershipRoleEnum.default("STAFF"),
   canSeeFinance: z.boolean().default(false),
-  jobTitle: z.string().optional().nullable(),
+  jobTitle: z.string().max(120).optional().nullable(),
 });
 
 export const partnerSearchQuery = paginationQuery.extend({
-  q: z.string().optional(),
-  type: z.string().optional(),
-  category: z.string().optional(),
-  species: z.string().optional(),
+  q: z.string().max(200).optional(),
+  type: z.string().max(60).optional(),
+  category: z.string().max(60).optional(),
+  species: z.string().max(60).optional(),
   minRating: z.coerce.number().min(0).max(5).optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
+  city: z.string().max(120).optional(),
+  state: z.string().max(40).optional(),
   lat: z.coerce.number().optional(),
   lng: z.coerce.number().optional(),
   radiusKm: z.coerce.number().min(1).max(200).optional(),
@@ -160,21 +177,21 @@ export type PartnerSearchQuery = z.infer<typeof partnerSearchQuery>;
 
 // ───────── pets ─────────
 export const petSchema = z.object({
-  name: z.string().min(1, "Informe o nome"),
-  speciesKey: z.string().min(1),
+  name: z.string().min(1, "Informe o nome").max(120),
+  speciesKey: z.string().min(1).max(40),
   breedId: id.optional().nullable(),
-  breedOther: z.string().optional().nullable(),
-  color: z.string().optional().nullable(),
+  breedOther: z.string().max(120).optional().nullable(),
+  color: z.string().max(60).optional().nullable(),
   sex: SexEnum.optional().nullable(),
   size: PetSizeEnum.optional().nullable(),
   birthDate: dateString.optional().nullable(),
-  approxAgeMonths: z.coerce.number().int().min(0).optional().nullable(),
+  approxAgeMonths: z.coerce.number().int().min(0).max(600).optional().nullable(),
   neutered: z.boolean().optional().nullable(),
-  microchip: z.string().optional().nullable(),
-  avatarUrl: z.string().url().optional().nullable(),
-  temperament: z.string().optional().nullable(),
-  specialCare: z.string().optional().nullable(),
-  feedingNotes: z.string().optional().nullable(),
+  microchip: z.string().max(40).optional().nullable(),
+  avatarUrl: httpUrl.optional().nullable(),
+  temperament: z.string().max(2000).optional().nullable(),
+  specialCare: z.string().max(5000).optional().nullable(),
+  feedingNotes: z.string().max(5000).optional().nullable(),
 });
 export type PetInput = z.infer<typeof petSchema>;
 export const updatePetSchema = petSchema.partial();
@@ -185,22 +202,22 @@ export const petAccessSchema = z.object({ email, level: AccessLevelEnum.default(
 
 export const petMediaSchema = z.object({
   kind: z.enum(["IMAGE", "VIDEO"]),
-  url: z.string().url(),
-  thumbUrl: z.string().url().optional().nullable(),
+  url: httpUrl,
+  thumbUrl: httpUrl.optional().nullable(),
   title: z.string().max(120).optional().nullable(),
   description: z.string().max(2000).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
   takenAt: isoDateTime,
   isStory: z.boolean().optional().default(false),
   visibility: MediaVisibilityEnum.optional().default("PRIVATE"),
-  sizeBytes: z.number().int().min(0).optional().default(0),
+  sizeBytes: z.number().int().min(0).max(100 * 1024 * 1024).optional().default(0),
 });
 
 export const petFoodSchema = z.object({
   type: FoodTypeEnum,
   brandId: id.optional().nullable(),
   productLineId: id.optional().nullable(),
-  brandOther: z.string().optional().nullable(),
+  brandOther: z.string().max(120).optional().nullable(),
   packageSizeG: z.coerce.number().int().min(0).optional().nullable(),
   dailyGrams: z.coerce.number().int().min(0).optional().nullable(),
   lastPurchaseAt: dateString.optional().nullable(),
@@ -216,12 +233,12 @@ export const bodyMeasurementSchema = z.object({
   chestCm: z.coerce.number().min(0).optional().nullable(),
   abdomenCm: z.coerce.number().min(0).optional().nullable(),
   bodyScore: z.coerce.number().int().min(1).max(9).optional().nullable(),
-  notes: z.string().optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
 });
 
 export const petSkillSchema = z.object({
   skillId: id.optional(),
-  customName: z.string().min(1).optional(),
+  customName: z.string().min(1).max(120).optional(),
   level: SkillLevelEnum,
   masteredAt: dateString.optional().nullable(),
 }).refine((v) => v.skillId || v.customName, { message: "Informe o comando" });
@@ -237,28 +254,28 @@ export const skillComparisonQuery = z.object({
 
 export const vaccinationSchema = z.object({
   kind: VaccinationKindEnum.default("VACCINE"),
-  name: z.string().min(1),
+  name: z.string().min(1).max(200),
   appliedAt: dateString,
   nextDueAt: dateString.optional().nullable(),
-  notes: z.string().optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
 });
 
 export const historyEventSchema = z.object({
   type: z.enum(["VISIT", "VACCINE", "DEWORMING", "WEIGHT", "ACHIEVEMENT", "MILESTONE", "SKILL", "NOTE", "ATTACHMENT"]),
-  title: z.string().min(1),
-  description: z.string().optional().nullable(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(10000).optional().nullable(),
   occurredAt: isoDateTime,
-  attachments: z.array(z.object({ url: z.string().url(), name: z.string(), type: z.string().optional() })).optional(),
+  attachments: z.array(z.object({ url: httpUrl, name: z.string().max(200), type: z.string().max(100).optional() })).max(10).optional(),
 });
 
 export const taskRuleSchema = z.object({
   freq: z.enum(["daily", "weekly"]),
-  days: z.array(z.number().int().min(0).max(6)).optional(),
-  times: z.array(timeString).optional(),
+  days: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+  times: z.array(timeString).max(24).optional(),
 });
 export const taskSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().optional().nullable(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional().nullable(),
   rule: taskRuleSchema.optional().nullable(),
   dueAt: isoDateTime.optional().nullable(),
 });
@@ -267,7 +284,7 @@ export const taskCompleteSchema = z.object({ forDate: dateString.optional() });
 // ───────── catalog ─────────
 export const catalogItemSchema = z.object({
   type: ItemTypeEnum,
-  name: z.string().min(2),
+  name: z.string().min(2).max(200),
   description: z.string().max(4000).optional().nullable(),
   categoryId: id,
   subcategoryId: id.optional().nullable(),
@@ -275,15 +292,15 @@ export const catalogItemSchema = z.object({
   promoPrice: money.optional().nullable(),
   promoUntil: isoDateTime.optional().nullable(),
   durationMinutes: z.coerce.number().int().min(5).max(1440).optional().nullable(),
-  serviceLocations: z.array(ServiceLocationEnum).optional(),
+  serviceLocations: z.array(ServiceLocationEnum).max(3).optional(),
   defaultLocation: ServiceLocationEnum.optional().nullable(),
   bookable: z.boolean().optional().default(false),
-  speciesKeys: z.array(z.string()).optional(),
+  speciesKeys: z.array(z.string().max(40)).max(20).optional(),
   brandId: id.optional().nullable(),
   productLineId: id.optional().nullable(),
   status: ItemStatusEnum.optional().default("DRAFT"),
   media: z
-    .array(z.object({ kind: z.enum(["IMAGE", "VIDEO"]), url: z.string().url(), thumbUrl: z.string().url().optional().nullable(), isCover: z.boolean().optional(), sortOrder: z.number().int().optional() }))
+    .array(z.object({ kind: z.enum(["IMAGE", "VIDEO"]), url: httpUrl, thumbUrl: httpUrl.optional().nullable(), isCover: z.boolean().optional(), sortOrder: z.number().int().optional() }))
     .max(10)
     .optional(),
 });
@@ -299,53 +316,53 @@ export const reportSchema = z.object({ reason: z.string().min(3).max(500) });
 
 // ───────── CRM ─────────
 export const clientSchema = z.object({
-  name: z.string().min(2),
-  notes: z.string().optional().nullable(),
-  tags: z.array(z.string()).optional(),
-  source: z.string().optional().nullable(),
+  name: z.string().min(2).max(200),
+  notes: z.string().max(10000).optional().nullable(),
+  tags: z.array(z.string().max(40)).max(20).optional(),
+  source: z.string().max(120).optional().nullable(),
   birthDate: dateString.optional().nullable(),
-  emails: z.array(emailSchema).optional(),
-  phones: z.array(phoneSchema).optional(),
-  addresses: z.array(addressSchema).optional(),
-  familyMembers: z.array(familyMemberSchema).optional(),
+  emails: z.array(emailSchema).max(10).optional(),
+  phones: z.array(phoneSchema).max(10).optional(),
+  addresses: z.array(addressSchema).max(10).optional(),
+  familyMembers: z.array(familyMemberSchema).max(20).optional(),
 });
 export type ClientInput = z.infer<typeof clientSchema>;
 export const updateClientSchema = clientSchema.partial();
 
 export const clientSearchQuery = paginationQuery.extend({
-  q: z.string().optional(),
-  tag: z.string().optional(),
-  species: z.string().optional(),
+  q: z.string().max(200).optional(),
+  tag: z.string().max(40).optional(),
+  species: z.string().max(60).optional(),
   birthdayMonth: z.coerce.number().int().min(1).max(12).optional(),
 });
 
-export const clientInviteSchema = z.object({ email: email.optional(), phone: z.string().optional() }).refine((v) => v.email || v.phone, {
+export const clientInviteSchema = z.object({ email: email.optional(), phone: z.string().max(30).optional() }).refine((v) => v.email || v.phone, {
   message: "Informe e-mail ou telefone",
 });
 
 export const acceptInviteSchema = z.object({
-  token: z.string().min(1),
-  petMerges: z.array(z.object({ partnerPetId: id, ownerPetId: id.nullable() })).optional(),
+  token: z.string().min(1).max(512),
+  petMerges: z.array(z.object({ partnerPetId: id, ownerPetId: id.nullable() })).max(50).optional(),
 });
 
 // ───────── scheduling ─────────
 export const availabilitySchema = z.object({
-  slots: z.array(z.object({ weekday: z.number().int().min(0).max(6), startsAt: timeString, endsAt: timeString })),
+  slots: z.array(z.object({ weekday: z.number().int().min(0).max(6), startsAt: timeString, endsAt: timeString })).max(50),
 });
-export const timeOffSchema = z.object({ startsAt: isoDateTime, endsAt: isoDateTime, reason: z.string().optional().nullable() });
+export const timeOffSchema = z.object({ startsAt: isoDateTime, endsAt: isoDateTime, reason: z.string().max(500).optional().nullable() });
 
 export const appointmentSchema = z.object({
   clientId: id.optional().nullable(),
-  petIds: z.array(id).min(1, "Escolha ao menos um pet"),
+  petIds: z.array(id).min(1, "Escolha ao menos um pet").max(20),
   itemId: id.optional().nullable(),
   membershipId: id.optional().nullable(),
-  title: z.string().optional().nullable(),
+  title: z.string().max(200).optional().nullable(),
   startsAt: isoDateTime,
   durationMinutes: z.coerce.number().int().min(5).max(1440),
   locationType: LocationTypeEnum,
   addressId: id.optional().nullable(),
-  locationNotes: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
+  locationNotes: z.string().max(1000).optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
   recurrence: RecurrenceEnum.optional().default("NONE"),
   occurrences: z.coerce.number().int().min(1).max(52).optional(),
   contractId: id.optional().nullable(),
@@ -355,20 +372,20 @@ export const updateAppointmentSchema = appointmentSchema.partial();
 
 export const appointmentStatusSchema = z.object({
   status: AppointmentStatusEnum,
-  cancelReason: z.string().optional().nullable(),
-  report: z.string().optional().nullable(),
-  nextSteps: z.string().optional().nullable(),
-  reportPhotos: z.array(z.string().url()).optional(),
+  cancelReason: z.string().max(500).optional().nullable(),
+  report: z.string().max(10000).optional().nullable(),
+  nextSteps: z.string().max(5000).optional().nullable(),
+  reportPhotos: z.array(httpUrl).max(10).optional(),
 });
 
 export const bookingRequestSchema = z.object({
   partnerId: id,
   itemId: id,
-  petIds: z.array(id).min(1),
+  petIds: z.array(id).min(1).max(20),
   startsAt: isoDateTime,
   locationType: LocationTypeEnum.optional(),
   addressId: id.optional().nullable(),
-  notes: z.string().optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
 });
 
 export const slotsQuery = z.object({
@@ -388,19 +405,19 @@ export const agendaQuery = z.object({
 // ───────── finance ─────────
 export const contractSchema = z.object({
   clientId: id,
-  petIds: z.array(id).optional(),
+  petIds: z.array(id).max(20).optional(),
   type: ContractTypeEnum.default("SINGLE"),
-  title: z.string().min(2),
-  description: z.string().optional().nullable(),
-  items: z.array(z.object({ itemId: id.optional().nullable(), description: z.string().min(1), quantity: z.coerce.number().int().min(1).default(1), unitPrice: money })).min(1),
+  title: z.string().min(2).max(200),
+  description: z.string().max(5000).optional().nullable(),
+  items: z.array(z.object({ itemId: id.optional().nullable(), description: z.string().min(1).max(500), quantity: z.coerce.number().int().min(1).max(10000).default(1), unitPrice: money })).min(1).max(50),
   discount: money.optional().default(0),
   installmentsCount: z.coerce.number().int().min(1).max(60),
   firstDueDate: dateString,
   periodicity: PeriodicityEnum.default("MONTHLY"),
   sessionsCount: z.coerce.number().int().min(1).max(200).optional().nullable(),
-  terms: z.string().optional().nullable(),
+  terms: z.string().max(20000).optional().nullable(),
   generateAppointments: z
-    .object({ startsAt: isoDateTime, durationMinutes: z.coerce.number().int().min(5), recurrence: z.enum(["WEEKLY", "BIWEEKLY", "MONTHLY"]), locationType: LocationTypeEnum, addressId: id.optional().nullable(), membershipId: id.optional().nullable(), itemId: id.optional().nullable() })
+    .object({ startsAt: isoDateTime, durationMinutes: z.coerce.number().int().min(5).max(1440), recurrence: z.enum(["WEEKLY", "BIWEEKLY", "MONTHLY"]), locationType: LocationTypeEnum, addressId: id.optional().nullable(), membershipId: id.optional().nullable(), itemId: id.optional().nullable() })
     .optional(),
 });
 export type ContractInput = z.infer<typeof contractSchema>;
@@ -412,14 +429,14 @@ export const paymentSchema = z.object({
   paidAt: dateString,
   amount: money.positive(),
   method: PaymentMethodEnum,
-  receiptUrl: z.string().url().optional().nullable(),
-  notes: z.string().optional().nullable(),
+  receiptUrl: httpUrl.optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
 });
 
 export const transactionSchema = z.object({
   kind: TransactionKindEnum,
-  category: z.string().min(1),
-  description: z.string().optional().nullable(),
+  category: z.string().min(1).max(120),
+  description: z.string().max(2000).optional().nullable(),
   amount: money.positive(),
   occurredAt: dateString,
   method: PaymentMethodEnum.optional().nullable(),
@@ -429,70 +446,70 @@ export const financeReportQuery = z.object({ from: dateString.optional(), to: da
 
 // ───────── courses ─────────
 export const courseSchema = z.object({
-  title: z.string().min(2),
-  description: z.string().optional().nullable(),
-  coverUrl: z.string().url().optional().nullable(),
+  title: z.string().min(2).max(200),
+  description: z.string().max(10000).optional().nullable(),
+  coverUrl: httpUrl.optional().nullable(),
   categoryId: id.optional().nullable(),
-  speciesKeys: z.array(z.string()).optional(),
+  speciesKeys: z.array(z.string().max(40)).max(20).optional(),
   level: CourseLevelEnum.default("BEGINNER"),
   price: money.optional().nullable(),
   status: CourseStatusEnum.optional().default("DRAFT"),
 });
 export const lessonSchema = z.object({
   moduleId: id.optional().nullable(),
-  title: z.string().min(1),
-  description: z.string().optional().nullable(),
-  videoUrl: z.string().url().optional().nullable(),
-  body: z.string().optional().nullable(),
-  durationMinutes: z.coerce.number().int().min(0).optional().nullable(),
-  exerciseTitle: z.string().optional().nullable(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional().nullable(),
+  videoUrl: httpUrl.optional().nullable(),
+  body: z.string().max(20000).optional().nullable(),
+  durationMinutes: z.coerce.number().int().min(0).max(1440).optional().nullable(),
+  exerciseTitle: z.string().max(200).optional().nullable(),
   exerciseRule: taskRuleSchema.optional().nullable(),
   sortOrder: z.number().int().optional(),
-  attachments: z.array(z.object({ name: z.string(), url: z.string().url() })).optional(),
+  attachments: z.array(z.object({ name: z.string().max(200), url: httpUrl })).max(10).optional(),
 });
-export const enrollSchema = z.object({ petIds: z.array(id).min(1) });
-export const lessonProgressSchema = z.object({ completed: z.boolean().optional(), question: z.string().optional().nullable() });
+export const enrollSchema = z.object({ petIds: z.array(id).min(1).max(20) });
+export const lessonProgressSchema = z.object({ completed: z.boolean().optional(), question: z.string().max(2000).optional().nullable() });
 
 // ───────── media ─────────
 export const uploadRequestSchema = z.object({
   purpose: MediaPurposeEnum,
-  mimeType: z.string(),
+  mimeType: z.string().max(100),
   sizeBytes: z.number().int().min(1),
-  fileName: z.string().min(1),
-  width: z.number().int().optional(),
-  height: z.number().int().optional(),
-  durationSeconds: z.number().optional(),
+  fileName: z.string().min(1).max(255),
+  width: z.number().int().min(1).max(20000).optional(),
+  height: z.number().int().min(1).max(20000).optional(),
+  durationSeconds: z.number().min(0).max(86400).optional(),
 });
 export const uploadCompleteSchema = z.object({ assetId: id, crop: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).optional() });
 
 // ───────── admin ─────────
-export const ownerTermSchema = z.object({ label: z.string().min(2), isDefault: z.boolean().optional(), active: z.boolean().optional(), sortOrder: z.number().int().optional() });
-export const categorySchema = z.object({ key: z.string().min(1), label: z.string().min(1), sortOrder: z.number().int().optional(), active: z.boolean().optional() });
+export const ownerTermSchema = z.object({ label: z.string().min(2).max(120), isDefault: z.boolean().optional(), active: z.boolean().optional(), sortOrder: z.number().int().optional() });
+export const categorySchema = z.object({ key: z.string().min(1).max(60), label: z.string().min(1).max(120), sortOrder: z.number().int().optional(), active: z.boolean().optional() });
 export const subcategorySchema = categorySchema.extend({ categoryId: id });
-export const speciesSchema = z.object({ key: z.string().min(1), label: z.string().min(1), sortOrder: z.number().int().optional(), active: z.boolean().optional() });
-export const breedSchema = z.object({ speciesId: id, name: z.string().min(1), isMixed: z.boolean().optional(), isOther: z.boolean().optional() });
-export const brandSchema = z.object({ name: z.string().min(1), status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional() });
-export const productLineSchema = z.object({ brandId: id, name: z.string().min(1) });
+export const speciesSchema = z.object({ key: z.string().min(1).max(40), label: z.string().min(1).max(120), sortOrder: z.number().int().optional(), active: z.boolean().optional() });
+export const breedSchema = z.object({ speciesId: id, name: z.string().min(1).max(120), isMixed: z.boolean().optional(), isOther: z.boolean().optional() });
+export const brandSchema = z.object({ name: z.string().min(1).max(120), status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional() });
+export const productLineSchema = z.object({ brandId: id, name: z.string().min(1).max(120) });
 export const planSchema = z.object({
-  key: z.string().min(1),
-  name: z.string().min(1),
+  key: z.string().min(1).max(60),
+  name: z.string().min(1).max(120),
   audience: z.enum(["OWNER", "PARTNER"]),
   priceMonthly: money.optional().nullable(),
   priceYearly: money.optional().nullable(),
   trialDays: z.number().int().min(0).optional(),
   visible: z.boolean().optional(),
   isDefault: z.boolean().optional(),
-  limits: z.array(z.object({ featureKey: z.string(), enabled: z.boolean().default(true), quantity: z.number().int().nullable().optional() })).optional(),
+  limits: z.array(z.object({ featureKey: z.string().max(60), enabled: z.boolean().default(true), quantity: z.number().int().nullable().optional() })).max(100).optional(),
 });
-export const assignPlanSchema = z.object({ planKey: z.string().min(1) });
+export const assignPlanSchema = z.object({ planKey: z.string().min(1).max(60) });
 export const moderationSchema = z.object({ action: z.enum(["HIDE", "RESTORE", "DISMISS"]) });
-export const badgeSchema = z.object({ key: z.string().min(1), name: z.string().min(1), description: z.string().optional().nullable(), iconUrl: z.string().url().optional().nullable() });
+export const badgeSchema = z.object({ key: z.string().min(1).max(60), name: z.string().min(1).max(120), description: z.string().max(2000).optional().nullable(), iconUrl: httpUrl.optional().nullable() });
 export const grantBadgeSchema = z.object({ petId: id });
-export const skillAdminSchema = z.object({ speciesKey: z.string().optional().nullable(), name: z.string().min(1), key: z.string().optional() });
+export const skillAdminSchema = z.object({ speciesKey: z.string().max(40).optional().nullable(), name: z.string().min(1).max(120), key: z.string().max(60).optional() });
 export const lifeStageRuleSchema = z.object({ speciesId: id, size: PetSizeEnum.optional().nullable(), puppyUntilMonths: z.number().int().min(0), seniorFromMonths: z.number().int().min(0) });
 
 export const petReportQuery = paginationQuery.extend({
-  species: z.string().optional(),
+  species: z.string().max(60).optional(),
   breedId: id.optional(),
   lifeStage: z.enum(["PUPPY", "ADULT", "SENIOR"]).optional(),
   bornFrom: dateString.optional(),
@@ -500,13 +517,13 @@ export const petReportQuery = paginationQuery.extend({
   birthMonth: z.coerce.number().int().min(1).max(12).optional(),
   ageMinMonths: z.coerce.number().int().optional(),
   ageMaxMonths: z.coerce.number().int().optional(),
-  state: z.string().optional(),
-  city: z.string().optional(),
-  district: z.string().optional(),
+  state: z.string().max(40).optional(),
+  city: z.string().max(120).optional(),
+  district: z.string().max(120).optional(),
   sex: SexEnum.optional(),
   size: PetSizeEnum.optional(),
   neutered: z.coerce.boolean().optional(),
   status: PetStatusEnum.optional(),
-  tag: z.string().optional(),
+  tag: z.string().max(40).optional(),
   groupBy: z.enum(["state", "city", "species", "breed", "lifeStage", "birthMonth", "createdMonth"]).optional(),
 });

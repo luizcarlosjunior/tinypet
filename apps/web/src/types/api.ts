@@ -102,7 +102,7 @@ export type Pet = PetSummary & {
   breedId?: Id | null;
   breedOther?: string | null;
   color?: string | null;
-  sex?: "MALE" | "FEMALE" | "UNKNOWN" | null;
+  sex?: "MALE" | "FEMALE" | null;
   size?: "SMALL" | "MEDIUM" | "LARGE" | "GIANT" | null;
   birthDate?: string | null;
   approxAgeMonths?: number | null;

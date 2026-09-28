@@ -1,8 +1,6 @@
-import { handler, ok } from "@/server";
-import { requireCron } from "@/server/jobs";
-import { jobVaccineReminders } from "@/server/jobs";
+import { cronRoute, jobVaccineReminders } from "@/server/jobs";
 
-export const POST = handler(async (req) => {
-  requireCron(req);
-  return ok(await jobVaccineReminders());
-});
+export const { GET, POST } = cronRoute(() => jobVaccineReminders());
+
+/** Never statically cached: must run on every cron hit. */
+export const dynamic = "force-dynamic";

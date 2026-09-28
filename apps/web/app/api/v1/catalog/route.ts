@@ -3,7 +3,7 @@ import { z } from "zod";
 import { handler, ok, parseBody, parseQuery, requirePartner, serialize } from "@/server";
 import { listCatalog, createCatalogItem } from "@/server/catalog";
 
-const listQuery = paginationQuery.extend({ status: ItemStatusEnum.optional(), type: ItemTypeEnum.optional(), q: z.string().optional() });
+const listQuery = paginationQuery.extend({ status: ItemStatusEnum.optional(), type: ItemTypeEnum.optional(), q: z.string().max(200).optional() });
 
 export const GET = handler(async (req) => {
   const ctx = await requirePartner(req);

@@ -49,7 +49,7 @@ function Verificar() {
   });
 
   useEffect(() => {
-    if (sessionStatus === "unauthenticated") router.replace(`/entrar?next=${encodeURIComponent(`/verificar?next=${next}`)}`);
+    if (sessionStatus === "unauthenticated") router.replace(`/entrar?next=${encodeURIComponent(`/verificar?next=${encodeURIComponent(next)}`)}`);
   }, [sessionStatus, router, next]);
   useEffect(() => {
     if (isLoggedIn && user && !user.emailVerified && !autoSent.current && sp.get("resend") !== "0") {

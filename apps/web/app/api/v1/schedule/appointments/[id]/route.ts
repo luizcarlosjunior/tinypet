@@ -7,7 +7,9 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
   const ctx = await requirePartner(req);
   const row = await prisma.appointment.findFirst({ where: { id: params.id, partnerId: ctx.partnerId }, include: { ...appointmentInclude, contract: { select: { id: true, title: true, status: true } }, historyEvents: true } });
   if (!row) throw Errors.notFound("Agendamento não encontrado");
-  return ok(serialize(decorateAppointment(row)));
+  // contract status is finance data
+  const contract = row.contract ? (ctx.canSeeFinance ? row.contract : { id: row.contract.id, title: row.contract.title }) : null;
+  return ok(serialize({ ...decorateAppointment(row), contract }));
 });
 
 /** PATCH /schedule/appointments/:id (updateAppointmentSchema); `?force=true` skips conflict checks. Legs are recomputed. */

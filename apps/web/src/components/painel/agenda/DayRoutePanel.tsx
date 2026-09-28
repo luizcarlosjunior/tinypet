@@ -5,6 +5,7 @@ import { fmtKm, fmtMinutes, fmtTime } from "@/lib/format";
 import { errorMessage } from "@/lib/errors";
 import { useApplySuggestion, useDayRoute } from "@/hooks/use-schedule";
 import { cn } from "@/lib/utils";
+import { safeHref } from "@tinypet/shared";
 
 export function DayRoutePanel({ date, membershipId, onOpenStop }: { date: string; membershipId: string | null; onOpenStop?: (appointmentId: string) => void }) {
   const q = useDayRoute(date, membershipId);
@@ -17,7 +18,7 @@ export function DayRoutePanel({ date, membershipId, onOpenStop }: { date: string
           <Route className="h-4 w-4" aria-hidden /> Rota do dia
         </h2>
         {r?.googleMapsUrl && (
-          <a href={r.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary h-8 px-2 text-xs">
+          <a href={safeHref(r.googleMapsUrl)} target="_blank" rel="noopener noreferrer" className="btn-secondary h-8 px-2 text-xs">
             <ExternalLink className="h-3 w-3" aria-hidden /> Abrir no Google Maps
           </a>
         )}

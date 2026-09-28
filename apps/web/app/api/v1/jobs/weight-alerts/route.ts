@@ -1,8 +1,6 @@
-import { handler, ok } from "@/server";
-import { requireCron } from "@/server/jobs";
-import { jobWeightAlerts } from "@/server/jobs";
+import { cronRoute, jobWeightAlerts } from "@/server/jobs";
 
-export const POST = handler(async (req) => {
-  requireCron(req);
-  return ok(await jobWeightAlerts());
-});
+export const { GET, POST } = cronRoute(() => jobWeightAlerts());
+
+/** Never statically cached: must run on every cron hit. */
+export const dynamic = "force-dynamic";

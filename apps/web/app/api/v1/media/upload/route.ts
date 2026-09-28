@@ -3,12 +3,12 @@ import { uploadRequestSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, requireUser, requirePartner, createUploadTarget, getLimits, storageUsed, rateLimit, Errors } from "@/server";
 
 /**
- * Step 1 of upload: validates and returns a signed URL (R2) or the local upload endpoint.
+ * Step 1 of upload: validates and returns a presigned AWS S3 URL or the local upload endpoint.
  * Partner purposes (logo, venue, catalog, course) need X-Partner-Id. Owner purposes check the owner plan.
  */
 export const POST = handler(async (req) => {
   const user = await requireUser(req);
-  rateLimit(`upload:${user.id}`, 60, 10 * 60 * 1000);
+  await rateLimit(`upload:${user.id}`, 60, 10 * 60 * 1000);
   const body = await parseBody(req, uploadRequestSchema);
   const partnerPurposes = ["PARTNER_LOGO", "VENUE_PHOTO", "CATALOG", "COURSE"];
   let partnerId: string | undefined;

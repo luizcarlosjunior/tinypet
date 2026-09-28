@@ -1,15 +1,15 @@
 import { prisma } from "@tinypet/db";
 import { formatBRL } from "@tinypet/shared";
-import { handler, ok, notify, Errors } from "@/server";
+import { notify } from "@/server";
+import { cronRoute } from "@/server/jobs";
 import { formatLocal, localDateStr } from "@/server/scheduling";
 import { dateOnly, formatDateBR, fromCents, toCents } from "@/server/finance";
 
 /**
- * POST /jobs/reminders (header x-cron-secret) → appointment reminders 24h/2h before (CONFIRMED) and
+ * GET|POST /jobs/reminders (Authorization: Bearer CRON_SECRET or x-cron-secret) → appointment reminders 24h/2h before (CONFIRMED) and
  * installment "due tomorrow" reminders to owners with an account.
  */
-export const POST = handler(async (req) => {
-  if (!process.env.CRON_SECRET || req.headers.get("x-cron-secret") !== process.env.CRON_SECRET) throw Errors.unauthorized("Cron secret inválido");
+async function jobReminders() {
   const now = new Date();
   const in24h = new Date(now.getTime() + 24 * 3_600_000);
   const in2h = new Date(now.getTime() + 2 * 3_600_000);
@@ -53,5 +53,10 @@ export const POST = handler(async (req) => {
     sentInstallments++;
   }
 
-  return ok({ appointments24h: sent24, appointments2h: sent2, installments: sentInstallments, ranAt: now });
-});
+  return { appointments24h: sent24, appointments2h: sent2, installments: sentInstallments, ranAt: now };
+}
+
+export const { GET, POST } = cronRoute(jobReminders);
+
+/** Never statically cached: must run on every cron hit. */
+export const dynamic = "force-dynamic";

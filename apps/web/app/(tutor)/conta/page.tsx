@@ -16,6 +16,7 @@ import { api } from "@/lib/api-client";
 import { errorMessage } from "@/lib/errors";
 import { setActivePartnerId } from "@/lib/api-client";
 import type { AddressRow, EmailRow as PanelEmailRow, PhoneRow } from "@/types/api";
+import { safeHref } from "@tinypet/shared";
 
 const FEATURE_LABEL: Record<string, string> = {
   owner_pets: "Pets cadastrados",
@@ -95,7 +96,7 @@ function ProfileCard() {
         <div className="flex flex-col items-center gap-2">
           <div className="h-24 w-24 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {user.avatarUrl ? <img src={user.avatarUrl} alt="Sua foto" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-2xl font-bold text-[var(--muted)]">{user.name.slice(0, 1)}</div>}
+            {user.avatarUrl ? <img src={safeHref(user.avatarUrl)} alt="Sua foto" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-2xl font-bold text-[var(--muted)]">{user.name.slice(0, 1)}</div>}
           </div>
           <Button variant="secondary" onClick={() => setCropOpen(true)}>Trocar foto</Button>
         </div>

@@ -1,5 +1,5 @@
 import { prisma } from "@tinypet/db";
-import { sendMail, layout } from "./mail";
+import { sendMail, layout, textToHtml } from "./mail";
 
 type Notify = { userId: string; type: string; title: string; body?: string; data?: Record<string, unknown>; email?: boolean };
 
@@ -20,7 +20,7 @@ export async function notify(n: Notify) {
   }
   if (n.email) {
     const u = await prisma.user.findUnique({ where: { id: n.userId }, select: { email: true } });
-    if (u) await sendMail(u.email, n.title, layout(n.title, `<p>${n.body ?? ""}</p>`), n.body);
+    if (u) await sendMail(u.email, n.title, layout(n.title, `<p>${textToHtml(n.body ?? "")}</p>`), n.body);
   }
   return notification;
 }

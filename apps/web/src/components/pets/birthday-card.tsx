@@ -4,7 +4,7 @@ import { Cake, Copy, Share2 } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { usePetResource, type Pet } from "@/hooks/use-pets";
-import { ageInMonths, formatAge } from "@tinypet/shared";
+import { ageInMonths, formatAge, safeHref } from "@tinypet/shared";
 import { fmtDate } from "@/lib/format";
 
 type ReportCard = { age?: string; ageMonths?: number; badges?: number; masteredSkills?: number; streakDays?: number; visits?: number; photos?: number; nextBirthday?: string; highlights?: string[] };
@@ -51,7 +51,7 @@ export function BirthdayCard({ pet }: { pet: Pet }) {
           <div className="relative flex items-center gap-4">
             {pet.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={pet.avatarUrl} alt="" className="h-20 w-20 rounded-full border-4 border-white/70 object-cover" />
+              <img src={safeHref(pet.avatarUrl)} alt="" className="h-20 w-20 rounded-full border-4 border-white/70 object-cover" />
             ) : (
               <span className="inline-flex h-20 w-20 items-center justify-center rounded-full border-4 border-white/70 bg-white/20 text-2xl font-bold">{pet.name[0]}</span>
             )}

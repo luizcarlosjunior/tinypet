@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
-import { updatePartnerSchema, isValidCNPJ, isValidCPF, onlyDigits } from "@tinypet/shared";
+import { updatePartnerSchema, isValidCNPJ, isValidCPF, onlyDigits, withHttps } from "@tinypet/shared";
 import { api } from "@/lib/api-client";
 import { Button, Input, Textarea } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
@@ -102,7 +102,7 @@ export function PartnerDataForm({ partner, onSaved, canEdit }: { partner: Partne
         <fieldset disabled={!canEdit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Input id="p-tradeName" label="Nome fantasia" {...register("tradeName")} error={errors.tradeName?.message} />
-            <Input id="p-website" label="Site" placeholder="https://" {...register("website")} error={errors.website?.message} />
+            <Input id="p-website" label="Site" placeholder="https://" {...register("website", { setValueAs: (v: string) => withHttps(v) })} error={errors.website?.message} />
           </div>
           <div>
             <span className="label">Tipos de negócio</span>

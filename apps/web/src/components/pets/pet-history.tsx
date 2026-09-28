@@ -6,6 +6,7 @@ import { fmtDateTime, toDateKey } from "@/lib/format";
 import { Button, Empty, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
+import { safeHref } from "@tinypet/shared";
 
 type Ev = { id: string; type: string; title: string; description: string | null; occurredAt: string; partner?: { tradeName: string } | null; user?: { name: string } | null; attachments?: { url: string; name: string; type?: string }[] | null; photos?: string[] | null };
 
@@ -63,7 +64,7 @@ export function PetHistory({ petId, deceased }: { petId: string; deceased: boole
                       {e.photos.map((p) => (
                         <li key={p}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={p} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                          <img src={safeHref(p)} alt="" className="h-16 w-16 rounded-lg object-cover" />
                         </li>
                       ))}
                     </ul>
@@ -72,7 +73,7 @@ export function PetHistory({ petId, deceased }: { petId: string; deceased: boole
                     <ul className="mt-2 flex flex-wrap gap-2">
                       {e.attachments.map((a) => (
                         <li key={a.url}>
-                          <a href={a.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
+                          <a href={safeHref(a.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
                             <Paperclip className="h-3 w-3" aria-hidden /> {a.name}
                           </a>
                         </li>

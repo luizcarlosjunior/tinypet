@@ -102,7 +102,7 @@ function CadastroForm() {
       <SocialButtons callbackUrl={next} />
       <p className="mt-6 text-center text-sm text-[var(--muted)]">
         Já tem conta?{" "}
-        <Link href={`/entrar${sp.get("next") ? `?next=${encodeURIComponent(sp.get("next")!)}` : ""}`} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+        <Link href={`/entrar${sp.get("next") ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
           Entrar
         </Link>
       </p>

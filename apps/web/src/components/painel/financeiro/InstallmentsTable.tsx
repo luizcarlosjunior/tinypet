@@ -2,7 +2,7 @@
 import { useState, Fragment } from "react";
 import Link from "next/link";
 import { Bell, ChevronDown, ChevronRight, CircleDollarSign, Trash2 } from "lucide-react";
-import { formatBRL, PAYMENT_METHOD_LABEL } from "@tinypet/shared";
+import { formatBRL, PAYMENT_METHOD_LABEL, safeHref } from "@tinypet/shared";
 import { Button } from "@/components/ui";
 import { ConfirmDialog, Table, td, th } from "@/components/painel/ui";
 import { useDeletePayment, useRemindInstallment } from "@/hooks/use-finance";
@@ -110,7 +110,7 @@ export function InstallmentsTable({ items, partnerId, showContract = true, empty
                               <span>{fmtDate(p.paidAt)}</span>
                               <span className="text-[var(--muted)]">{PAYMENT_METHOD_LABEL[p.method as keyof typeof PAYMENT_METHOD_LABEL] ?? p.method}</span>
                               {p.receiptUrl && (
-                                <a href={p.receiptUrl} target="_blank" rel="noreferrer" className="text-brand-600 underline dark:text-brand-300">
+                                <a href={safeHref(p.receiptUrl)} target="_blank" rel="noopener noreferrer" className="text-brand-600 underline dark:text-brand-300">
                                   Comprovante
                                 </a>
                               )}

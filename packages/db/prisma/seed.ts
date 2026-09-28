@@ -128,8 +128,42 @@ const TASK_TEMPLATES: Record<string, { title: string; rule: object }[]> = {
   rodent: [{ title: "Limpar gaiola", rule: { freq: "weekly", days: [6] } }],
 };
 
+/**
+ * Env:
+ * - NODE_ENV=production → refuses unless SEED_DEMO=1 (reference + demo) or SEED_ALLOW_PRODUCTION=1 (reference data only).
+ * - SEED_DEMO=0 → skip demo users/partner/pet (reference data only). Default outside production: demo on.
+ * - SEED_ADMIN_PASSWORD → password for the admin (and demo users). Default "tinypet123" ONLY outside production;
+ *   in production the admin is created only when SEED_ADMIN_PASSWORD is set (SEED_ADMIN_EMAIL, default admin@tinypet.local).
+ */
+const IS_PROD = process.env.NODE_ENV === "production";
+const DEMO = IS_PROD ? process.env.SEED_DEMO === "1" : process.env.SEED_DEMO !== "0";
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || (IS_PROD ? undefined : "tinypet123");
+const ADMIN_EMAIL = (process.env.SEED_ADMIN_EMAIL || "admin@tinypet.local").toLowerCase();
+
 async function main() {
-  console.log("Seeding…");
+  if (IS_PROD && process.env.SEED_DEMO !== "1" && process.env.SEED_ALLOW_PRODUCTION !== "1") {
+    console.error("Recusado: NODE_ENV=production. Use SEED_ALLOW_PRODUCTION=1 (só dados de referência) ou SEED_DEMO=1 (inclui dados demo).");
+    process.exit(1);
+  }
+  if (IS_PROD && DEMO && !process.env.SEED_ADMIN_PASSWORD) {
+    console.error("Recusado: SEED_DEMO=1 em produção exige SEED_ADMIN_PASSWORD (as contas demo não podem usar a senha padrão).");
+    process.exit(1);
+  }
+  console.log(`Seeding… (reference data${DEMO ? " + demo" : ""})`);
+  await seedReference();
+  await seedAdmin();
+  if (DEMO) await seedDemo();
+  console.log("Seed done.");
+  if (DEMO && !process.env.SEED_ADMIN_PASSWORD) console.log("Logins (senha: tinypet123): admin@tinypet.local · tutor@tinypet.local · parceiro@tinypet.local");
+}
+
+async function speciesIds() {
+  const rows = await prisma.species.findMany({ select: { id: true, key: true } });
+  return Object.fromEntries(rows.map((r) => [r.key, r.id])) as Record<string, string>;
+}
+
+/** Reference data: species, breeds, terms, types, categories, plans, features, add-ons, badges, skills, brands, templates, settings. */
+async function seedReference() {
 
   for (const [i, t] of OWNER_TERMS.entries()) {
     await prisma.ownerTerm.upsert({ where: { label: t }, update: { sortOrder: i, isDefault: i === 0 }, create: { label: t, sortOrder: i, isDefault: i === 0 } });
@@ -224,14 +258,29 @@ async function main() {
   await prisma.setting.upsert({ where: { key: "weight_alert" }, update: {}, create: { key: "weight_alert", value: { pct: 10, days: 30 } } });
   await prisma.setting.upsert({ where: { key: "terms_version" }, update: {}, create: { key: "terms_version", value: "2026-09-01" } });
 
-  // Users
+}
+
+async function seedAdmin() {
+  if (!ADMIN_PASSWORD) {
+    console.log("Admin não criado (defina SEED_ADMIN_PASSWORD).");
+    return null;
+  }
   const defaultTerm = await prisma.ownerTerm.findFirst({ where: { isDefault: true } });
-  const pwd = await hash("tinypet123");
+  const ownerFree = await prisma.plan.findUniqueOrThrow({ where: { key: "owner_free" } });
   const admin = await prisma.user.upsert({
-    where: { email: "admin@tinypet.local" },
+    where: { email: ADMIN_EMAIL },
     update: {},
-    create: { name: "Admin tinyPet", email: "admin@tinypet.local", passwordHash: pwd, role: "ADMIN", emailVerifiedAt: new Date(), ownerTermId: defaultTerm?.id, termsVersion: "2026-09-01", termsAcceptedAt: new Date() },
+    create: { name: "Admin tinyPet", email: ADMIN_EMAIL, passwordHash: await hash(ADMIN_PASSWORD), role: "ADMIN", emailVerifiedAt: new Date(), ownerTermId: defaultTerm?.id, termsVersion: "2026-09-01", termsAcceptedAt: new Date() },
   });
+  await prisma.subscription.upsert({ where: { userId: admin.id }, update: {}, create: { userId: admin.id, planId: ownerFree.id, status: "ACTIVE", startsAt: new Date() } });
+  return admin;
+}
+
+/** Demo users, partner, catalog and pet. Never runs in production unless SEED_DEMO=1. */
+async function seedDemo() {
+  const speciesByKey = await speciesIds();
+  const defaultTerm = await prisma.ownerTerm.findFirst({ where: { isDefault: true } });
+  const pwd = await hash(ADMIN_PASSWORD ?? "tinypet123");
   const tutor = await prisma.user.upsert({
     where: { email: "tutor@tinypet.local" },
     update: {},
@@ -244,7 +293,7 @@ async function main() {
   });
 
   const ownerFree = await prisma.plan.findUniqueOrThrow({ where: { key: "owner_free" } });
-  for (const u of [admin, tutor, partnerOwner]) {
+  for (const u of [tutor, partnerOwner]) {
     await prisma.subscription.upsert({ where: { userId: u.id }, update: {}, create: { userId: u.id, planId: ownerFree.id, status: "ACTIVE", startsAt: new Date() } });
   }
 
@@ -302,9 +351,6 @@ async function main() {
     await prisma.address.create({ data: { userId: tutor.id, label: "Casa", zipCode: "80240-000", street: "Av. Sete de Setembro", number: "3000", district: "Batel", city: "Curitiba", state: "PR", latitude: -25.4416, longitude: -49.2883, isPrimary: true } });
     await prisma.phone.create({ data: { userId: tutor.id, number: "+5541988887777", type: "WHATSAPP", isPrimary: true, verifiedAt: new Date() } });
   }
-
-  console.log("Seed done.");
-  console.log("Logins (senha: tinypet123): admin@tinypet.local · tutor@tinypet.local · parceiro@tinypet.local");
 }
 
 main()

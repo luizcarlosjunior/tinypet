@@ -1,8 +1,6 @@
-import { handler, ok } from "@/server";
-import { requireCron } from "@/server/jobs";
-import { jobOverdue } from "@/server/jobs";
+import { cronRoute, jobOverdue } from "@/server/jobs";
 
-export const POST = handler(async (req) => {
-  requireCron(req);
-  return ok(await jobOverdue());
-});
+export const { GET, POST } = cronRoute(() => jobOverdue());
+
+/** Never statically cached: must run on every cron hit. */
+export const dynamic = "force-dynamic";

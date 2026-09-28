@@ -1,4 +1,5 @@
-import { Alert, Linking, Platform } from "react-native";
+import { Alert, Platform } from "react-native";
+import { openLocal } from "./links";
 import { mapsLinks } from "@tinypet/shared";
 import type { Address } from "./types";
 import { NAV_APP_KEY, getPref, setPref } from "./storage";
@@ -33,11 +34,7 @@ export async function setNavAppPref(app: NavApp | null) {
 
 export async function openNav(app: NavApp, links: ReturnType<typeof mapsLinks>) {
   const url = links[app];
-  try {
-    await Linking.openURL(url);
-  } catch {
-    Alert.alert("Não foi possível abrir", "Nenhum aplicativo de mapas encontrado para abrir a rota.");
-  }
+  if (!(await openLocal(url))) Alert.alert("Não foi possível abrir", "Nenhum aplicativo de mapas encontrado para abrir a rota.");
 }
 
 /** Opens the route in the preferred nav app, or asks which one to use. */

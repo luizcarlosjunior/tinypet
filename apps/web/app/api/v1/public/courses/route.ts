@@ -4,15 +4,15 @@ import { handler, ok, parseQuery, serialize } from "@/server";
 import { listPublicCourses } from "@/server/public";
 
 const publicCoursesQuery = paginationQuery.extend({
-  q: z.string().optional(),
-  category: z.string().optional(),
-  species: z.string().optional(),
+  q: z.string().max(200).optional(),
+  category: z.string().max(60).optional(),
+  species: z.string().max(60).optional(),
   level: CourseLevelEnum.optional(),
   free: z
     .enum(["true", "false"])
     .transform((v) => v === "true")
     .optional(),
-  partner: z.string().optional(),
+  partner: z.string().max(120).optional(),
 });
 
 export const GET = handler(async (req) => {

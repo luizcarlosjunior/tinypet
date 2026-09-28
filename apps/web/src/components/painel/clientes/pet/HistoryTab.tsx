@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { historyEventSchema } from "@tinypet/shared";
+import { historyEventSchema, safeHref } from "@tinypet/shared";
 import { z } from "zod";
 import { Activity, Award, FileText, Paperclip, Plus, Scale, Stethoscope, Syringe, Star, Flag, X } from "lucide-react";
 import { Button, Input, Modal, Select, Spinner, Textarea, Empty } from "@/components/ui";
@@ -70,12 +70,12 @@ export function HistoryTab({ petId, partnerId }: { petId: string; partnerId: str
                       {ev.attachments.map((a, i) => (
                         <li key={i}>
                           {a.type?.startsWith("image") ? (
-                            <a href={a.url} target="_blank" rel="noreferrer" className="block h-16 w-16 overflow-hidden rounded-lg border">
+                            <a href={safeHref(a.url)} target="_blank" rel="noopener noreferrer" className="block h-16 w-16 overflow-hidden rounded-lg border">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={a.url} alt={a.name} className="h-full w-full object-cover" />
+                              <img src={safeHref(a.url)} alt={a.name} className="h-full w-full object-cover" />
                             </a>
                           ) : (
-                            <a href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs hover:bg-ink-100 dark:hover:bg-ink-800">
+                            <a href={safeHref(a.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs hover:bg-ink-100 dark:hover:bg-ink-800">
                               <Paperclip className="h-3 w-3" aria-hidden /> {a.name}
                             </a>
                           )}

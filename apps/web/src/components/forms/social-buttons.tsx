@@ -31,7 +31,4 @@ export function SocialButtons({ callbackUrl }: { callbackUrl: string }) {
   );
 }
 
-export function safeNext(next: string | null | undefined, fallback = "/inicio"): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return fallback;
-  return next;
-}
+export { safeNext } from "@/lib/safe-next";

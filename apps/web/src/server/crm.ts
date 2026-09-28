@@ -1,9 +1,11 @@
 import { randomBytes } from "node:crypto";
+import { z } from "zod";
 import { prisma, Prisma } from "@tinypet/db";
 import { onlyDigits, toE164BR, type AddressInput, type PhoneInput, type EmailInput } from "@tinypet/shared";
 import { Errors } from "./errors";
 import { geocode } from "./geo";
-import { sendMail, layout } from "./mail";
+import { sendMail, layout, escapeHtml } from "./mail";
+import { rateLimit } from "./api";
 import { notifyPartner } from "./notify";
 import { getLimits } from "./plans";
 import { dateOnly, jsonInput, petData, ymd } from "./pets";
@@ -272,6 +274,7 @@ export async function updateClient(partnerId: string, id: string, body: ClientBo
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
 
 export async function createInvite(partnerId: string, clientId: string, input: { email?: string; phone?: string }) {
+  await rateLimit(`invite:partner:${partnerId}`, 30, 60 * 60 * 1000); // 30 invites / hour / partner
   const client = await getClient(partnerId, clientId);
   if (client.userId) throw Errors.conflict("Cliente já vinculado a uma conta");
   const partner = await prisma.partner.findUniqueOrThrow({ where: { id: partnerId }, select: { tradeName: true } });
@@ -281,17 +284,21 @@ export async function createInvite(partnerId: string, clientId: string, input: {
   });
   const link = `${APP_URL()}/convite/${invite.token}`;
   if (input.email) {
+    const trade = escapeHtml(partner.tradeName);
+    const safeLink = escapeHtml(link);
     await sendMail(
       input.email,
       `${partner.tradeName} convidou você para o tinyPet`,
       layout(
         `${partner.tradeName} quer se conectar com você`,
-        `<p>Olá, ${client.name}!</p><p><strong>${partner.tradeName}</strong> cadastrou você e seus pets no tinyPet. Aceite o convite para acompanhar agendamentos, histórico e muito mais.</p><p><a href="${link}" style="display:inline-block;background:#f95d16;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Aceitar convite</a></p><p style="font-size:12px;color:#8792a8">O link vale por 14 dias: ${link}</p>`,
+        `<p>Olá, ${escapeHtml(client.name)}!</p><p><strong>${trade}</strong> cadastrou você e seus pets no tinyPet. Aceite o convite para acompanhar agendamentos, histórico e muito mais.</p><p><a href="${safeLink}" style="display:inline-block;background:#f95d16;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Aceitar convite</a></p><p style="font-size:12px;color:#8792a8">O link vale por 14 dias: ${safeLink}</p>`,
       ),
       `Aceite o convite: ${link}`,
     );
   } else if (input.phone) {
-    console.log(`[whatsapp] to=${input.phone} invite=${link}`); // WhatsApp provider: phase 2
+    // WhatsApp provider: phase 2. Never log the tokenized link in production.
+    if (process.env.NODE_ENV === "production") console.log(`[whatsapp] invite requested (invite=${invite.id})`);
+    else console.log(`[whatsapp][dev] to=${input.phone} invite=${link}`);
   }
   return { ...invite, link };
 }
@@ -312,9 +319,27 @@ export async function inviteByToken(token: string) {
   return invite;
 }
 
+/** An invite is bound to its recipient: the invite e-mail must be the login e-mail or a verified e-mail of the user, or the invite phone a verified phone. */
+export async function inviteMatchesUser(invite: { email: string | null; phone: string | null }, userId: string): Promise<boolean> {
+  if (invite.email) {
+    const target = invite.email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (user?.email.toLowerCase() === target) return true;
+    const verified = await prisma.email.findMany({ where: { userId, verifiedAt: { not: null } }, select: { address: true } });
+    if (verified.some((e) => e.address.toLowerCase() === target)) return true;
+  }
+  if (invite.phone) {
+    const target = onlyDigits(invite.phone);
+    const verified = await prisma.phone.findMany({ where: { userId, verifiedAt: { not: null } }, select: { number: true } });
+    if (target && verified.some((p) => onlyDigits(p.number) === target || onlyDigits(toE164BR(p.number)) === target)) return true;
+  }
+  return false;
+}
+
 export async function acceptInvite(userId: string, input: { token: string; petMerges?: { partnerPetId: string; ownerPetId: string | null }[] }) {
   const invite = await inviteByToken(input.token);
   if (invite.status !== "PENDING") throw Errors.badRequest(invite.status === "EXPIRED" ? "Convite expirado" : "Convite não está mais disponível");
+  if (!(await inviteMatchesUser(invite, userId))) throw Errors.forbidden("Este convite foi enviado para outro e-mail/telefone. Entre com a conta correta.");
   if (invite.client.userId && invite.client.userId !== userId) throw Errors.conflict("Este cliente já está vinculado a outra conta");
   const clientId = invite.client.id;
   const merges = new Map((input.petMerges ?? []).map((m) => [m.partnerPetId, m.ownerPetId]));
@@ -341,6 +366,7 @@ export async function acceptInvite(userId: string, input: { token: string; petMe
   await prisma.$transaction([
     prisma.client.update({ where: { id: clientId }, data: { userId } }),
     prisma.clientInvite.update({ where: { id: invite.id }, data: { status: "ACCEPTED", acceptedAt: new Date() } }),
+    prisma.clientInvite.updateMany({ where: { clientId, status: "PENDING", id: { not: invite.id } }, data: { status: "CANCELED" } }),
   ]);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { name: true } });
   await notifyPartner(invite.partnerId, { type: "client_linked", title: `${user.name} aceitou o convite`, body: `O cliente ${invite.client.name} agora está vinculado à conta do tutor.`, data: { clientId } });
@@ -389,9 +415,17 @@ export async function exportClientsCsv(partnerId: string) {
   ]);
 }
 
-/** CSV columns: name,email,phone,petName,species (species key or pt-BR label). Skips rows without name or already present (same name + same e-mail/phone). */
+export const IMPORT_MAX_ROWS = 5000;
+const importEmail = z.string().trim().toLowerCase().email().max(200);
+
+/**
+ * CSV columns: name,email,phone,petName,species (species key or pt-BR label). At most 5000 rows.
+ * Invalid rows (name 2–120 chars, valid e-mail, phone ≤ 20 digits) go to `errors[]`; rows already present (same name +
+ * same e-mail/phone) are skipped.
+ */
 export async function importClientsCsv(partnerId: string, text: string) {
   const rows = csvObjects(parseCsv(text));
+  if (rows.length > IMPORT_MAX_ROWS) throw Errors.badRequest(`O arquivo tem ${rows.length} linhas; o máximo é ${IMPORT_MAX_ROWS} por importação`);
   const species = await prisma.species.findMany({ where: { active: true } });
   const speciesFor = (v: string) => {
     const k = v.trim().toLowerCase();
@@ -410,6 +444,19 @@ export async function importClientsCsv(partnerId: string, text: string) {
   for (const [i, r] of rows.entries()) {
     const name = r.name?.trim();
     if (!name) {
+      skipped++;
+      continue;
+    }
+    const rowErrors: string[] = [];
+    if (name.length < 2 || name.length > 120) rowErrors.push("nome deve ter de 2 a 120 caracteres");
+    const rawEmail = r.email?.trim();
+    if (rawEmail && !importEmail.safeParse(rawEmail).success) rowErrors.push("e-mail inválido");
+    const rawPhone = r.phone?.trim();
+    if (rawPhone && (onlyDigits(rawPhone).length === 0 || onlyDigits(rawPhone).length > 20)) rowErrors.push("telefone inválido (máx. 20 dígitos)");
+    const petNameRaw = r.petname?.trim();
+    if (petNameRaw && petNameRaw.length > 120) rowErrors.push("nome do pet acima de 120 caracteres");
+    if (rowErrors.length) {
+      errors.push({ row: i + 2, message: rowErrors.join("; ") });
       skipped++;
       continue;
     }
@@ -448,7 +495,8 @@ export async function importClientsCsv(partnerId: string, text: string) {
       created++;
       current++;
     } catch (e) {
-      errors.push({ row: i + 2, message: e instanceof Error ? e.message : "Erro" });
+      console.warn("[import] row failed", e);
+      errors.push({ row: i + 2, message: "Erro ao importar a linha" });
       skipped++;
     }
   }

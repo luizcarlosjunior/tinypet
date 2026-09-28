@@ -1,5 +1,5 @@
 import { Clock, ExternalLink, Globe, MapPin, Navigation } from "lucide-react";
-import { mapsLinks } from "@tinypet/shared";
+import { mapsLinks, safeHref } from "@tinypet/shared";
 import { WEEKDAYS } from "@/lib/format";
 import { addressLine } from "@/lib/format";
 import { SOCIAL_LABEL, num, type PublicAddress, type PublicPartner } from "./types";
@@ -69,7 +69,9 @@ export function AddressBlock({ address, tradeName, radiusKm }: { address: Public
   );
 }
 
-export function SocialLinks({ links, website }: { links: PublicPartner["socialLinks"]; website?: string | null }) {
+export function SocialLinks({ links: rawLinks, website: rawWebsite }: { links: PublicPartner["socialLinks"]; website?: string | null }) {
+  const website = safeHref(rawWebsite);
+  const links = rawLinks?.filter((l) => safeHref(l.url));
   if (!links?.length && !website) return null;
   return (
     <section aria-labelledby="redes" className="card">
@@ -86,7 +88,7 @@ export function SocialLinks({ links, website }: { links: PublicPartner["socialLi
         )}
         {links?.map((l) => (
           <li key={l.network}>
-            <a href={l.url} target="_blank" rel="noopener noreferrer" className="btn-secondary h-8 px-3 text-xs">
+            <a href={safeHref(l.url)} target="_blank" rel="noopener noreferrer" className="btn-secondary h-8 px-3 text-xs">
               {SOCIAL_LABEL[l.network] ?? l.network} <ExternalLink className="h-3 w-3" aria-hidden />
             </a>
           </li>
@@ -107,9 +109,9 @@ export function VenuePhotos({ photos }: { photos: PublicPartner["venuePhotos"] }
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
         {sorted.map((p) => (
           <li key={p.id} className="overflow-hidden rounded-xl">
-            <a href={p.url} target="_blank" rel="noopener noreferrer">
+            <a href={safeHref(p.url)} target="_blank" rel="noopener noreferrer">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.thumbUrl ?? p.url} alt={p.caption ?? "Foto do estabelecimento"} loading="lazy" className="aspect-square w-full object-cover transition hover:scale-[1.02]" />
+              <img src={safeHref(p.thumbUrl ?? p.url)} alt={p.caption ?? "Foto do estabelecimento"} loading="lazy" className="aspect-square w-full object-cover transition hover:scale-[1.02]" />
             </a>
             {p.caption && <p className="mt-1 text-xs text-[var(--muted)]">{p.caption}</p>}
           </li>

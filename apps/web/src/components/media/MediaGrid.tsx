@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Star, Trash2, Video } from "lucide-react";
 import { UploadButton } from "./UploadButton";
 import type { MediaPurpose } from "@/lib/upload";
 import { cn } from "@/lib/utils";
+import { safeHref } from "@tinypet/shared";
 
 export type MediaItem = { kind: "IMAGE" | "VIDEO"; url: string; thumbUrl?: string | null; isCover?: boolean; sortOrder?: number; caption?: string | null };
 
@@ -30,14 +31,14 @@ export function MediaGrid({ items, onChange, purpose, partnerId, max = 10, allow
                 <div className="flex h-full w-full items-center justify-center">
                   {m.thumbUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.thumbUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={safeHref(m.thumbUrl)} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <Video className="h-8 w-8 text-[var(--muted)]" aria-label="Vídeo" />
                   )}
                 </div>
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.thumbUrl || m.url} alt={m.caption ?? `Mídia ${i + 1}`} className="h-full w-full object-cover" />
+                <img src={safeHref(m.thumbUrl || m.url)} alt={m.caption ?? `Mídia ${i + 1}`} className="h-full w-full object-cover" />
               )}
             </div>
             {m.isCover && withCover && <span className="absolute left-2 top-2 rounded-full bg-brand-500 px-2 py-0.5 text-[10px] font-semibold text-white">Capa</span>}

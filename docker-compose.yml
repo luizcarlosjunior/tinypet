@@ -3,9 +3,11 @@ services:
     image: mysql:8.4
     container_name: tinypet-mysql
     ports:
-      - "3307:3306"
+      # Local only: never expose the dev database on the LAN.
+      - "127.0.0.1:3307:3306"
     environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      # Only applied when the volume is created. For an existing volume, change the password with ALTER USER.
+      MYSQL_ROOT_PASSWORD: tinypet
       MYSQL_DATABASE: tinypet
     volumes:
       - tinypet-mysql:/var/lib/mysql

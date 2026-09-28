@@ -5,7 +5,7 @@ import { serverApiList } from "@/lib/server-api";
 import { RatingStars } from "@/components/ui/rating";
 import { Empty } from "@/components/ui";
 import { COURSE_LEVEL_LABEL, type PublicCourse } from "@/components/public/types";
-import { formatBRL } from "@tinypet/shared";
+import { formatBRL, safeHref } from "@tinypet/shared";
 
 export const metadata: Metadata = { title: "Cursos", description: "Cursos online de adestramento e cuidados com pets, feitos por parceiros tinyPet." };
 export const revalidate = 120;
@@ -28,7 +28,7 @@ export default async function CursosPage() {
               <Link href={`/cursos/${c.id}`} className="block overflow-hidden rounded-t-2xl">
                 {c.coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.coverUrl} alt="" className="aspect-video w-full object-cover" />
+                  <img src={safeHref(c.coverUrl)} alt="" className="aspect-video w-full object-cover" />
                 ) : (
                   <div className="flex aspect-video items-center justify-center bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-200">
                     <GraduationCap className="h-10 w-10" aria-hidden />

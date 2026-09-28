@@ -52,6 +52,8 @@ export default function PetPage() {
   const pet = q.data;
   const months = ageInMonths(pet.birthDate, pet.approxAgeMonths);
   const stage = lifeStageFor(months, pet.species?.key ?? pet.speciesKey ?? "other", pet.size);
+  /** Once a tutor owns the pet, the tutor controls the profile and the deceased status; the partner only complements. */
+  const tutorControlled = !!pet.ownerId;
 
   return (
     <div>
@@ -70,7 +72,7 @@ export default function PetPage() {
             {[pet.species?.label, pet.breed?.name ?? pet.breedOther, pet.sex ? SEX_LABEL[pet.sex] : null, formatAge(months)].filter(Boolean).join(" · ")}
           </p>
         </div>
-        {pet.status === "DECEASED" ? (
+        {tutorControlled ? null : pet.status === "DECEASED" ? (
           <Button type="button" variant="secondary" loading={undoDeceased.isPending} onClick={() => undoDeceased.mutate()}>
             <Undo2 className="h-4 w-4" aria-hidden /> Desfazer falecimento
           </Button>
@@ -85,7 +87,31 @@ export default function PetPage() {
       {tab === "ficha" && (
         <section className="card">
           {pet.memorialNote && <p className="mb-4 rounded-xl bg-ink-100 p-3 text-sm italic dark:bg-ink-800">{pet.memorialNote}</p>}
-          <PetForm key={pet.id + (pet.avatarUrl ?? "")} initial={pet} partnerId={partnerId} onSubmit={(v) => update.mutate(v)} submitting={update.isPending} />
+          {tutorControlled ? (
+            <div className="space-y-3 text-sm">
+              <p className="rounded-xl bg-brand-50 p-3 text-brand-800 dark:bg-brand-900/30 dark:text-brand-100">
+                A ficha deste pet é gerenciada pelo tutor. Você pode registrar atendimentos, medidas, vacinas, comandos e rotinas nas outras abas.
+              </p>
+              <dl className="grid gap-2 sm:grid-cols-2">
+                {[
+                  ["Cor/pelagem", pet.color],
+                  ["Nascimento", pet.birthDate ? fmtDate(pet.birthDate) : null],
+                  ["Castrado", pet.neutered == null ? null : pet.neutered ? "Sim" : "Não"],
+                  ["Microchip", pet.microchip],
+                  ["Temperamento", pet.temperament],
+                  ["Cuidados especiais", pet.specialCare],
+                  ["Alimentação", pet.feedingNotes],
+                ].map(([label, value]) => (
+                  <div key={label as string}>
+                    <dt className="text-xs text-[var(--muted)]">{label}</dt>
+                    <dd>{value || "Não informado"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : (
+            <PetForm key={pet.id + (pet.avatarUrl ?? "")} initial={pet} partnerId={partnerId} onSubmit={(v) => update.mutate(v)} submitting={update.isPending} />
+          )}
         </section>
       )}
       {tab === "historico" && <HistoryTab petId={petId} partnerId={partnerId} />}

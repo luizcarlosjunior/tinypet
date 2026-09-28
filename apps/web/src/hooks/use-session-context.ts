@@ -17,6 +17,8 @@ export type SessionUser = {
   publicPhotosConsent?: boolean;
   statsConsent: boolean;
   birthDate?: string | null;
+  /** `false` when the account never accepted the current terms (e.g. OAuth sign-up). Absent on older servers. */
+  termsAccepted?: boolean;
 };
 export type SessionMembership = {
   membershipId: string;

@@ -59,6 +59,10 @@ export async function upsertPetSkill(
       ).id;
   }
   const current = await prisma.petSkill.findUnique({ where: { petId_skillId: { petId, skillId } } });
+  // partners only change marks they made themselves; owner/family or other partners' marks stay (they can validate instead)
+  if (actor.partnerId && current && current.markedByPartnerId !== actor.partnerId) {
+    throw Errors.forbidden("Este comando foi registrado pelo tutor ou por outro parceiro. Use a validação.");
+  }
   const masteredAt =
     input.level === "MASTERED" ? (input.masteredAt ? dateOnly(input.masteredAt) : current?.masteredAt ?? dateOnly(todaySP())) : null;
   const marked = actor.partnerId ? { markedByPartnerId: actor.partnerId, markedByUserId: null } : { markedByUserId: actor.userId, markedByPartnerId: null };

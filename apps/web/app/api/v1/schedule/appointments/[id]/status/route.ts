@@ -5,7 +5,7 @@ import { transitionAppointment } from "@/server/scheduling";
 /**
  * POST /schedule/appointments/:id/status (appointmentStatusSchema).
  * REQUESTED→CONFIRMED|CANCELED · CONFIRMED→IN_PROGRESS|COMPLETED|CANCELED|NO_SHOW · IN_PROGRESS→COMPLETED|CANCELED.
- * COMPLETED writes a VISIT history event per pet; CANCELED needs cancelReason; CONFIRMED on a "reschedule:<id>" proposal cancels the original.
+ * COMPLETED writes a VISIT history event per pet; CANCELED needs cancelReason; CONFIRMED on a reschedule proposal (`rescheduleOfId`) cancels the original (same partner and client only).
  */
 export const POST = handler<{ id: string }>(async (req, { params }) => {
   const ctx = await requirePartner(req);

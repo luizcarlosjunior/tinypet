@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Linking, View } from "react-native";
+import { Alert, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { mapsLinks } from "@tinypet/shared";
@@ -10,6 +10,7 @@ import { addressText, availableNavApps, getNavAppPref, NAV_APP_LABEL, openNav, s
 import { spacing, useTheme } from "@/lib/theme";
 import { Badge, Button, Card, Empty, ErrorState, Loading, Screen, Text } from "@/components/ui";
 import { BackHeader } from "@/components/BackHeader";
+import { openExternal, openLocal } from "@/lib/links";
 
 export default function DayRouteScreen() {
   const t = useTheme();
@@ -29,13 +30,13 @@ export default function DayRouteScreen() {
   const r = q.data;
 
   const openFullRoute = () => {
-    if (r?.googleMapsUrl) return Linking.openURL(r.googleMapsUrl).catch(() => Alert.alert("Não foi possível abrir o Google Maps"));
+    if (r?.googleMapsUrl) return openExternal(r.googleMapsUrl);
     // Fallback: build a Google Maps directions URL with waypoints from the stops.
     const pts = (r?.stops ?? []).map((s) => (s.lat != null && s.lng != null ? `${s.lat},${s.lng}` : encodeURIComponent(addressText(s.address))));
     if (pts.length === 0) return;
     const dest = pts[pts.length - 1];
     const way = pts.slice(0, -1).join("|");
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${dest}${way ? `&waypoints=${way}` : ""}&travelmode=driving`);
+    void openLocal(`https://www.google.com/maps/dir/?api=1&destination=${dest}${way ? `&waypoints=${way}` : ""}&travelmode=driving`);
   };
 
   return (

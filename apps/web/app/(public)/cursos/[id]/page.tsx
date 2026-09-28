@@ -8,7 +8,7 @@ import { RatingStars } from "@/components/ui/rating";
 import { JsonLd } from "@/components/public/json-ld";
 import { EnrollButton } from "@/components/public/enroll-button";
 import { COURSE_LEVEL_LABEL, num, type PublicCourse } from "@/components/public/types";
-import { formatBRL, SPECIES } from "@tinypet/shared";
+import { formatBRL, SPECIES, safeHref } from "@tinypet/shared";
 
 export const revalidate = 120;
 
@@ -49,7 +49,7 @@ export default async function CursoPage({ params }: { params: { id: string } }) 
         <div>
           {c.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={c.coverUrl} alt="" className="aspect-video w-full rounded-2xl object-cover" />
+            <img src={safeHref(c.coverUrl)} alt="" className="aspect-video w-full rounded-2xl object-cover" />
           ) : (
             <div className="flex aspect-video items-center justify-center rounded-2xl bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-200">
               <GraduationCap className="h-12 w-12" aria-hidden />

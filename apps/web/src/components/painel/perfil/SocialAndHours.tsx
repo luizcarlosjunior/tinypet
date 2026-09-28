@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { SocialNetworkEnum } from "@tinypet/shared";
+import { SocialNetworkEnum, withHttps } from "@tinypet/shared";
 import { api } from "@/lib/api-client";
 import { Button, Input } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
@@ -25,7 +25,7 @@ export function SocialLinksCard({ partner, onSaved, canEdit }: { partner: Partne
   const [values, setValues] = useState<Record<string, string>>(initial);
   useEffect(() => setValues(Object.fromEntries(NETWORKS.map((n) => [n.key, partner.socialLinks?.find((s) => s.network === n.key)?.url ?? ""]))), [partner.socialLinks]);
   const save = useMutation({
-    mutationFn: () => api(`/partners/${partner.id}`, { method: "PATCH", json: { socialLinks: NETWORKS.filter((n) => values[n.key]?.trim()).map((n) => ({ network: n.key, url: values[n.key]!.trim() })) } }),
+    mutationFn: () => api(`/partners/${partner.id}`, { method: "PATCH", json: { socialLinks: NETWORKS.filter((n) => values[n.key]?.trim()).map((n) => ({ network: n.key, url: withHttps(values[n.key]) })) } }),
     onSuccess: () => {
       toast("Redes sociais salvas", "success");
       onSaved();
@@ -43,7 +43,7 @@ export function SocialLinksCard({ partner, onSaved, canEdit }: { partner: Partne
       >
         <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-2">
           {NETWORKS.map((n) => (
-            <Input key={n.key} id={`social-${n.key}`} label={n.label} type="url" placeholder={n.placeholder} value={values[n.key] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [n.key]: e.target.value }))} />
+            <Input key={n.key} id={`social-${n.key}`} label={n.label} type="url" inputMode="url" placeholder={n.placeholder} value={values[n.key] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [n.key]: e.target.value }))} onBlur={(e) => setValues((v) => ({ ...v, [n.key]: withHttps(e.target.value) }))} />
           ))}
         </fieldset>
         {canEdit && (

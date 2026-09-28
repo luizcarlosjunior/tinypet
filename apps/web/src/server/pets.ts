@@ -104,7 +104,7 @@ export async function petLifeStage(pet: PetAgeInput): Promise<LifeStage | null> 
 
 export type PetActor = {
   user: AuthUser;
-  pet: { id: string; ownerId: string | null; status: "ACTIVE" | "DECEASED"; name: string };
+  pet: { id: string; ownerId: string | null; status: "ACTIVE" | "DECEASED"; name: string; createdByPartnerId: string | null };
   via: "owner" | "family" | "partner";
   partnerId?: string;
 };
@@ -114,11 +114,11 @@ export type PetActor = {
  * linked (ClientPet) to one of that partner's clients; otherwise `assertPetAccess` (owner / family / partner member).
  */
 export async function petActor(req: NextRequest, petId: string, level: "VIEW" | "EDIT" = "VIEW"): Promise<PetActor> {
-  const select = { id: true, ownerId: true, status: true, name: true } as const;
+  const select = { id: true, ownerId: true, status: true, name: true, createdByPartnerId: true } as const;
   if (req.headers.get("x-partner-id")) {
     const ctx = await requirePartner(req);
     const pet = await prisma.pet.findFirst({
-      where: { id: petId, deletedAt: null, clients: { some: { client: { partnerId: ctx.partnerId, deletedAt: null } } } },
+      where: { id: petId, deletedAt: null, clients: { some: { client: { partnerId: ctx.partnerId, deletedAt: null, partner: { deletedAt: null } } } } },
       select,
     });
     if (!pet) throw Errors.notFound("Pet não encontrado");
@@ -128,6 +128,24 @@ export async function petActor(req: NextRequest, petId: string, level: "VIEW" | 
   const a = await assertPetAccess(user.id, petId, level);
   const pet = await prisma.pet.findUniqueOrThrow({ where: { id: petId }, select });
   return { user, pet, via: a.via, partnerId: a.via === "partner" ? a.partnerId : undefined };
+}
+
+/**
+ * Owner-controlled data (pet profile, deceased flag): owner / family EDIT always; a partner only for pets it created
+ * that have no owner yet (`createdByPartnerId === partnerId && ownerId === null`).
+ */
+export function canEditOwnerControlled(actor: PetActor): boolean {
+  if (actor.via !== "partner") return true;
+  return actor.pet.ownerId === null && !!actor.partnerId && actor.pet.createdByPartnerId === actor.partnerId;
+}
+
+export function assertOwnerControlled(actor: PetActor, msg = "Apenas o tutor pode alterar estes dados do pet") {
+  if (!canEditOwnerControlled(actor)) throw Errors.forbidden(msg);
+}
+
+/** Partners may only edit/delete rows they created themselves (rows with partnerId null belong to owner/family). */
+export function assertPartnerOwnsRow(actor: PetActor, rowPartnerId: string | null | undefined, msg = "Registro do tutor ou de outro parceiro não pode ser alterado") {
+  if (actor.via === "partner" && (!rowPartnerId || rowPartnerId !== actor.partnerId)) throw Errors.forbidden(msg);
 }
 
 /** Pets the user owns or can see through PetAccess. */
@@ -168,7 +186,7 @@ export async function petData(body: {
   breedId?: string | null;
   breedOther?: string | null;
   color?: string | null;
-  sex?: "MALE" | "FEMALE" | "UNKNOWN" | null;
+  sex?: "MALE" | "FEMALE" | null;
   size?: PetSize | null;
   birthDate?: string | null;
   approxAgeMonths?: number | null;
@@ -524,4 +542,21 @@ export async function milestones(petId: string) {
   }
   items.sort((a, b) => b.date.getTime() - a.date.getTime());
   return items;
+}
+
+// ───────────────────────────── owner family ─────────────────────────────
+
+type FamilyRow = { id: string; name: string; relationship: string | null; phone: string | null; email: string | null; canAuthorize: boolean; canPickUp: boolean; linkedUserId: string | null };
+
+/**
+ * Owner's family members for API responses. Never exposes `linkedUserId` (account-existence oracle); `hasAccount: true`
+ * is only added when the member's e-mail belongs to an account this user already shared a pet with (PetAccess).
+ */
+export async function familyView(userId: string, rows: FamilyRow[]) {
+  const emails = Array.from(new Set(rows.map((r) => r.email?.toLowerCase()).filter((e): e is string => !!e)));
+  const shared = emails.length
+    ? await prisma.petAccess.findMany({ where: { pet: { ownerId: userId, deletedAt: null }, user: { email: { in: emails }, deletedAt: null } }, select: { user: { select: { email: true } } } })
+    : [];
+  const withAccess = new Set(shared.map((s) => s.user.email.toLowerCase()));
+  return rows.map(({ linkedUserId: _l, ...r }) => ({ ...r, ...(r.email && withAccess.has(r.email.toLowerCase()) ? { hasAccount: true } : {}) }));
 }

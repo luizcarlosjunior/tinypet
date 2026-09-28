@@ -6,7 +6,7 @@ import { ownerRescheduleAppointment } from "@/server/scheduling";
 const schema = z.object({ startsAt: isoDateTime });
 
 /**
- * POST /me/appointments/:id/reschedule {startsAt} → new REQUESTED proposal (notes "reschedule:<id>").
+ * POST /me/appointments/:id/reschedule {startsAt} → new REQUESTED proposal (`rescheduleOfId` set server-side).
  * The original stays until the partner confirms the proposal, which cancels it with "Remarcação solicitada".
  */
 export const POST = handler<{ id: string }>(async (req, { params }) => {

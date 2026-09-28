@@ -8,7 +8,7 @@ import { Button, Input, Select, Textarea } from "@/components/ui";
 import { AvatarUpload } from "@/components/media/avatar-upload";
 import type { Pet } from "@/hooks/use-pets";
 
-const SEX = [["", "Não informado"], ["MALE", "Macho"], ["FEMALE", "Fêmea"], ["UNKNOWN", "Não sei"]] as const;
+const SEX = [["", "Não informado"], ["MALE", "Macho"], ["FEMALE", "Fêmea"]] as const;
 const SIZE = [["", "Não informado"], ["SMALL", "Pequeno"], ["MEDIUM", "Médio"], ["LARGE", "Grande"], ["GIANT", "Gigante"]] as const;
 
 function toInput(pet?: Pet | null): Partial<PetInput> {
