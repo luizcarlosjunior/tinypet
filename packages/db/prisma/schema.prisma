@@ -1,0 +1,1707 @@
+// tinyPet — Prisma schema (MySQL)
+// Naming: models/fields in English, tables snake_case plural via @@map, columns snake_case via @map.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Identity ─────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id                  String     @id @default(cuid())
+  name                String
+  email               String     @unique
+  emailVerifiedAt     DateTime?  @map("email_verified_at")
+  passwordHash        String?    @map("password_hash")
+  avatarUrl           String?    @map("avatar_url")
+  birthDate           DateTime?  @map("birth_date") @db.Date
+  role                UserRole   @default(USER)
+  ownerTermId         String?    @map("owner_term_id")
+  ownerTerm           OwnerTerm? @relation(fields: [ownerTermId], references: [id])
+  marketingConsent    Boolean    @default(false) @map("marketing_consent")
+  publicPhotosConsent Boolean    @default(false) @map("public_photos_consent")
+  statsConsent        Boolean    @default(true) @map("stats_consent")
+  termsVersion        String?    @map("terms_version")
+  termsAcceptedAt     DateTime?  @map("terms_accepted_at")
+  twoFactorSecret     String?    @map("two_factor_secret")
+  locale              String     @default("pt-BR")
+  timezone            String     @default("America/Sao_Paulo")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+  deletedAt           DateTime?  @map("deleted_at")
+
+  accounts              Account[]
+  sessions              Session[]
+  memberships           Membership[]
+  clients               Client[]
+  pets                  Pet[]              @relation("PrimaryOwner")
+  petAccesses           PetAccess[]
+  phones                Phone[]
+  emails                Email[]
+  addresses             Address[]
+  familyMembers         FamilyMember[]
+  reviews               Review[]
+  reports               Report[]
+  enrollments           Enrollment[]
+  subscription          Subscription?
+  taskCompletions       TaskCompletion[]
+  mediaAssets           MediaAsset[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  petHistoryEvents      PetHistoryEvent[]
+  bodyMeasurements      BodyMeasurement[]
+  petSkills             PetSkill[]
+  appointmentsRequested Appointment[]      @relation("RequestedBy")
+  verificationCodes     VerificationCode[]
+
+  @@map("users")
+}
+
+// NextAuth adapter tables
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+enum VerificationChannel {
+  EMAIL
+  PHONE
+}
+
+model VerificationCode {
+  id        String              @id @default(cuid())
+  userId    String              @map("user_id")
+  channel   VerificationChannel
+  target    String
+  code      String
+  expiresAt DateTime            @map("expires_at")
+  usedAt    DateTime?           @map("used_at")
+  createdAt DateTime            @default(now()) @map("created_at")
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel])
+  @@map("verification_codes")
+}
+
+model OwnerTerm {
+  id        String  @id @default(cuid())
+  label     String  @unique // Tutor, Dono, Pai de pet...
+  isDefault Boolean @default(false) @map("is_default")
+  active    Boolean @default(true)
+  sortOrder Int     @default(0) @map("sort_order")
+  users     User[]
+
+  @@map("owner_terms")
+}
+
+enum MembershipRole {
+  OWNER
+  STAFF
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String         @map("user_id")
+  partnerId      String         @map("partner_id")
+  role           MembershipRole @default(STAFF)
+  canSeeFinance  Boolean        @default(false) @map("can_see_finance")
+  jobTitle       String?        @map("job_title")
+  baseAddressId  String?        @map("base_address_id")
+  costPerKm      Decimal?       @map("cost_per_km") @db.Decimal(10, 2)
+  navApp         String?        @map("nav_app") // google | waze | apple
+  calendarToken  String?        @unique @map("calendar_token")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner        Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  availabilities Availability[]
+  timeOffs       TimeOff[]
+  appointments   Appointment[]
+
+  @@unique([userId, partnerId])
+  @@map("memberships")
+}
+
+// ───────────────────────────── Partner ─────────────────────────────
+
+enum DocumentType {
+  CNPJ
+  CPF
+}
+
+model Partner {
+  id                 String        @id @default(cuid())
+  slug               String        @unique
+  tradeName          String        @map("trade_name")
+  legalName          String?       @map("legal_name")
+  description        String?       @db.Text
+  documentType       DocumentType? @map("document_type")
+  document           String?
+  logoUrl            String?       @map("logo_url")
+  website            String?
+  plan               String        @default("free")
+  serviceRadiusKm    Int?          @map("service_radius_km")
+  cancellationHours  Int           @default(24) @map("cancellation_hours")
+  bufferMinutes      Int           @default(0) @map("buffer_minutes")
+  travelSlackMinutes Int           @default(10) @map("travel_slack_minutes")
+  emailVerifiedAt    DateTime?     @map("email_verified_at")
+  phoneVerifiedAt    DateTime?     @map("phone_verified_at")
+  published          Boolean       @default(false)
+  featured           Boolean       @default(false)
+  ratingAvg          Decimal?      @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount        Int           @default(0) @map("rating_count")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  deletedAt          DateTime?     @map("deleted_at")
+
+  types            PartnerTypeLink[]
+  socialLinks      SocialLink[]
+  businessHours    BusinessHours[]
+  venuePhotos      VenuePhoto[]
+  memberships      Membership[]
+  clients          Client[]
+  catalogItems     CatalogItem[]
+  phones           Phone[]
+  emails           Email[]
+  addresses        Address[]
+  appointments     Appointment[]
+  contracts        Contract[]
+  transactions     Transaction[]
+  courses          Course[]
+  subscription     Subscription?
+  paymentRecipient PaymentRecipient?
+  badges           Badge[]
+  reviews          Review[]
+  mediaAssets      MediaAsset[]
+  petHistoryEvents PetHistoryEvent[]
+  bodyMeasurements BodyMeasurement[]
+  petSkills        PetSkill[]
+  vaccinations     Vaccination[]
+  tasks            Task[]
+  auditLogs        AuditLog[]
+  clientInvites    ClientInvite[]
+
+  @@map("partners")
+}
+
+model PartnerType {
+  id        String            @id @default(cuid())
+  key       String            @unique // trainer, vet_clinic, specialty_store, pet_shop
+  label     String
+  active    Boolean           @default(true)
+  sortOrder Int               @default(0) @map("sort_order")
+  partners  PartnerTypeLink[]
+
+  @@map("partner_types")
+}
+
+model PartnerTypeLink {
+  partnerId String      @map("partner_id")
+  typeId    String      @map("type_id")
+  partner   Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  type      PartnerType @relation(fields: [typeId], references: [id])
+
+  @@id([partnerId, typeId])
+  @@map("partner_type_links")
+}
+
+enum SocialNetwork {
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  YOUTUBE
+  WHATSAPP
+  LINKEDIN
+}
+
+model SocialLink {
+  id        String        @id @default(cuid())
+  partnerId String        @map("partner_id")
+  network   SocialNetwork
+  url       String
+  partner   Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerId, network])
+  @@map("social_links")
+}
+
+model BusinessHours {
+  id        String  @id @default(cuid())
+  partnerId String  @map("partner_id")
+  weekday   Int // 0 = Sunday
+  opensAt   String  @map("opens_at") // "08:00"
+  closesAt  String  @map("closes_at")
+  closed    Boolean @default(false)
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerId, weekday])
+  @@map("business_hours")
+}
+
+model VenuePhoto {
+  id        String  @id @default(cuid())
+  partnerId String  @map("partner_id")
+  url       String
+  thumbUrl  String? @map("thumb_url")
+  caption   String?
+  sortOrder Int     @default(0) @map("sort_order")
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@map("venue_photos")
+}
+
+// ───────────────────────────── Contacts (polymorphic: user | client | partner) ─────────────────────────────
+
+enum PhoneType {
+  MOBILE
+  LANDLINE
+  WHATSAPP
+}
+
+model Phone {
+  id         String    @id @default(cuid())
+  userId     String?   @map("user_id")
+  clientId   String?   @map("client_id")
+  partnerId  String?   @map("partner_id")
+  type       PhoneType @default(MOBILE)
+  number     String // E.164
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  verifiedAt DateTime? @map("verified_at")
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client     Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  partner    Partner?  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([partnerId])
+  @@index([number])
+  @@map("phones")
+}
+
+model Email {
+  id         String    @id @default(cuid())
+  userId     String?   @map("user_id")
+  clientId   String?   @map("client_id")
+  partnerId  String?   @map("partner_id")
+  address    String
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  verifiedAt DateTime? @map("verified_at")
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client     Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  partner    Partner?  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([partnerId])
+  @@index([address])
+  @@map("emails")
+}
+
+model Address {
+  id           String        @id @default(cuid())
+  userId       String?       @map("user_id")
+  clientId     String?       @map("client_id")
+  partnerId    String?       @map("partner_id")
+  label        String? // Casa, Trabalho, Loja
+  zipCode      String        @map("zip_code")
+  street       String
+  number       String?
+  complement   String?
+  reference    String?
+  accessNotes  String?       @map("access_notes") @db.Text // portaria, interfone
+  district     String?
+  city         String
+  state        String // UF
+  country      String        @default("BR")
+  latitude     Decimal?      @db.Decimal(10, 7)
+  longitude    Decimal?      @db.Decimal(10, 7)
+  isPrimary    Boolean       @default(false) @map("is_primary")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client       Client?       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  partner      Partner?      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([partnerId])
+  @@index([city, state])
+  @@map("addresses")
+}
+
+// ───────────────────────────── Pets & CRM ─────────────────────────────
+
+model Client {
+  id        String    @id @default(cuid())
+  partnerId String    @map("partner_id")
+  userId    String?   @map("user_id")
+  name      String
+  notes     String?   @db.Text
+  tags      Json? // ["VIP","inadimplente"]
+  source    String?
+  birthDate DateTime? @map("birth_date") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  partner       Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  user          User?          @relation(fields: [userId], references: [id])
+  familyMembers FamilyMember[]
+  pets          ClientPet[]
+  contracts     Contract[]
+  appointments  Appointment[]
+  phones        Phone[]
+  emails        Email[]
+  addresses     Address[]
+  invites       ClientInvite[]
+
+  @@index([partnerId, name])
+  @@index([userId])
+  @@map("clients")
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELED
+}
+
+model ClientInvite {
+  id         String       @id @default(cuid())
+  partnerId  String       @map("partner_id")
+  clientId   String       @map("client_id")
+  token      String       @unique
+  email      String?
+  phone      String?
+  status     InviteStatus @default(PENDING)
+  expiresAt  DateTime     @map("expires_at")
+  acceptedAt DateTime?    @map("accepted_at")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  partner    Partner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  client     Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_invites")
+}
+
+model FamilyMember {
+  id           String  @id @default(cuid())
+  userId       String? @map("user_id") // owner's family
+  clientId     String? @map("client_id") // partner's client family
+  name         String
+  relationship String?
+  phone        String?
+  email        String?
+  canAuthorize Boolean @default(false) @map("can_authorize")
+  canPickUp    Boolean @default(false) @map("can_pick_up")
+  linkedUserId String? @map("linked_user_id")
+  user         User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client       Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([clientId])
+  @@map("family_members")
+}
+
+model Species {
+  id            String                 @id @default(cuid())
+  key           String                 @unique // dog, cat, bird, turtle, fish, rodent, reptile, other
+  label         String
+  sortOrder     Int                    @default(0) @map("sort_order")
+  active        Boolean                @default(true)
+  breeds        Breed[]
+  pets          Pet[]
+  skills        Skill[]
+  lifeStages    LifeStageRule[]
+  references    MeasurementReference[]
+  taskTemplates TaskTemplate[]
+
+  @@map("species")
+}
+
+model Breed {
+  id         String                 @id @default(cuid())
+  speciesId  String                 @map("species_id")
+  name       String
+  isMixed    Boolean                @default(false) @map("is_mixed") // SRD
+  isOther    Boolean                @default(false) @map("is_other")
+  species    Species                @relation(fields: [speciesId], references: [id])
+  pets       Pet[]
+  references MeasurementReference[]
+
+  @@unique([speciesId, name])
+  @@map("breeds")
+}
+
+enum Sex {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum PetSize {
+  SMALL
+  MEDIUM
+  LARGE
+  GIANT
+}
+
+enum PetStatus {
+  ACTIVE
+  DECEASED
+}
+
+model Pet {
+  id                 String    @id @default(cuid())
+  name               String
+  speciesId          String    @map("species_id")
+  breedId            String?   @map("breed_id")
+  breedOther         String?   @map("breed_other")
+  color              String?
+  sex                Sex?
+  size               PetSize?
+  birthDate          DateTime? @map("birth_date") @db.Date
+  approxAgeMonths    Int?      @map("approx_age_months")
+  neutered           Boolean?
+  microchip          String?
+  avatarUrl          String?   @map("avatar_url")
+  temperament        String?   @db.Text
+  specialCare        String?   @map("special_care") @db.Text
+  feedingNotes       String?   @map("feeding_notes") @db.Text
+  ownerId            String?   @map("owner_id")
+  createdByPartnerId String?   @map("created_by_partner_id")
+  status             PetStatus @default(ACTIVE)
+  deceasedAt         DateTime? @map("deceased_at") @db.Date
+  memorialNote       String?   @map("memorial_note") @db.Text
+  streakDays         Int       @default(0) @map("streak_days")
+  level              Int       @default(1)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  species       Species           @relation(fields: [speciesId], references: [id])
+  breed         Breed?            @relation(fields: [breedId], references: [id])
+  owner         User?             @relation("PrimaryOwner", fields: [ownerId], references: [id])
+  clients       ClientPet[]
+  accesses      PetAccess[]
+  media         PetMedia[]
+  historyEvents PetHistoryEvent[]
+  appointments  AppointmentPet[]
+  contracts     ContractPet[]
+  foods         PetFood[]
+  measurements  BodyMeasurement[]
+  skills        PetSkill[]
+  vaccinations  Vaccination[]
+  tasks         Task[]
+  earnedBadges  EarnedBadge[]
+  enrollments   EnrollmentPet[]
+
+  @@index([ownerId])
+  @@index([speciesId, breedId])
+  @@map("pets")
+}
+
+model ClientPet {
+  clientId String @map("client_id")
+  petId    String @map("pet_id")
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  pet      Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, petId])
+  @@map("client_pets")
+}
+
+enum AccessLevel {
+  VIEW
+  EDIT
+}
+
+model PetAccess {
+  id     String      @id @default(cuid())
+  petId  String      @map("pet_id")
+  userId String      @map("user_id")
+  level  AccessLevel @default(VIEW)
+  pet    Pet         @relation(fields: [petId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([petId, userId])
+  @@map("pet_accesses")
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+enum MediaVisibility {
+  PRIVATE
+  FAMILY
+  PARTNERS
+  PUBLIC
+}
+
+model PetMedia {
+  id                  String          @id @default(cuid())
+  petId               String          @map("pet_id")
+  kind                MediaKind
+  url                 String
+  thumbUrl            String?         @map("thumb_url")
+  title               String?
+  description         String?         @db.Text
+  notes               String?         @db.Text
+  takenAt             DateTime        @map("taken_at")
+  isStory             Boolean         @default(false) @map("is_story")
+  expiresAt           DateTime?       @map("expires_at")
+  visibility          MediaVisibility @default(PRIVATE)
+  uploadedByUserId    String?         @map("uploaded_by_user_id")
+  uploadedByPartnerId String?         @map("uploaded_by_partner_id")
+  sizeBytes           Int             @default(0) @map("size_bytes")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  deletedAt           DateTime?       @map("deleted_at")
+  pet                 Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@index([petId, takenAt])
+  @@map("pet_media")
+}
+
+enum HistoryEventType {
+  VISIT
+  VACCINE
+  DEWORMING
+  WEIGHT
+  ACHIEVEMENT
+  MILESTONE
+  SKILL
+  NOTE
+  ATTACHMENT
+}
+
+model PetHistoryEvent {
+  id            String           @id @default(cuid())
+  petId         String           @map("pet_id")
+  type          HistoryEventType
+  title         String
+  description   String?          @db.Text
+  occurredAt    DateTime         @map("occurred_at")
+  partnerId     String?          @map("partner_id")
+  userId        String?          @map("user_id")
+  appointmentId String?          @map("appointment_id")
+  attachments   Json? // [{url, name, type}]
+  createdAt     DateTime         @default(now()) @map("created_at")
+  pet           Pet              @relation(fields: [petId], references: [id], onDelete: Cascade)
+  partner       Partner?         @relation(fields: [partnerId], references: [id])
+  user          User?            @relation(fields: [userId], references: [id])
+  appointment   Appointment?     @relation(fields: [appointmentId], references: [id])
+
+  @@index([petId, occurredAt])
+  @@map("pet_history_events")
+}
+
+model LifeStageRule {
+  id               String   @id @default(cuid())
+  speciesId        String   @map("species_id")
+  size             PetSize?
+  puppyUntilMonths Int      @map("puppy_until_months")
+  seniorFromMonths Int      @map("senior_from_months")
+  species          Species  @relation(fields: [speciesId], references: [id])
+
+  @@unique([speciesId, size])
+  @@map("life_stage_rules")
+}
+
+model Skill {
+  id                 String      @id @default(cuid())
+  speciesId          String?     @map("species_id") // null = all species
+  key                String?
+  name               String
+  isCustom           Boolean     @default(false) @map("is_custom")
+  createdByUserId    String?     @map("created_by_user_id")
+  createdByPartnerId String?     @map("created_by_partner_id")
+  species            Species?    @relation(fields: [speciesId], references: [id])
+  petSkills          PetSkill[]
+  stats              SkillStat[]
+
+  @@index([speciesId])
+  @@map("skills")
+}
+
+enum SkillLevel {
+  LEARNING
+  SOMETIMES
+  MASTERED
+}
+
+model PetSkill {
+  id                   String     @id @default(cuid())
+  petId                String     @map("pet_id")
+  skillId              String     @map("skill_id")
+  level                SkillLevel @default(LEARNING)
+  masteredAt           DateTime?  @map("mastered_at") @db.Date
+  markedByUserId       String?    @map("marked_by_user_id")
+  markedByPartnerId    String?    @map("marked_by_partner_id")
+  validatedByPartnerId String?    @map("validated_by_partner_id")
+  validatedAt          DateTime?  @map("validated_at")
+  updatedAt            DateTime   @updatedAt @map("updated_at")
+  pet                  Pet        @relation(fields: [petId], references: [id], onDelete: Cascade)
+  skill                Skill      @relation(fields: [skillId], references: [id])
+  markedBy             User?      @relation(fields: [markedByUserId], references: [id])
+  markedByPartner      Partner?   @relation(fields: [markedByPartnerId], references: [id])
+
+  @@unique([petId, skillId])
+  @@map("pet_skills")
+}
+
+// Daily aggregated stats for skill comparison
+model SkillStat {
+  id         String   @id @default(cuid())
+  skillId    String   @map("skill_id")
+  speciesId  String   @map("species_id")
+  breedId    String?  @map("breed_id")
+  lifeStage  String   @map("life_stage") // PUPPY | ADULT | SENIOR
+  state      String?
+  city       String?
+  total      Int
+  mastered   Int
+  computedAt DateTime @map("computed_at")
+  skill      Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@index([skillId, speciesId, lifeStage])
+  @@index([breedId])
+  @@index([state, city])
+  @@map("skill_stats")
+}
+
+enum FoodType {
+  DRY
+  WET
+  NATURAL
+  TREAT
+  SUPPLEMENT
+}
+
+model PetFood {
+  id             String       @id @default(cuid())
+  petId          String       @map("pet_id")
+  type           FoodType
+  brandId        String?      @map("brand_id")
+  productLineId  String?      @map("product_line_id")
+  brandOther     String?      @map("brand_other")
+  packageSizeG   Int?         @map("package_size_g")
+  dailyGrams     Int?         @map("daily_grams")
+  lastPurchaseAt DateTime?    @map("last_purchase_at") @db.Date
+  offersEnabled  Boolean      @default(true) @map("offers_enabled")
+  pet            Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  brand          Brand?       @relation(fields: [brandId], references: [id])
+  productLine    ProductLine? @relation(fields: [productLineId], references: [id])
+
+  @@index([petId])
+  @@index([brandId])
+  @@map("pet_foods")
+}
+
+// ───────────────────────────── Catalog ─────────────────────────────
+
+model Category {
+  id            String        @id @default(cuid())
+  key           String        @unique
+  label         String
+  sortOrder     Int           @default(0) @map("sort_order")
+  active        Boolean       @default(true)
+  subcategories Subcategory[]
+  items         CatalogItem[]
+  courses       Course[]
+
+  @@map("categories")
+}
+
+model Subcategory {
+  id         String        @id @default(cuid())
+  categoryId String        @map("category_id")
+  key        String
+  label      String
+  sortOrder  Int           @default(0) @map("sort_order")
+  active     Boolean       @default(true)
+  category   Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  items      CatalogItem[]
+
+  @@unique([categoryId, key])
+  @@map("subcategories")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Brand {
+  id                String         @id @default(cuid())
+  name              String         @unique
+  status            ApprovalStatus @default(APPROVED)
+  suggestedByUserId String?        @map("suggested_by_user_id")
+  lines             ProductLine[]
+  items             CatalogItem[]
+  petFoods          PetFood[]
+
+  @@map("brands")
+}
+
+model ProductLine {
+  id       String         @id @default(cuid())
+  brandId  String         @map("brand_id")
+  name     String
+  status   ApprovalStatus @default(APPROVED)
+  brand    Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  items    CatalogItem[]
+  petFoods PetFood[]
+
+  @@unique([brandId, name])
+  @@map("product_lines")
+}
+
+enum ItemType {
+  PRODUCT
+  SERVICE
+}
+
+enum ServiceLocation {
+  PARTNER_VENUE
+  CLIENT_HOME
+  ONLINE
+}
+
+enum ItemStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+}
+
+model CatalogItem {
+  id               String           @id @default(cuid())
+  partnerId        String           @map("partner_id")
+  type             ItemType
+  name             String
+  description      String?          @db.Text
+  categoryId       String           @map("category_id")
+  subcategoryId    String?          @map("subcategory_id")
+  price            Decimal?         @db.Decimal(10, 2) // null = on request
+  promoPrice       Decimal?         @map("promo_price") @db.Decimal(10, 2)
+  promoUntil       DateTime?        @map("promo_until")
+  durationMinutes  Int?             @map("duration_minutes")
+  serviceLocations Json? // ["PARTNER_VENUE","CLIENT_HOME"]
+  defaultLocation  ServiceLocation? @map("default_location")
+  bookable         Boolean          @default(false)
+  speciesKeys      Json? // ["dog","cat"]
+  brandId          String?          @map("brand_id")
+  productLineId    String?          @map("product_line_id")
+  status           ItemStatus       @default(DRAFT)
+  ratingAvg        Decimal?         @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount      Int              @default(0) @map("rating_count")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  deletedAt        DateTime?        @map("deleted_at")
+
+  partner       Partner            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  category      Category           @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory?       @relation(fields: [subcategoryId], references: [id])
+  brand         Brand?             @relation(fields: [brandId], references: [id])
+  productLine   ProductLine?       @relation(fields: [productLineId], references: [id])
+  media         CatalogItemMedia[]
+  reviews       Review[]
+  appointments  Appointment[]
+  contractItems ContractItem[]
+
+  @@index([partnerId, status])
+  @@index([categoryId, status])
+  @@map("catalog_items")
+}
+
+model CatalogItemMedia {
+  id        String      @id @default(cuid())
+  itemId    String      @map("item_id")
+  kind      MediaKind
+  url       String
+  thumbUrl  String?     @map("thumb_url")
+  isCover   Boolean     @default(false) @map("is_cover")
+  sortOrder Int         @default(0) @map("sort_order")
+  item      CatalogItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("catalog_item_media")
+}
+
+enum ReviewStatus {
+  VISIBLE
+  HIDDEN
+}
+
+model Review {
+  id        String       @id @default(cuid())
+  userId    String       @map("user_id")
+  partnerId String       @map("partner_id")
+  itemId    String?      @map("item_id")
+  courseId  String?      @map("course_id")
+  rating    Int
+  comment   String?      @db.Text
+  verified  Boolean      @default(false)
+  status    ReviewStatus @default(VISIBLE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner   Partner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  item      CatalogItem? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  course    Course?      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  reply     ReviewReply?
+  reports   Report[]
+
+  @@unique([userId, itemId])
+  @@unique([userId, courseId])
+  @@index([partnerId, status])
+  @@map("reviews")
+}
+
+model ReviewReply {
+  id        String   @id @default(cuid())
+  reviewId  String   @unique @map("review_id")
+  body      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@map("review_replies")
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+model Report {
+  id           String       @id @default(cuid())
+  reviewId     String?      @map("review_id")
+  mediaAssetId String?      @map("media_asset_id")
+  reporterId   String       @map("reporter_id")
+  reason       String
+  status       ReportStatus @default(OPEN)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  review       Review?      @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reporter     User         @relation(fields: [reporterId], references: [id])
+
+  @@map("reports")
+}
+
+// ───────────────────────────── Courses ─────────────────────────────
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Course {
+  id           String         @id @default(cuid())
+  partnerId    String         @map("partner_id")
+  title        String
+  description  String?        @db.Text
+  coverUrl     String?        @map("cover_url")
+  categoryId   String?        @map("category_id")
+  speciesKeys  Json?          @map("species_keys")
+  level        CourseLevel    @default(BEGINNER)
+  price        Decimal?       @db.Decimal(10, 2) // null = free
+  status       CourseStatus   @default(DRAFT)
+  ratingAvg    Decimal?       @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount  Int            @default(0) @map("rating_count")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  partner      Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  category     Category?      @relation(fields: [categoryId], references: [id])
+  modules      CourseModule[]
+  lessons      Lesson[]
+  enrollments  Enrollment[]
+  reviews      Review[]
+  certificates Certificate[]
+
+  @@index([partnerId, status])
+  @@map("courses")
+}
+
+model CourseModule {
+  id        String   @id @default(cuid())
+  courseId  String   @map("course_id")
+  title     String
+  sortOrder Int      @default(0) @map("sort_order")
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons   Lesson[]
+
+  @@map("course_modules")
+}
+
+model Lesson {
+  id              String             @id @default(cuid())
+  courseId        String             @map("course_id")
+  moduleId        String?            @map("module_id")
+  title           String
+  description     String?            @db.Text
+  videoUrl        String?            @map("video_url")
+  body            String?            @db.Text
+  durationMinutes Int?               @map("duration_minutes")
+  exerciseTitle   String?            @map("exercise_title")
+  exerciseRule    Json?              @map("exercise_rule")
+  sortOrder       Int                @default(0) @map("sort_order")
+  course          Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module          CourseModule?      @relation(fields: [moduleId], references: [id])
+  attachments     LessonAttachment[]
+  progress        LessonProgress[]
+
+  @@map("lessons")
+}
+
+model LessonAttachment {
+  id       String @id @default(cuid())
+  lessonId String @map("lesson_id")
+  name     String
+  url      String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("lesson_attachments")
+}
+
+model Enrollment {
+  id          String           @id @default(cuid())
+  courseId    String           @map("course_id")
+  userId      String           @map("user_id")
+  contractId  String?          @map("contract_id")
+  progressPct Int              @default(0) @map("progress_pct")
+  completedAt DateTime?        @map("completed_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pets        EnrollmentPet[]
+  progress    LessonProgress[]
+  certificate Certificate?
+
+  @@unique([courseId, userId])
+  @@map("enrollments")
+}
+
+model EnrollmentPet {
+  enrollmentId String     @map("enrollment_id")
+  petId        String     @map("pet_id")
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  pet          Pet        @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@id([enrollmentId, petId])
+  @@map("enrollment_pets")
+}
+
+model LessonProgress {
+  id           String     @id @default(cuid())
+  enrollmentId String     @map("enrollment_id")
+  lessonId     String     @map("lesson_id")
+  completedAt  DateTime?  @map("completed_at")
+  question     String?    @db.Text
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@map("lesson_progress")
+}
+
+model Certificate {
+  id           String     @id @default(cuid())
+  enrollmentId String     @unique @map("enrollment_id")
+  courseId     String     @map("course_id")
+  code         String     @unique
+  pdfUrl       String?    @map("pdf_url")
+  issuedAt     DateTime   @default(now()) @map("issued_at")
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  course       Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("certificates")
+}
+
+// ───────────────────────────── Scheduling ─────────────────────────────
+
+enum AppointmentStatus {
+  REQUESTED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+  NO_SHOW
+}
+
+enum LocationType {
+  CLIENT_HOME
+  PARTNER_VENUE
+  OTHER
+  ONLINE
+}
+
+enum Recurrence {
+  NONE
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  PACKAGE
+}
+
+model Appointment {
+  id                String            @id @default(cuid())
+  partnerId         String            @map("partner_id")
+  clientId          String?           @map("client_id")
+  membershipId      String?           @map("membership_id") // professional
+  itemId            String?           @map("item_id")
+  contractId        String?           @map("contract_id")
+  requestedByUserId String?           @map("requested_by_user_id")
+  title             String?
+  startsAt          DateTime          @map("starts_at")
+  endsAt            DateTime          @map("ends_at")
+  durationMinutes   Int               @map("duration_minutes")
+  locationType      LocationType      @map("location_type")
+  addressId         String?           @map("address_id")
+  locationNotes     String?           @map("location_notes")
+  status            AppointmentStatus @default(CONFIRMED)
+  recurrence        Recurrence        @default(NONE)
+  seriesId          String?           @map("series_id")
+  sessionNumber     Int?              @map("session_number")
+  notes             String?           @db.Text
+  report            String?           @db.Text
+  nextSteps         String?           @map("next_steps") @db.Text
+  reportPhotos      Json?             @map("report_photos")
+  cancelReason      String?           @map("cancel_reason")
+  canceledBy        String?           @map("canceled_by") // PARTNER | OWNER
+  reminder24hSentAt DateTime?         @map("reminder_24h_sent_at")
+  reminder2hSentAt  DateTime?         @map("reminder_2h_sent_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  partner       Partner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  client        Client?           @relation(fields: [clientId], references: [id])
+  membership    Membership?       @relation(fields: [membershipId], references: [id])
+  item          CatalogItem?      @relation(fields: [itemId], references: [id])
+  contract      Contract?         @relation(fields: [contractId], references: [id])
+  address       Address?          @relation(fields: [addressId], references: [id])
+  requestedBy   User?             @relation("RequestedBy", fields: [requestedByUserId], references: [id])
+  pets          AppointmentPet[]
+  travelLeg     TravelLeg?        @relation("LegTo")
+  historyEvents PetHistoryEvent[]
+
+  @@index([partnerId, startsAt])
+  @@index([membershipId, startsAt])
+  @@index([clientId])
+  @@map("appointments")
+}
+
+model AppointmentPet {
+  appointmentId String      @map("appointment_id")
+  petId         String      @map("pet_id")
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  pet           Pet         @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@id([appointmentId, petId])
+  @@map("appointment_pets")
+}
+
+model Availability {
+  id           String     @id @default(cuid())
+  membershipId String     @map("membership_id")
+  weekday      Int
+  startsAt     String     @map("starts_at") // "08:00"
+  endsAt       String     @map("ends_at")
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([membershipId, weekday])
+  @@map("availabilities")
+}
+
+model TimeOff {
+  id           String     @id @default(cuid())
+  membershipId String     @map("membership_id")
+  startsAt     DateTime   @map("starts_at")
+  endsAt       DateTime   @map("ends_at")
+  reason       String?
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([membershipId, startsAt])
+  @@map("time_offs")
+}
+
+model TravelLeg {
+  id              String      @id @default(cuid())
+  toAppointmentId String      @unique @map("to_appointment_id")
+  fromAddressId   String?     @map("from_address_id")
+  distanceKm      Decimal     @map("distance_km") @db.Decimal(8, 2)
+  durationMinutes Int         @map("duration_minutes")
+  estimated       Boolean     @default(false) // straight-line fallback
+  startsAt        DateTime    @map("starts_at")
+  endsAt          DateTime    @map("ends_at")
+  toAppointment   Appointment @relation("LegTo", fields: [toAppointmentId], references: [id], onDelete: Cascade)
+
+  @@map("travel_legs")
+}
+
+// ───────────────────────────── Finance ─────────────────────────────
+
+enum ContractType {
+  PACKAGE
+  RECURRING
+  SINGLE
+  COURSE
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+enum Periodicity {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+model Contract {
+  id                String         @id @default(cuid())
+  partnerId         String         @map("partner_id")
+  clientId          String         @map("client_id")
+  type              ContractType   @default(SINGLE)
+  title             String
+  description       String?        @db.Text
+  totalAmount       Decimal        @map("total_amount") @db.Decimal(10, 2)
+  discount          Decimal        @default(0) @db.Decimal(10, 2)
+  installmentsCount Int            @map("installments_count")
+  firstDueDate      DateTime       @map("first_due_date") @db.Date
+  periodicity       Periodicity    @default(MONTHLY)
+  sessionsCount     Int?           @map("sessions_count")
+  terms             String?        @db.Text
+  acceptedAt        DateTime?      @map("accepted_at")
+  acceptedIp        String?        @map("accepted_ip")
+  pdfUrl            String?        @map("pdf_url")
+  status            ContractStatus @default(DRAFT)
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  partner      Partner        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  client       Client         @relation(fields: [clientId], references: [id])
+  items        ContractItem[]
+  pets         ContractPet[]
+  installments Installment[]
+  appointments Appointment[]
+
+  @@index([partnerId, status])
+  @@map("contracts")
+}
+
+model ContractItem {
+  id          String       @id @default(cuid())
+  contractId  String       @map("contract_id")
+  itemId      String?      @map("item_id")
+  description String
+  quantity    Int          @default(1)
+  unitPrice   Decimal      @map("unit_price") @db.Decimal(10, 2)
+  contract    Contract     @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  item        CatalogItem? @relation(fields: [itemId], references: [id])
+
+  @@map("contract_items")
+}
+
+model ContractPet {
+  contractId String   @map("contract_id")
+  petId      String   @map("pet_id")
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  pet        Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@id([contractId, petId])
+  @@map("contract_pets")
+}
+
+enum InstallmentStatus {
+  PENDING
+  OVERDUE
+  PAID
+  CANCELED
+}
+
+model Installment {
+  id             String            @id @default(cuid())
+  contractId     String            @map("contract_id")
+  number         Int
+  dueDate        DateTime          @map("due_date") @db.Date
+  amount         Decimal           @db.Decimal(10, 2)
+  paidAmount     Decimal           @default(0) @map("paid_amount") @db.Decimal(10, 2)
+  status         InstallmentStatus @default(PENDING)
+  reminderSentAt DateTime?         @map("reminder_sent_at")
+  payments       Payment[]
+  contract       Contract          @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId, dueDate])
+  @@map("installments")
+}
+
+enum PaymentMethod {
+  PIX
+  CASH
+  CARD
+  BOLETO
+  TRANSFER
+  GATEWAY
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  installmentId  String        @map("installment_id")
+  paidAt         DateTime      @map("paid_at") @db.Date
+  amount         Decimal       @db.Decimal(10, 2)
+  method         PaymentMethod
+  receiptUrl     String?       @map("receipt_url")
+  gatewayOrderId String?       @map("gateway_order_id")
+  notes          String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  installment    Installment   @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+enum TransactionKind {
+  INCOME
+  EXPENSE
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  partnerId   String          @map("partner_id")
+  kind        TransactionKind
+  category    String
+  description String?
+  amount      Decimal         @db.Decimal(10, 2)
+  occurredAt  DateTime        @map("occurred_at") @db.Date
+  method      PaymentMethod?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  partner     Partner         @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, occurredAt])
+  @@map("transactions")
+}
+
+// ───────────────────────────── Billing (plans & limits) ─────────────────────────────
+
+enum Audience {
+  OWNER
+  PARTNER
+}
+
+enum FeatureKind {
+  BOOLEAN
+  QUANTITY
+}
+
+model Plan {
+  id            String             @id @default(cuid())
+  key           String             @unique // free, pro, business, owner_free, owner_plus
+  name          String
+  audience      Audience
+  priceMonthly  Decimal?           @map("price_monthly") @db.Decimal(10, 2)
+  priceYearly   Decimal?           @map("price_yearly") @db.Decimal(10, 2)
+  trialDays     Int                @default(0) @map("trial_days")
+  visible       Boolean            @default(true)
+  isDefault     Boolean            @default(false) @map("is_default")
+  sortOrder     Int                @default(0) @map("sort_order")
+  limits        PlanFeatureLimit[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Feature {
+  key      String             @id // courses, lessons_per_course, catalog_items...
+  module   String
+  label    String
+  kind     FeatureKind
+  audience Audience
+  limits   PlanFeatureLimit[]
+  addOns   AddOn[]
+
+  @@map("features")
+}
+
+model PlanFeatureLimit {
+  planId     String  @map("plan_id")
+  featureKey String  @map("feature_key")
+  enabled    Boolean @default(true)
+  quantity   Int? // null = unlimited
+  plan       Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature    Feature @relation(fields: [featureKey], references: [key], onDelete: Cascade)
+
+  @@id([planId, featureKey])
+  @@map("plan_feature_limits")
+}
+
+model AddOn {
+  id            String              @id @default(cuid())
+  key           String              @unique
+  name          String
+  featureKey    String              @map("feature_key")
+  quantity      Int
+  priceMonthly  Decimal?            @map("price_monthly") @db.Decimal(10, 2)
+  feature       Feature             @relation(fields: [featureKey], references: [key])
+  subscriptions SubscriptionAddOn[]
+
+  @@map("add_ons")
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+model Subscription {
+  id                    String              @id @default(cuid())
+  partnerId             String?             @unique @map("partner_id")
+  userId                String?             @unique @map("user_id")
+  planId                String              @map("plan_id")
+  status                SubscriptionStatus  @default(ACTIVE)
+  startsAt              DateTime            @map("starts_at")
+  endsAt                DateTime?           @map("ends_at")
+  gatewaySubscriptionId String?             @map("gateway_subscription_id")
+  plan                  Plan                @relation(fields: [planId], references: [id])
+  partner               Partner?            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  user                  User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addOns                SubscriptionAddOn[]
+
+  @@map("subscriptions")
+}
+
+model SubscriptionAddOn {
+  subscriptionId String       @map("subscription_id")
+  addOnId        String       @map("add_on_id")
+  quantity       Int          @default(1)
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  addOn          AddOn        @relation(fields: [addOnId], references: [id])
+
+  @@id([subscriptionId, addOnId])
+  @@map("subscription_add_ons")
+}
+
+model PaymentRecipient {
+  id                 String   @id @default(cuid())
+  partnerId          String   @unique @map("partner_id")
+  gatewayRecipientId String?  @map("gateway_recipient_id")
+  status             String   @default("pending") // pending | active | refused
+  bankData           Json?    @map("bank_data")
+  createdAt          DateTime @default(now()) @map("created_at")
+  partner            Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@map("payment_recipients")
+}
+
+model GatewayOrder {
+  id             String   @id @default(cuid())
+  provider       String   @default("pagarme")
+  gatewayOrderId String?  @unique @map("gateway_order_id")
+  kind           String // installment | course | subscription | addon
+  referenceId    String   @map("reference_id")
+  amountCents    Int      @map("amount_cents")
+  status         String   @default("pending")
+  payload        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([kind, referenceId])
+  @@map("gateway_orders")
+}
+
+model WebhookEvent {
+  id             String    @id @default(cuid())
+  provider       String
+  idempotencyKey String    @unique @map("idempotency_key")
+  type           String
+  payload        Json
+  processedAt    DateTime? @map("processed_at")
+  error          String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@map("webhook_events")
+}
+
+// ───────────────────────────── Engagement ─────────────────────────────
+
+model TaskTemplate {
+  id        String   @id @default(cuid())
+  speciesId String?  @map("species_id")
+  title     String
+  rule      Json // {freq:"daily", times:["08:00"]}
+  species   Species? @relation(fields: [speciesId], references: [id])
+
+  @@map("task_templates")
+}
+
+enum TaskStatus {
+  PROPOSED
+  ACTIVE
+  PAUSED
+  DONE
+}
+
+model Task {
+  id                  String           @id @default(cuid())
+  petId               String           @map("pet_id")
+  title               String
+  description         String?          @db.Text
+  rule                Json? // null = one-off; {freq:"daily"|"weekly", days:[1,3], times:["08:00"]}
+  dueAt               DateTime?        @map("due_at")
+  status              TaskStatus       @default(ACTIVE)
+  proposedByPartnerId String?          @map("proposed_by_partner_id")
+  lessonId            String?          @map("lesson_id")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  pet                 Pet              @relation(fields: [petId], references: [id], onDelete: Cascade)
+  proposedByPartner   Partner?         @relation(fields: [proposedByPartnerId], references: [id])
+  completions         TaskCompletion[]
+
+  @@index([petId, status])
+  @@map("tasks")
+}
+
+model TaskCompletion {
+  id          String   @id @default(cuid())
+  taskId      String   @map("task_id")
+  userId      String   @map("user_id")
+  completedAt DateTime @default(now()) @map("completed_at")
+  forDate     DateTime @map("for_date") @db.Date
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([taskId, forDate])
+  @@map("task_completions")
+}
+
+enum VaccinationKind {
+  VACCINE
+  DEWORMING
+}
+
+model Vaccination {
+  id        String          @id @default(cuid())
+  petId     String          @map("pet_id")
+  kind      VaccinationKind @default(VACCINE)
+  name      String
+  appliedAt DateTime        @map("applied_at") @db.Date
+  nextDueAt DateTime?       @map("next_due_at") @db.Date
+  partnerId String?         @map("partner_id")
+  notes     String?
+  createdAt DateTime        @default(now()) @map("created_at")
+  pet       Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
+  partner   Partner?        @relation(fields: [partnerId], references: [id])
+
+  @@index([petId, nextDueAt])
+  @@map("vaccinations")
+}
+
+model BodyMeasurement {
+  id          String   @id @default(cuid())
+  petId       String   @map("pet_id")
+  measuredAt  DateTime @map("measured_at") @db.Date
+  weightG     Int      @map("weight_g")
+  heightCm    Decimal? @map("height_cm") @db.Decimal(6, 2)
+  lengthCm    Decimal? @map("length_cm") @db.Decimal(6, 2)
+  neckCm      Decimal? @map("neck_cm") @db.Decimal(6, 2)
+  chestCm     Decimal? @map("chest_cm") @db.Decimal(6, 2)
+  abdomenCm   Decimal? @map("abdomen_cm") @db.Decimal(6, 2)
+  bodyScore   Int?     @map("body_score") // 1-9
+  notes       String?
+  userId      String?  @map("user_id")
+  partnerId   String?  @map("partner_id")
+  vetVerified Boolean  @default(false) @map("vet_verified")
+  createdAt   DateTime @default(now()) @map("created_at")
+  pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id])
+  partner     Partner? @relation(fields: [partnerId], references: [id])
+
+  @@index([petId, measuredAt])
+  @@map("body_measurements")
+}
+
+model MeasurementReference {
+  id         String   @id @default(cuid())
+  speciesId  String   @map("species_id")
+  breedId    String?  @map("breed_id")
+  size       PetSize?
+  lifeStage  String   @map("life_stage")
+  minWeightG Int      @map("min_weight_g")
+  maxWeightG Int      @map("max_weight_g")
+  species    Species  @relation(fields: [speciesId], references: [id])
+  breed      Breed?   @relation(fields: [breedId], references: [id])
+
+  @@map("measurement_references")
+}
+
+model Badge {
+  id          String        @id @default(cuid())
+  key         String        @unique
+  name        String
+  description String?
+  iconUrl     String?       @map("icon_url")
+  partnerId   String?       @map("partner_id") // null = system badge
+  rule        Json?
+  partner     Partner?      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  earned      EarnedBadge[]
+
+  @@map("badges")
+}
+
+model EarnedBadge {
+  id       String   @id @default(cuid())
+  badgeId  String   @map("badge_id")
+  petId    String   @map("pet_id")
+  earnedAt DateTime @default(now()) @map("earned_at")
+  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  pet      Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@unique([badgeId, petId])
+  @@map("earned_badges")
+}
+
+// ───────────────────────────── Media, audit, notifications ─────────────────────────────
+
+enum MediaPurpose {
+  PARTNER_LOGO
+  USER_AVATAR
+  PET_AVATAR
+  VENUE_PHOTO
+  PET_GALLERY
+  CATALOG
+  COURSE
+  ATTACHMENT
+  RECEIPT
+}
+
+enum MediaStatus {
+  PENDING
+  READY
+  FLAGGED
+  REJECTED
+}
+
+model MediaAsset {
+  id        String       @id @default(cuid())
+  key       String       @unique // storage key
+  url       String
+  thumbUrl  String?      @map("thumb_url")
+  kind      MediaKind
+  purpose   MediaPurpose
+  mimeType  String       @map("mime_type")
+  sizeBytes Int          @map("size_bytes")
+  width     Int?
+  height    Int?
+  status    MediaStatus  @default(PENDING)
+  userId    String?      @map("user_id")
+  partnerId String?      @map("partner_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+  user      User?        @relation(fields: [userId], references: [id])
+  partner   Partner?     @relation(fields: [partnerId], references: [id])
+
+  @@index([userId])
+  @@index([partnerId])
+  @@map("media_assets")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  partnerId String?  @map("partner_id")
+  action    String
+  entity    String
+  entityId  String   @map("entity_id")
+  data      Json?
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+  partner   Partner? @relation(fields: [partnerId], references: [id])
+
+  @@index([partnerId, createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  type      String
+  title     String
+  body      String?
+  data      Json?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("push_tokens")
+}
+
+model Setting {
+  key   String @id
+  value Json
+
+  @@map("settings")
+}

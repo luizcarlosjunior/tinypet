@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #fafaf9;
+  --fg: #242833;
+  --card: #ffffff;
+  --muted: #68748e;
+  --border: #e5e7eb;
+}
+.dark {
+  --bg: #171a21;
+  --fg: #eceef2;
+  --card: #242833;
+  --muted: #b1b8c8;
+  --border: #3a4150;
+}
+html, body { background: var(--bg); color: var(--fg); }
+* { border-color: var(--border); }
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:pointer-events-none; }
+  .btn-primary { @apply btn bg-brand-500 text-white hover:bg-brand-600; }
+  .btn-secondary { @apply btn bg-ink-100 text-ink-900 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-50 dark:hover:bg-ink-700; }
+  .btn-ghost { @apply btn hover:bg-ink-100 dark:hover:bg-ink-800; }
+  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  .input { @apply w-full rounded-xl border bg-[var(--card)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-400; }
+  .label { @apply mb-1 block text-xs font-medium text-[var(--muted)]; }
+  .card { @apply rounded-2xl border bg-[var(--card)] p-4 shadow-sm; }
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+}

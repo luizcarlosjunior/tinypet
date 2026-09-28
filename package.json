@@ -1,0 +1,23 @@
+{
+  "name": "tinypet",
+  "private": true,
+  "packageManager": "pnpm@10.2.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @tinypet/web dev",
+    "dev:mobile": "pnpm --filter @tinypet/mobile start",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @tinypet/db generate",
+    "db:push": "pnpm --filter @tinypet/db push",
+    "db:migrate": "pnpm --filter @tinypet/db migrate",
+    "db:seed": "pnpm --filter @tinypet/db seed",
+    "db:studio": "pnpm --filter @tinypet/db studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.5",
+    "typescript": "^5.9.3"
+  }
+}
