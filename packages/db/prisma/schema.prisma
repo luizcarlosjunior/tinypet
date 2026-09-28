@@ -34,6 +34,7 @@ model User {
   termsVersion        String?    @map("terms_version")
   termsAcceptedAt     DateTime?  @map("terms_accepted_at")
   twoFactorSecret     String?    @map("two_factor_secret")
+  tokenVersion        Int        @default(0) @map("token_version")
   locale              String     @default("pt-BR")
   timezone            String     @default("America/Sao_Paulo")
   createdAt           DateTime   @default(now()) @map("created_at")
@@ -116,7 +117,8 @@ model VerificationCode {
   userId    String              @map("user_id")
   channel   VerificationChannel
   target    String
-  code      String
+  code      String // sha256 hex of the code, never plaintext
+  attempts  Int                 @default(0)
   expiresAt DateTime            @map("expires_at")
   usedAt    DateTime?           @map("used_at")
   createdAt DateTime            @default(now()) @map("created_at")
@@ -1111,6 +1113,7 @@ model Appointment {
   status            AppointmentStatus @default(CONFIRMED)
   recurrence        Recurrence        @default(NONE)
   seriesId          String?           @map("series_id")
+  rescheduleOfId    String?           @map("reschedule_of_id") // set by the server only
   sessionNumber     Int?              @map("session_number")
   notes             String?           @db.Text
   report            String?           @db.Text
@@ -1704,4 +1707,13 @@ model Setting {
   value Json
 
   @@map("settings")
+}
+
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime @map("reset_at")
+
+  @@index([resetAt])
+  @@map("rate_limits")
 }
