@@ -9,8 +9,9 @@ build
 .env.*.local
 *.log
 .DS_Store
-apps/web/public/uploads
+tinyPet/public/uploads
 coverage
 ios
 android
-apps/web/public/ffmpeg
+tinyPet/public/ffmpeg
+*.tsbuildinfo

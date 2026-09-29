@@ -1,0 +1,18 @@
+# Run from tinyPet/: docker compose up -d  (or `pnpm db:up` from the repo root)
+name: tinypet
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: tinypet-mysql
+    ports:
+      # Local only: never expose the dev database on the LAN.
+      - "127.0.0.1:3307:3306"
+    environment:
+      # Only applied when the volume is created. For an existing volume, change the password with ALTER USER.
+      MYSQL_ROOT_PASSWORD: tinypet
+      MYSQL_DATABASE: tinypet
+    volumes:
+      - tinypet-mysql:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+volumes:
+  tinypet-mysql:
