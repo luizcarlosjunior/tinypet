@@ -1,6 +1,7 @@
 package expo.modules.videotranscoder
 
 import android.content.Context
+import android.media.MediaCodecInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
@@ -137,6 +138,10 @@ class VideoTranscoderModule : Module() {
       .setRequestedVideoEncoderSettings(
         VideoEncoderSettings.Builder()
           .setBitrate(o.videoBitrate)
+          // CBR: in VBR mode the platform's video-quality floor (CCodec "VQApply") silently raises low 1080p/720p
+          // targets (e.g. 900 kbps -> ~3.9 Mbps), producing files the API rejects (> 1 Mbps). The floor only
+          // applies to VBR. Encoders without CBR support fall back to their default mode (fallback enabled below).
+          .setBitrateMode(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
           .setiFrameIntervalSeconds(o.keyFrameIntervalSeconds.toFloat())
           .build()
       )

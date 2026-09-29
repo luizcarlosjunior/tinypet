@@ -5,7 +5,7 @@ import { Button, Modal } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { usePetResource, type Pet } from "@/hooks/use-pets";
 import { ageInMonths, formatAge, safeHref } from "@tinypet/shared";
-import { fmtDate } from "@/lib/format";
+import { fmtDay } from "@/lib/format";
 
 type ReportCard = { age?: string; ageMonths?: number; badges?: number; masteredSkills?: number; streakDays?: number; visits?: number; photos?: number; nextBirthday?: string; highlights?: string[] };
 
@@ -58,7 +58,7 @@ export function BirthdayCard({ pet }: { pet: Pet }) {
             <div>
               <p className="text-xs uppercase tracking-widest opacity-90">Feliz aniversário</p>
               <p className="text-3xl font-extrabold leading-tight">{pet.name}</p>
-              <p className="text-sm opacity-90">{years != null ? `${years} ${years === 1 ? "ano" : "anos"}` : formatAge(months)}{pet.birthDate ? ` · ${fmtDate(pet.birthDate, "d 'de' MMMM")}` : ""}</p>
+              <p className="text-sm opacity-90">{years != null ? `${years} ${years === 1 ? "ano" : "anos"}` : formatAge(months)}{pet.birthDate ? ` · ${fmtDay(pet.birthDate, "d 'de' MMMM")}` : ""}</p>
             </div>
           </div>
           <dl className="relative mt-5 grid grid-cols-3 gap-2 text-center">

@@ -8,7 +8,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
 import { ConfirmDialog, ErrorBox, Table, td, th } from "@/components/painel/ui";
 import { useApiMutation, usePetVaccinations } from "@/hooks/use-crm";
-import { fmtDate, todayISO } from "@/lib/format";
+import { todayISO, fmtDay } from "@/lib/format";
 import { useActivePartner } from "@/hooks/use-partner";
 import type { Vaccination } from "@/types/api";
 
@@ -63,11 +63,11 @@ export function VaccinationsTab({ petId }: { petId: string }) {
                 <tr key={v.id}>
                   <td className={td}>{v.kind === "DEWORMING" ? "Vermífugo" : "Vacina"}</td>
                   <td className={`${td} font-medium`}>{v.name}</td>
-                  <td className={td}>{fmtDate(v.appliedAt)}</td>
+                  <td className={td}>{fmtDay(v.appliedAt)}</td>
                   <td className={td}>
                     {v.nextDueAt ? (
                       <span className="inline-flex items-center gap-1">
-                        {fmtDate(v.nextDueAt)} {late && <Badge tone="red">Atrasada</Badge>}
+                        {fmtDay(v.nextDueAt)} {late && <Badge tone="red">Atrasada</Badge>}
                       </span>
                     ) : (
                       "—"

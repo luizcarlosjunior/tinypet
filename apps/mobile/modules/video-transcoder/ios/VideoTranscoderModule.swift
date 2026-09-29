@@ -123,6 +123,11 @@ public class VideoTranscoderModule: Module {
   private static func codecName(_ track: AVAssetTrack) -> String {
     guard let desc = track.formatDescriptions.first else { return "" }
     let fourCC = CMFormatDescriptionGetMediaSubType(desc as! CMFormatDescription)
+    // Audio format descriptions carry the CoreAudio format ID ('aac ' for AAC), not the MP4 sample entry.
+    // Report the sample entry ("mp4a") like Android does, so JS validation sees the same codec names.
+    if fourCC == kAudioFormatMPEG4AAC || fourCC == kAudioFormatMPEG4AAC_HE || fourCC == kAudioFormatMPEG4AAC_HE_V2 || fourCC == kAudioFormatMPEG4AAC_LD {
+      return "mp4a"
+    }
     let bytes = [24, 16, 8, 0].map { UInt8((fourCC >> $0) & 0xFF) }
     return String(bytes: bytes, encoding: .ascii)?.trimmingCharacters(in: .whitespaces) ?? ""
   }
@@ -146,7 +151,10 @@ public class VideoTranscoderModule: Module {
       self.jobsLock.lock(); self.jobs.removeValue(forKey: jobId); self.jobsLock.unlock()
     }
 
-    let outURL = FileManager.default.temporaryDirectory.appendingPathComponent("tinypet-video-\(UUID().uuidString).mp4")
+    // Write into Caches (not tmp): expo-file-system only allows deleting inside its document/cache directories, so
+    // outputs in NSTemporaryDirectory could never be cleaned up by the JS side (rejected attempts, cancel, unmount).
+    let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+    let outURL = cachesDir.appendingPathComponent("tinypet-video-\(UUID().uuidString).mp4")
     try? FileManager.default.removeItem(at: outURL)
 
     do {

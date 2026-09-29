@@ -7,7 +7,7 @@ import { Badge, Button, Empty, Spinner } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
-import { fmtDate, fmtDateTime } from "@/lib/format";
+import { fmtDateTime, fmtDay } from "@/lib/format";
 import { formatBRL, INSTALLMENT_STATUS_LABEL, safeHref } from "@tinypet/shared";
 import { CONTRACT_STATUS_LABEL, CONTRACT_TYPE_LABEL } from "@/components/tutor/contract-labels";
 
@@ -100,7 +100,7 @@ export default function ContratoPage({ params }: { params: { id: string } }) {
           </tfoot>
         </table>
         <p className="mt-2 text-xs text-[var(--muted)]">
-          {c.installmentsCount}x {PERIOD[c.periodicity]} · primeira em {fmtDate(c.firstDueDate)}
+          {c.installmentsCount}x {PERIOD[c.periodicity]} · primeira em {fmtDay(c.firstDueDate)}
           {c.sessionsCount ? ` · ${c.sessionsCount} sessões` : ""}
           {c.pets?.length ? ` · Pets: ${c.pets.map((p) => p.name ?? p.pet?.name).filter(Boolean).join(", ")}` : ""}
         </p>
@@ -115,7 +115,7 @@ export default function ContratoPage({ params }: { params: { id: string } }) {
             {(c.installments ?? []).map((i) => (
               <li key={i.id} className="flex items-center gap-3 py-2">
                 <span className="w-8 text-[var(--muted)]">{i.number}ª</span>
-                <span className="flex-1">Vence em {fmtDate(i.dueDate)}</span>
+                <span className="flex-1">Vence em {fmtDay(i.dueDate)}</span>
                 <span className="font-medium">{formatBRL(i.amount)}</span>
                 {Number(i.paidAmount) > 0 && i.status !== "PAID" && <span className="text-xs text-[var(--muted)]">pago {formatBRL(i.paidAmount)}</span>}
                 <Badge tone={INST_TONE[i.status]}>{INSTALLMENT_STATUS_LABEL[i.status]}</Badge>

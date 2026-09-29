@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { formatBRL, INSTALLMENT_STATUS_LABEL } from "@tinypet/shared";
 import { useMyContracts, useMyInstallments } from "@/hooks/use-me";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtDay } from "@/lib/format";
 import { spacing } from "@/lib/theme";
 import { Badge, Empty, ErrorState, ListItem, Loading, Screen, Segmented } from "@/components/ui";
 import { statusTone } from "@/components/ui/Badge";
@@ -32,7 +32,7 @@ export default function Contracts() {
             <ListItem
               key={c.id}
               title={c.title}
-              subtitle={[c.partner?.tradeName, TYPE_LABEL[c.type], formatBRL(c.total), `${c.installmentsCount}x`].filter(Boolean).join(" · ")}
+              subtitle={[c.partner?.tradeName, TYPE_LABEL[c.type], formatBRL(c.netAmount ?? c.totalAmount ?? c.total), `${c.installmentsCount}x`].filter(Boolean).join(" · ")}
               right={<Badge label={c.status === "DRAFT" && !c.acceptedAt ? "Aceite pendente" : CONTRACT_STATUS[c.status]} tone={c.status === "DRAFT" ? "warning" : statusTone(c.status)} />}
               onPress={() => router.push(`/(tutor)/contratos/${c.id}`)}
             />
@@ -49,7 +49,7 @@ export default function Contracts() {
               <ListItem
                 key={i.id}
                 title={`${formatBRL(i.amount)} · parcela ${i.number}`}
-                subtitle={[`Vence ${fmtDate(i.dueDate)}`, i.contract?.title, i.contract?.partner?.tradeName ?? i.partner?.tradeName, i.paidAmount && Number(i.paidAmount) > 0 && i.status !== "PAID" ? `pago ${formatBRL(i.paidAmount)}` : null].filter(Boolean).join(" · ")}
+                subtitle={[`Vence ${fmtDay(i.dueDate)}`, i.contract?.title, i.contract?.partner?.tradeName ?? i.partner?.tradeName, i.paidAmount && Number(i.paidAmount) > 0 && i.status !== "PAID" ? `pago ${formatBRL(i.paidAmount)}` : null].filter(Boolean).join(" · ")}
                 right={<Badge label={INSTALLMENT_STATUS_LABEL[i.status]} tone={statusTone(i.status)} />}
                 onPress={i.contractId || i.contract?.id ? () => router.push(`/(tutor)/contratos/${i.contractId ?? i.contract!.id}`) : undefined}
               />

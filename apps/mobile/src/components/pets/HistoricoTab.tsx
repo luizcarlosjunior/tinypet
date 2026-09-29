@@ -3,7 +3,7 @@ import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { usePetHistory } from "@/hooks/use-pets";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtDay } from "@/lib/format";
 import { radius, spacing, useTheme } from "@/lib/theme";
 import type { HistoryEvent } from "@/lib/types";
 import { Empty, ErrorState, Loading, Text } from "@/components/ui";
@@ -41,7 +41,7 @@ function TimelineItem({ ev, last, color }: { ev: HistoryEvent; last: boolean; co
       </View>
       <View style={{ flex: 1, paddingLeft: spacing.sm, paddingBottom: spacing.lg }}>
         <Text variant="tiny" tone="faint">
-          {LABEL[ev.type] ?? ev.type} · {fmtDate(ev.occurredAt, "dd/MM/yyyy")}
+          {LABEL[ev.type] ?? ev.type} · {fmtDay(ev.occurredAt)}
           {ev.partner ? ` · ${ev.partner.tradeName}` : ""}
         </Text>
         <Text variant="h3">{ev.title}</Text>

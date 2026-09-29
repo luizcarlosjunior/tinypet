@@ -14,7 +14,7 @@ import { splitInstallmentsPreview as splitInstallments } from "@/lib/installment
 import { ClientSearch, clientPets } from "@/components/forms/ClientSearch";
 import { useCreateContract } from "@/hooks/use-finance";
 import { errorMessage } from "@/lib/errors";
-import { fmtAddress, fmtDate, localToISO, num, todayISO } from "@/lib/format";
+import { fmtAddress, localToISO, num, todayISO, fmtDay } from "@/lib/format";
 import type { CatalogItem, Client, TeamMember } from "@/types/api";
 import { CONTRACT_TYPE_LABEL, PERIODICITY_LABEL } from "./common";
 
@@ -270,7 +270,7 @@ export function ContractForm({ partnerId, initialClientId }: { partnerId: string
               {preview.map((p) => (
                 <tr key={p.number}>
                   <td className={td}>{p.number}</td>
-                  <td className={td}>{p.dueDate ? fmtDate(p.dueDate) : "—"}</td>
+                  <td className={td}>{p.dueDate ? fmtDay(p.dueDate) : "—"}</td>
                   <td className={`${td} text-right tabular-nums`}>{formatBRL(p.amount)}</td>
                 </tr>
               ))}

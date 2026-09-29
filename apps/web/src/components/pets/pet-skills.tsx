@@ -6,7 +6,7 @@ import { useGeolocation } from "@/hooks/use-geolocation";
 import { Button, Empty, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
-import { fmtDate, toDateKey } from "@/lib/format";
+import { toDateKey, fmtDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Level = "LEARNING" | "SOMETIMES" | "MASTERED";
@@ -77,7 +77,7 @@ export function PetSkills({ petId, deceased: isDeceased, readOnly = false }: { p
                       </span>
                     )}
                   </p>
-                  {s.masteredAt && <p className="text-xs text-[var(--muted)]">Dominado em {fmtDate(s.masteredAt)}</p>}
+                  {s.masteredAt && <p className="text-xs text-[var(--muted)]">Dominado em {fmtDay(s.masteredAt)}</p>}
                 </div>
                 <div role="radiogroup" aria-label={`Nível de ${s.name}`} className="inline-flex rounded-xl border p-0.5">
                   {LEVELS.map(([lv, label]) => (

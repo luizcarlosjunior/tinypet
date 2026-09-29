@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-store";
 import { useOwnerTerms } from "@/hooks/use-ref";
-import { useDeleteAccount, useHome, useUpdateProfile } from "@/hooks/use-me";
+import { useDeleteAccount, useHome, useNotifications, useUpdateProfile } from "@/hooks/use-me";
 import { useUsernameAvailability } from "@/hooks/use-sharing";
 import { USERNAME_HINT, usernameProblem, usernameReasonText } from "@/lib/username";
 import { errorMessage } from "@/lib/api";
@@ -12,6 +12,7 @@ import { pickAndUpload } from "@/lib/upload";
 import { unregisterPushToken } from "@/lib/push";
 import { spacing, useTheme } from "@/lib/theme";
 import { Avatar, Badge, Button, Checkbox, Input, ListItem, Screen, Section, Select, Sheet, Text } from "@/components/ui";
+import { planName } from "@/lib/plans";
 
 export default function Account() {
   const t = useTheme();
@@ -25,6 +26,8 @@ export default function Account() {
   const [uploading, setUploading] = useState(false);
   const home = useHome();
   const pendingInvites = home.data?.pendingPetInvites ?? 0;
+  const notifications = useNotifications();
+  const unreadNotifications = (notifications.data ?? []).filter((n) => !n.readAt).length;
   const [usernameOpen, setUsernameOpen] = useState(false);
   const [username, setUsername] = useState(user?.username ?? "");
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -118,7 +121,7 @@ export default function Account() {
           </Text>
           <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
             <Badge label={user.ownerTerm || "Tutor"} tone="primary" />
-            {user.plan ? <Badge label={`Plano ${user.plan}`} /> : null}
+            {user.plan ? <Badge label={`Plano ${planName(user.plan)}`} /> : null}
             {!user.emailVerified ? <Badge label="E-mail não verificado" tone="warning" /> : null}
           </View>
         </View>
@@ -137,6 +140,10 @@ export default function Account() {
         />
         <Select label="Como quer ser chamado" value={user.ownerTermId ?? null} onChange={(v) => patch({ ownerTermId: v })} options={(terms.data ?? []).map((o) => ({ value: o.id, label: o.label }))} />
         {!user.emailVerified ? <ListItem title="Verificar e-mail ou telefone" onPress={() => router.push("/(auth)/verificar")} /> : null}
+      </Section>
+
+      <Section title="Avisos">
+        <ListItem title="Notificações" subtitle={unreadNotifications ? `${unreadNotifications} ${unreadNotifications === 1 ? "não lida" : "não lidas"}` : "Tudo lido"} right={unreadNotifications ? <Badge label={String(unreadNotifications)} tone="primary" /> : undefined} onPress={() => router.push("/(tutor)/conta/notificacoes")} />
       </Section>
 
       <Section title="Pets compartilhados">
@@ -158,7 +165,7 @@ export default function Account() {
       </Section>
 
       <Section title="Plano">
-        <ListItem title="Meu plano e limites" subtitle={user.plan ? `Plano ${user.plan}` : undefined} onPress={() => router.push("/(tutor)/conta/plano")} />
+        <ListItem title="Meu plano e limites" subtitle={user.plan ? `Plano ${planName(user.plan)}` : undefined} onPress={() => router.push("/(tutor)/conta/plano")} />
       </Section>
 
       <Section title="Privacidade (LGPD)">

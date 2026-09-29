@@ -11,6 +11,7 @@ import { spacing, useTheme } from "@/lib/theme";
 import type { Pet } from "@/lib/types";
 import { MicrochipField } from "./Microchip";
 import { Avatar, Button, Input, Segmented, Select, Text } from "@/components/ui";
+import { speciesKeyOf } from "@/lib/species";
 
 const SEX = [{ key: "MALE", label: "Macho" }, { key: "FEMALE", label: "Fêmea" }] as const;
 const SIZE = [{ value: "SMALL", label: "Pequeno" }, { value: "MEDIUM", label: "Médio" }, { value: "LARGE", label: "Grande" }, { value: "GIANT", label: "Gigante" }] as const;
@@ -26,7 +27,7 @@ export function PetForm({ initial, onSubmit, submitLabel = "Salvar" }: Props) {
     resolver: zodResolver(petSchema),
     defaultValues: {
       name: initial?.name ?? "",
-      speciesKey: initial?.speciesKey ?? "dog",
+      speciesKey: speciesKeyOf(initial) ?? "dog",
       breedId: initial?.breedId ?? null,
       breedOther: initial?.breedOther ?? null,
       color: initial?.color ?? null,

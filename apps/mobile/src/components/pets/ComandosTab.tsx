@@ -4,9 +4,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useSkillComparison, useSkillMutations, useSkills } from "@/hooks/use-pets";
 import { errorMessage } from "@/lib/api";
-import { fmtDate, todayISO } from "@/lib/format";
+import { fmtDate, todayISO, fmtDay } from "@/lib/format";
 import { radius, spacing, useTheme } from "@/lib/theme";
-import type { PetSkill } from "@/lib/types";
+import type { PetSkill, SkillComparison } from "@/lib/types";
 import { Badge, Button, Card, Empty, ErrorState, Input, ListItem, Loading, Section, Segmented, Select, Sheet, Text } from "@/components/ui";
 
 const LEVELS = [{ key: "LEARNING", label: "Aprendendo" }, { key: "SOMETIMES", label: "Às vezes" }, { key: "MASTERED", label: "Domina" }] as const;
@@ -74,7 +74,7 @@ export function ComandosTab({ petId, canEdit, canValidate }: { petId: string; ca
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorState error={q.error} onRetry={q.refetch} />;
   const skills = q.data?.skills ?? [];
-  const available = (q.data?.available ?? []).filter((a) => !skills.some((s) => s.skillId === a.id));
+  const available = (q.data?.available ?? []).map((a) => ({ id: (a.skillId ?? a.id)!, name: a.name })).filter((a) => a.id && !skills.some((s) => s.skillId === a.id));
   const mastered = skills.filter((s) => s.level === "MASTERED").length;
 
   return (
@@ -100,9 +100,20 @@ export function ComandosTab({ petId, canEdit, canValidate }: { petId: string; ca
             </Text>
           ) : cmp.data ? (
             <View>
-              <Text>
-                {mastered} {mastered === 1 ? "comando dominado" : "comandos dominados"} — sabe mais que <Text style={{ fontWeight: "700" }}>{Math.round(cmp.data.summary.percentile)}%</Text> dos pets {cmp.data.scope ? `(${cmp.data.scope})` : ""}
-              </Text>
+              {cmp.data.summary.percentile != null && cmp.data.groupSize > 0 ? (
+                <Text>
+                  {mastered} {mastered === 1 ? "comando dominado" : "comandos dominados"} — sabe mais que <Text style={{ fontWeight: "700" }}>{Math.round(cmp.data.summary.percentile)}%</Text> dos pets{scopeLabel(cmp.data.scope) ? ` ${scopeLabel(cmp.data.scope)}` : ""}
+                </Text>
+              ) : (
+                <Text>
+                  {mastered} {mastered === 1 ? "comando dominado" : "comandos dominados"}. Ainda não há pets semelhantes suficientes{scopeLabel(cmp.data.scope) ? ` ${scopeLabel(cmp.data.scope)}` : ""} para comparar.
+                </Text>
+              )}
+              {cmp.data.note ? (
+                <Text variant="tiny" tone="muted" style={{ marginTop: 4 }}>
+                  {cmp.data.note}
+                </Text>
+              ) : null}
               <Text variant="tiny" tone="muted" style={{ marginTop: 4 }}>
                 Grupo de {cmp.data.groupSize} pets{cmp.data.widened ? " · escopo ampliado por falta de pets suficientes" : ""}. Atualizado diariamente.
               </Text>
@@ -123,7 +134,7 @@ export function ComandosTab({ petId, canEdit, canValidate }: { petId: string; ca
             <ListItem
               key={s.skillId}
               title={s.name}
-              subtitle={[s.masteredAt ? `dominado em ${fmtDate(s.masteredAt)}` : null, pct != null ? `${Math.round(pct)}% dos pets semelhantes dominam` : null, s.markedBy ? `marcado por ${s.markedBy}` : null].filter(Boolean).join(" · ") || null}
+              subtitle={[s.masteredAt ? `dominado em ${fmtDay(s.masteredAt)}` : null, pct != null ? `${Math.round(pct)}% dos pets semelhantes dominam` : null, markedByName(s.markedBy) ? `marcado por ${markedByName(s.markedBy)}` : null].filter(Boolean).join(" · ") || null}
               onPress={canEdit ? () => openEdit(s) : undefined}
               chevron={false}
               right={
@@ -171,4 +182,20 @@ export function ComandosTab({ petId, canEdit, canValidate }: { petId: string; ca
       </View>
     </View>
   );
+}
+
+const SCOPE_WHERE: Record<string, string> = { nearMe: "perto de você", city: "na sua cidade", state: "no seu estado", Brasil: "no Brasil" };
+
+/** Readable comparison scope (same wording as the web): "da raça Border Collie em Campinas" / "no Brasil". */
+function scopeLabel(scope: SkillComparison["scope"]): string | null {
+  if (!scope) return null;
+  if (typeof scope === "string") return scope;
+  const label = scope.label ?? "Brasil";
+  const where = label === "city" || label === "nearMe" ? (scope.city ? `em ${scope.city}` : SCOPE_WHERE[label]) : label === "state" ? (scope.state ? `em ${scope.state}` : SCOPE_WHERE.state) : SCOPE_WHERE.Brasil;
+  return `${scope.breed?.name ? `da raça ${scope.breed.name} ` : ""}${where}`;
+}
+
+function markedByName(m: PetSkill["markedBy"]): string | null {
+  if (!m) return null;
+  return typeof m === "string" ? m : (m.tradeName ?? m.name ?? null);
 }

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { RegisterInput } from "@tinypet/shared";
 import { API_BASE, api, getApiContext, onUnauthorized, setApiContext } from "./api";
 import { PARTNER_KEY, getPref, getToken, setPref, setToken } from "./storage";
+import { queryClient } from "./query";
 import type { AuthPayload, Membership, User } from "./types";
 
 type AuthState = {
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signingOut = useRef(false);
 
   const applyPayload = useCallback(async (p: AuthPayload) => {
+    queryClient.clear();
     setApiContext({ token: p.token });
     await setToken(p.token);
     setTokenState(p.token);
@@ -65,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setMemberships([]);
       setActivePartnerId(null);
+      // Drop every cached response so the next account never sees the previous one's data.
+      queryClient.clear();
     } finally {
       signingOut.current = false;
     }
@@ -117,6 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setContext = useCallback(async (partnerId: string | null) => {
     setApiContext({ partnerId });
     await setPref(PARTNER_KEY, partnerId);
+    // Query keys don't carry the X-Partner-Id context (e.g. ["notifications"], ["pets", id]): start clean.
+    queryClient.clear();
     setActivePartnerId(partnerId);
   }, []);
 

@@ -12,6 +12,7 @@ import { Avatar, Badge, Button, ErrorState, ListItem, Loading, Screen, Section, 
 import { BackHeader } from "@/components/BackHeader";
 import { Stars, ReviewRow } from "@/components/Reviews";
 import { openExternal, openLocal, telUrl, whatsappUrl } from "@/lib/links";
+import { fmtPhone } from "@/lib/format";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -42,9 +43,9 @@ export default function PartnerPage() {
                   {(p.types ?? []).map((x) => (typeof x === "string" ? x : x.label)).join(", ")}
                 </Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-                  {p.ratingAvg != null ? <Stars value={p.ratingAvg} /> : null}
+                  {p.ratingAvg != null ? <Stars value={Number(p.ratingAvg)} /> : null}
                   <Text variant="tiny" tone="muted">
-                    {p.ratingCount ? `${p.ratingAvg?.toFixed(1)} · ${p.ratingCount} avaliações` : "Sem avaliações"}
+                    {p.ratingCount ? `${Number(p.ratingAvg ?? 0).toFixed(1).replace(".", ",")} · ${p.ratingCount} ${p.ratingCount === 1 ? "avaliação" : "avaliações"}` : "Sem avaliações"}
                   </Text>
                 </View>
               </View>
@@ -109,7 +110,7 @@ export default function PartnerPage() {
                 {p.phones?.length || p.website || p.socialLinks?.length ? (
                   <Section title="Contato">
                     {p.phones?.map((ph) => (
-                      <ListItem key={ph.id} title={ph.number} subtitle={ph.type === "WHATSAPP" ? "WhatsApp" : "Telefone"} onPress={() => openLocal(ph.type === "WHATSAPP" ? whatsappUrl(ph.number) : telUrl(ph.number))} chevron={false} />
+                      <ListItem key={ph.number} title={fmtPhone(ph.number)} subtitle={ph.type === "WHATSAPP" ? "WhatsApp" : "Telefone"} onPress={() => openLocal(ph.type === "WHATSAPP" ? whatsappUrl(ph.number) : telUrl(ph.number))} chevron={false} />
                     ))}
                     {p.website ? <ListItem title="Site" subtitle={p.website} onPress={() => openExternal(p.website)} chevron={false} /> : null}
                     {p.socialLinks?.map((s) => (

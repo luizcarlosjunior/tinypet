@@ -37,7 +37,10 @@ export function useMyAppointment(id: string | undefined) {
   return useQuery({
     queryKey: ["me", "appointments", "one", id],
     queryFn: async () => {
-      const list = await api<Appointment[]>("/me/appointments");
+      // There is no GET /me/appointments/:id and the list defaults to today → +60 days: ask for a wide window
+      // so past visits (history, "Avaliar serviço") and far-future ones open too.
+      const day = 86_400_000;
+      const list = await api<Appointment[]>(`/me/appointments${qs({ from: new Date(Date.now() - 400 * day).toISOString(), to: new Date(Date.now() + 400 * day).toISOString() })}`);
       return list.find((a) => a.id === id) ?? null;
     },
     enabled: !!id,

@@ -150,3 +150,15 @@ export function fmtWeight(grams: number | string | null | undefined): string {
   if (!g) return "—";
   return g < 1000 ? `${Math.round(g)} g` : `${(g / 1000).toFixed(g < 10000 ? 2 : 1).replace(".", ",")} kg`;
 }
+
+/**
+ * Formats a CALENDAR date (`@db.Date` columns: birth date, due dates, measuredAt, appliedAt…). Prisma serializes them as
+ * UTC midnight; converting to America/Sao_Paulo would show the previous day, so they are formatted in UTC.
+ * Use `fmtDate` for real instants (appointments, createdAt…).
+ */
+export function fmtDay(v: string | Date | null | undefined, pattern = "dd/MM/yyyy"): string {
+  if (!v) return "—";
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) v = `${v}T00:00:00.000Z`;
+  const d = toDate(v);
+  return d ? formatInTimeZone(d, "UTC", pattern, { locale: ptBR }) : "—";
+}

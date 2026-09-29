@@ -38,7 +38,10 @@ Seed: dados de referência (espécies, raças, categorias, planos, features, bad
 ## App mobile
 
 - O monorepo usa `node-linker=hoisted` (`.npmrc`), exigido pelo Metro/Expo com pnpm.
-- Em dispositivo físico, defina `EXPO_PUBLIC_API_URL` com o IP da máquina (ex.: `http://192.168.0.10:3001`).
+- Em dispositivo físico, defina `EXPO_PUBLIC_API_URL` com o IP da máquina (ex.: `http://192.168.0.10:3001`). No emulador Android use `http://10.0.2.2:3001`.
+- Em desenvolvimento sem S3, as URLs de mídia usam `NEXT_PUBLIC_APP_URL`. Para ver imagens em aparelho/emulador, rode a web com `NEXT_PUBLIC_APP_URL` apontando para o mesmo IP (ex.: `http://192.168.0.10:3001`). Em produção as mídias vêm do S3.
+- O app precisa de build de desenvolvimento (`npx expo run:ios` / `npx expo run:android` ou EAS) por causa do módulo nativo de vídeo; não roda no Expo Go.
+- iOS com Xcode 26: o plugin `plugins/with-fmt-xcode26.js` corrige a compilação do pod `fmt` do React Native 0.76.
 - Verificações: `pnpm --filter @tinypet/mobile typecheck` e `npx expo-doctor` em `apps/mobile`.
 - Builds de loja via EAS (`eas build`), ainda não configurado.
 

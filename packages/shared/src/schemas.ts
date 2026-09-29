@@ -305,7 +305,9 @@ export const historyEventSchema = z.object({
 });
 
 export const taskRuleSchema = z.object({
-  freq: z.enum(["daily", "weekly"]),
+  freq: z.enum(["daily", "weekly", "monthly"]),
+  /** For monthly tasks (1–31; clamps to the last day of shorter months). Defaults to the creation day. */
+  dayOfMonth: z.number().int().min(1).max(31).optional(),
   days: z.array(z.number().int().min(0).max(6)).max(7).optional(),
   times: z.array(timeString).max(24).optional(),
 });

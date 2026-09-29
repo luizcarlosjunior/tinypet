@@ -7,6 +7,7 @@ import { petRoleOf } from "@/hooks/use-sharing";
 import { useAuth } from "@/lib/auth-store";
 import { spacing, useTheme } from "@/lib/theme";
 import { Avatar, Badge, Button, Checkbox, Empty, ErrorState, ListItem, Loading, Screen } from "@/components/ui";
+import { speciesKeyOf } from "@/lib/species";
 
 export default function PetsList() {
   const t = useTheme();
@@ -32,7 +33,7 @@ export default function PetsList() {
             <ListItem
               title={p.name}
               subtitle={[p.species?.label, p.breed?.name ?? p.breedOther, formatAge(ageInMonths(p.birthDate, p.approxAgeMonths))].filter(Boolean).join(" · ")}
-              left={<Avatar uri={p.avatarUrl} name={p.name} species={p.speciesKey} size={52} />}
+              left={<Avatar uri={p.avatarUrl} name={p.name} species={speciesKeyOf(p)} size={52} />}
               right={
                 <View style={{ gap: 4, alignItems: "flex-end" }}>
                   {p.status === "DECEASED" ? <Badge label="Em memória" icon="heart" /> : null}

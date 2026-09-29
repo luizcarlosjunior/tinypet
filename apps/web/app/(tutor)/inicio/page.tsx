@@ -6,7 +6,7 @@ import { useHome } from "@/hooks/use-me";
 import { useSessionContext } from "@/hooks/use-session-context";
 import { api } from "@/lib/api-client";
 import { errorMessage } from "@/lib/errors";
-import { fmtDate, fmtDateTime, toDateKey, addressLine } from "@/lib/format";
+import { fmtDate, fmtDateTime, toDateKey, addressLine, fmtDay } from "@/lib/format";
 import { Avatar } from "@/components/ui/avatar";
 import { Card, Empty, PageHeader, Spinner } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
@@ -163,7 +163,7 @@ export default function InicioPage() {
                       {i.contract?.title ?? "Contrato"} · parcela {i.number}
                       {i.contract?.partner?.tradeName && <span className="text-[var(--muted)]"> · {i.contract.partner.tradeName}</span>}
                     </span>
-                    <span className="text-xs text-red-600">venceu em {fmtDate(i.dueDate)}</span>
+                    <span className="text-xs text-red-600">venceu em {fmtDay(i.dueDate)}</span>
                     <span className="font-semibold">{formatBRL(i.amount)}</span>
                     <Link href={`/contratos/${i.contractId}`} className="text-xs text-brand-600 hover:underline">
                       Ver

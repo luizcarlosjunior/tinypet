@@ -16,6 +16,9 @@ import { brand, useTheme } from "@/lib/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+// A render error in any screen shows Expo Router's "try again" screen instead of killing the whole app.
+export { ErrorBoundary } from "expo-router";
+
 function useProtectedRoutes() {
   const { ready, token, activePartnerId } = useAuth();
   const segments = useSegments();

@@ -4,7 +4,7 @@ import { useLocalSearchParams } from "expo-router";
 import { formatBRL, INSTALLMENT_STATUS_LABEL } from "@tinypet/shared";
 import { useAcceptContract, useMyContract } from "@/hooks/use-me";
 import { errorMessage } from "@/lib/api";
-import { fmtDate, fmtDateTime } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtDay } from "@/lib/format";
 import { spacing, useTheme } from "@/lib/theme";
 import { Badge, Button, Card, ErrorState, KeyValue, ListItem, Loading, Screen, Section, Text } from "@/components/ui";
 import { statusTone } from "@/components/ui/Badge";
@@ -36,8 +36,11 @@ export default function ContractDetail() {
             <Text tone="muted">{c.partner?.tradeName}</Text>
             {c.description ? <Text style={{ marginTop: spacing.sm }}>{c.description}</Text> : null}
             <Card style={{ marginTop: spacing.md }}>
-              <KeyValue k="Valor total" v={formatBRL(c.total)} />
+              <KeyValue k="Valor total" v={formatBRL(c.totalAmount ?? c.total)} />
               {c.discount && Number(c.discount) > 0 ? <KeyValue k="Desconto" v={formatBRL(c.discount)} /> : null}
+              {c.discount && Number(c.discount) > 0 && c.netAmount != null ? <KeyValue k="Valor final" v={formatBRL(c.netAmount)} /> : null}
+              {c.paidAmount != null && Number(c.paidAmount) > 0 ? <KeyValue k="Pago" v={formatBRL(c.paidAmount)} /> : null}
+              {c.balance != null && Number(c.paidAmount ?? 0) > 0 ? <KeyValue k="Saldo" v={formatBRL(c.balance)} /> : null}
               <KeyValue k="Parcelas" v={`${c.installmentsCount}x`} />
               {c.sessionsCount ? <KeyValue k="Sessões" v={String(c.sessionsCount)} /> : null}
               <KeyValue k="Pets" v={(c.pets ?? []).map((p) => p.name).join(", ")} />
@@ -60,7 +63,7 @@ export default function ContractDetail() {
             {c.installments?.length ? (
               <Section title="Parcelas">
                 {c.installments.map((i) => (
-                  <ListItem key={i.id} title={`${i.number}ª · ${formatBRL(i.amount)}`} subtitle={`Vence ${fmtDate(i.dueDate)}`} right={<Badge label={INSTALLMENT_STATUS_LABEL[i.status]} tone={statusTone(i.status)} />} chevron={false} />
+                  <ListItem key={i.id} title={`${i.number}ª · ${formatBRL(i.amount)}`} subtitle={`Vence ${fmtDay(i.dueDate)}`} right={<Badge label={INSTALLMENT_STATUS_LABEL[i.status]} tone={statusTone(i.status)} />} chevron={false} />
                 ))}
               </Section>
             ) : null}

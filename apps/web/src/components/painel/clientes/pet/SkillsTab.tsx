@@ -4,7 +4,7 @@ import { BadgeCheck, Plus } from "lucide-react";
 import { Badge, Button, Input, Modal, Select, Spinner } from "@/components/ui";
 import { ErrorBox, Table, td, th } from "@/components/painel/ui";
 import { useApiMutation, usePetSkills } from "@/hooks/use-crm";
-import { fmtDate, todayISO } from "@/lib/format";
+import { todayISO, fmtDay } from "@/lib/format";
 import { useActivePartner } from "@/hooks/use-partner";
 
 const LEVEL: Record<string, { label: string; tone: "gray" | "amber" | "green" }> = { LEARNING: { label: "Aprendendo", tone: "gray" }, SOMETIMES: { label: "Às vezes", tone: "amber" }, MASTERED: { label: "Dominado", tone: "green" } };
@@ -68,7 +68,7 @@ export function SkillsTab({ petId }: { petId: string }) {
                     </select>
                   </span>
                 </td>
-                <td className={`${td} hidden sm:table-cell`}>{s.masteredAt ? fmtDate(s.masteredAt) : "—"}</td>
+                <td className={`${td} hidden sm:table-cell`}>{s.masteredAt ? fmtDay(s.masteredAt) : "—"}</td>
                 <td className={td}>
                   {s.validated ? (
                     <Badge tone="green">

@@ -8,7 +8,7 @@ import { AlertTriangle, Plus } from "lucide-react";
 import { Badge, Button, Input, Modal, Spinner, Textarea } from "@/components/ui";
 import { ErrorBox, Table, td, th } from "@/components/painel/ui";
 import { useApiMutation, usePetMeasurements } from "@/hooks/use-crm";
-import { fmtDate, num, todayISO } from "@/lib/format";
+import { num, todayISO, fmtDay } from "@/lib/format";
 import type { Measurement } from "@/types/api";
 
 type MeasurementInput = z.infer<typeof bodyMeasurementSchema>;
@@ -81,7 +81,7 @@ export function MeasurementsTab({ petId }: { petId: string }) {
               {[...items].reverse().map((m) => (
                 <tr key={m.id}>
                   <td className={td}>
-                    {fmtDate(m.measuredAt)} {m.vetVerified && <Badge tone="green" className="ml-1">Vet</Badge>}
+                    {fmtDay(m.measuredAt)} {m.vetVerified && <Badge tone="green" className="ml-1">Vet</Badge>}
                   </td>
                   <td className={`${td} font-medium`}>{(m.weightG / 1000).toFixed(2).replace(".", ",")} kg</td>
                   <td className={`${td} hidden sm:table-cell`}>{m.heightCm ? `${num(m.heightCm)} cm` : "—"}</td>
@@ -141,13 +141,13 @@ function WeightChart({ items, reference }: { items: Measurement[]; reference: { 
       {items.map((m, i) => (
         <circle key={m.id} cx={sx(xs[i]!)} cy={sy(ys[i]!)} r={4} className={m.vetVerified ? "fill-emerald-500" : "fill-brand-500"}>
           <title>
-            {fmtDate(m.measuredAt)}: {ys[i]!.toFixed(2)} kg
+            {fmtDay(m.measuredAt)}: {ys[i]!.toFixed(2)} kg
           </title>
         </circle>
       ))}
       {xLabels.map((m) => (
         <text key={m.id} x={sx(new Date(m.measuredAt.slice(0, 10) + "T12:00:00").getTime())} y={H - 8} textAnchor="middle" className="fill-[var(--muted)] text-[11px]">
-          {fmtDate(m.measuredAt).slice(0, 5)}
+          {fmtDay(m.measuredAt).slice(0, 5)}
         </text>
       ))}
       {reference && (

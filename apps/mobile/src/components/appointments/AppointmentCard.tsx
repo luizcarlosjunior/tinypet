@@ -67,14 +67,22 @@ export function AddressBlock({ address, notes }: { address: Address | null | und
   );
 }
 
+/** Where the visit happens: its own address, or (owner side, at the partner's venue) the partner's address. */
+export function appointmentAddress(a: Appointment, side: "owner" | "partner"): Address | null {
+  if (a.address) return a.address;
+  if (side === "owner" && a.locationType === "PARTNER_VENUE") return a.partner?.address ?? null;
+  return null;
+}
+
 export function AppointmentCard({ a, onPress, side, showDate }: { a: Appointment; onPress?: () => void; side: "owner" | "partner"; showDate?: boolean }) {
   const t = useTheme();
   const petNames = (a.pets ?? []).map((p) => p.name).join(", ");
   const who = side === "owner" ? a.partner?.tradeName : a.client?.name;
-  const alert = a.travelLeg?.alert;
+  const leg = a.travelLeg;
+  const legKm = leg?.distanceKm != null ? Number(leg.distanceKm) : null;
   const showMaps = side === "owner" ? a.locationType === "PARTNER_VENUE" || a.locationType === "OTHER" : a.locationType === "CLIENT_HOME" || a.locationType === "OTHER";
   return (
-    <Card onPress={onPress} accessibilityLabel={`${a.item?.name ?? a.title ?? "Atendimento"} ${fmtTime(a.startsAt)}`} style={alert ? { borderColor: t.warning } : undefined}>
+    <Card onPress={onPress} accessibilityLabel={`${a.item?.name ?? a.title ?? "Atendimento"} ${fmtTime(a.startsAt)}`}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.md }}>
         <View style={{ alignItems: "center", minWidth: 52 }}>
           <Text variant="h2">{fmtTime(a.startsAt)}</Text>
@@ -99,15 +107,14 @@ export function AppointmentCard({ a, onPress, side, showDate }: { a: Appointment
             <Badge label={APPOINTMENT_STATUS_LABEL[a.status] ?? a.status} tone={statusTone(a.status)} />
             {side === "partner" && a.membership ? <Badge label={a.membership.user?.name ?? a.membership.name ?? "Profissional"} icon="person" /> : null}
           </View>
-          {a.travelLeg && side === "partner" && a.locationType === "CLIENT_HOME" ? (
-            <Text variant="tiny" tone={alert ? "danger" : "faint"} style={{ marginTop: 4 }}>
-              {a.travelLeg.distanceKm != null ? `${a.travelLeg.distanceKm.toFixed(1)} km · ` : ""}
-              {a.travelLeg.minutes != null ? `${Math.round(a.travelLeg.minutes)} min de deslocamento` : ""}
-              {a.travelLeg.estimated ? " (estimativa)" : ""}
-              {alert ? ` · ${alert}` : ""}
+          {leg && side === "partner" && a.locationType === "CLIENT_HOME" ? (
+            <Text variant="tiny" tone="faint" style={{ marginTop: 4 }}>
+              {legKm != null && Number.isFinite(legKm) ? `${legKm.toFixed(1).replace(".", ",")} km · ` : ""}
+              {leg.durationMinutes != null ? `${Math.round(leg.durationMinutes)} min de deslocamento` : ""}
+              {leg.estimated ? " (estimativa)" : ""}
             </Text>
           ) : null}
-          {showMaps && a.status !== "CANCELED" && a.status !== "COMPLETED" ? <MapsButtons address={a.address ?? null} compact /> : null}
+          {showMaps && a.status !== "CANCELED" && a.status !== "COMPLETED" ? <MapsButtons address={appointmentAddress(a, side)} compact /> : null}
         </View>
       </View>
     </Card>

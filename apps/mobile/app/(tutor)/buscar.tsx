@@ -78,7 +78,7 @@ export default function SearchPartners() {
                 left={<Avatar uri={p.logoUrl} name={p.tradeName} size={48} square />}
                 right={
                   <View style={{ alignItems: "flex-end", gap: 4 }}>
-                    {p.ratingAvg != null && p.ratingCount ? <Badge label={`${p.ratingAvg.toFixed(1)} (${p.ratingCount})`} tone="warning" icon="star" /> : null}
+                    {p.ratingAvg != null && p.ratingCount ? <Badge label={`${Number(p.ratingAvg).toFixed(1).replace(".", ",")} (${p.ratingCount})`} tone="warning" icon="star" /> : null}
                     {p.featured ? <Badge label="Destaque" tone="primary" /> : null}
                   </View>
                 }

@@ -105,7 +105,8 @@
           "supportsBackgroundPlayback": false,
           "supportsPictureInPicture": false
         }
-      ]
+      ],
+      "./plugins/with-fmt-xcode26"
     ],
     "experiments": {
       "typedRoutes": false

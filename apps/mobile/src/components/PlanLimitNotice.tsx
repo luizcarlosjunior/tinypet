@@ -58,7 +58,8 @@ export function PlanLimitNotice({ error, compact }: { error: ApiError; compact?:
   const d = (error.details ?? {}) as { featureKey?: string; current?: number; limit?: number | null; planKey?: string };
   const feature = FEATURE_LABEL[d.featureKey ?? ""] ?? "este recurso";
   const videoText = videoLimitMessage(d.featureKey, d.limit, d.planKey);
-  const limitText = videoText ?? (d.limit != null ? `Seu plano ${d.planKey ? `(${d.planKey}) ` : ""}permite até ${d.limit} ${feature}.` : `Seu plano atual não inclui ${feature}.`);
+  // limit 0 / null = feature not included (boolean features such as owner_gallery answer limit 0).
+  const limitText = videoText ?? (d.limit ? `Seu plano permite até ${d.limit} ${feature}.` : `Seu plano atual não inclui ${feature}.`);
   return (
     <Card style={{ backgroundColor: t.primarySoft, borderColor: t.primary }}>
       <View style={{ flexDirection: "row", gap: spacing.md, alignItems: "flex-start" }}>

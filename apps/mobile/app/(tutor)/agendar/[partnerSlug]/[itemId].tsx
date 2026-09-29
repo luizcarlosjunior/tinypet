@@ -12,6 +12,7 @@ import { radius, spacing, useTheme } from "@/lib/theme";
 import type { Address } from "@/lib/types";
 import { Avatar, Button, Card, ErrorState, Input, Loading, Screen, Select, Text } from "@/components/ui";
 import { BackHeader } from "@/components/BackHeader";
+import { speciesKeyOf } from "@/lib/species";
 
 type Loc = "PARTNER_VENUE" | "CLIENT_HOME" | "ONLINE";
 
@@ -83,7 +84,7 @@ export default function BookingScreen() {
                   return (
                     <Pressable key={p.id} onPress={() => setPetIds((s) => (on ? s.filter((x) => x !== p.id) : [...s, p.id]))} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={p.name} style={{ alignItems: "center", width: 68 }}>
                       <View style={{ padding: 2, borderRadius: 34, borderWidth: 2, borderColor: on ? t.primary : "transparent" }}>
-                        <Avatar uri={p.avatarUrl} name={p.name} species={p.speciesKey} size={56} />
+                        <Avatar uri={p.avatarUrl} name={p.name} species={speciesKeyOf(p)} size={56} />
                       </View>
                       <Text variant="tiny" numberOfLines={1} style={{ marginTop: 4, color: on ? t.primary : t.inkMuted }}>
                         {p.name}

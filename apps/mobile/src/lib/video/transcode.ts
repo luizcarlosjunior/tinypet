@@ -172,8 +172,13 @@ export async function transcodeVideo(
     if (problem === "TOO_LARGE") throw new VideoProcessingError("TOO_LARGE", VIDEO_TOO_LARGE_MESSAGE);
     lastError = new VideoProcessingError("FAILED", `O vídeo convertido não atende ao padrão (${problem}). Tente outro vídeo.`);
     if (problem === "FRAME" && size.width !== fallback720.width) size = fallback720;
-    else if (problem === "VIDEO_BITRATE") bitrate = Math.round(bitrate * 0.75);
-    else break;
+    else if (problem === "VIDEO_BITRATE") {
+      // Scale by the measured overshoot (encoders on busy footage can overshoot far more than 25%), and on the
+      // last attempt also drop to 720p, which reaches the same bitrate with much less rate-control pressure.
+      const ratio = out.videoBitrate > 0 ? (VIDEO_TARGET_BITRATE * 0.9) / out.videoBitrate : 0.75;
+      bitrate = Math.max(250_000, Math.round(bitrate * Math.min(0.75, ratio)));
+      if (attempt === 1) size = fallback720;
+    } else break;
   }
   throw lastError ?? new VideoProcessingError("FAILED", "Não foi possível converter o vídeo.");
 }
@@ -184,7 +189,8 @@ function validateOutput(out: TranscodeResult, size: { width: number; height: num
   if (out.sizeBytes > MEDIA_MAX_BYTES) return "TOO_LARGE";
   if (out.width !== size.width || out.height !== size.height || !isAllowedVideoFrame(out.width, out.height)) return "FRAME";
   if (out.videoCodec !== "avc1") return "CODEC";
-  if (out.hasAudio && out.audioCodec !== "mp4a") return "CODEC";
+  // "mp4a" = MP4 sample entry (Android, iOS module ≥ this fix); "aac" = CoreAudio format ID reported by older iOS builds.
+  if (out.hasAudio && out.audioCodec !== "mp4a" && out.audioCodec !== "aac") return "CODEC";
   // Stay under the hard cap ourselves (the API tolerates +10%, we don't rely on it).
   if (out.videoBitrate > VIDEO_OUTPUT.maxVideoBitrate) return "VIDEO_BITRATE";
   if (out.audioBitrate > VIDEO_OUTPUT.maxAudioBitrate * (1 + VIDEO_OUTPUT.bitrateTolerance)) return "AUDIO_BITRATE";

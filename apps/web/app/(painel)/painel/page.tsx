@@ -11,7 +11,7 @@ import { Badge, Button, Card, PageHeader } from "@/components/ui";
 import { PublishCard } from "@/components/painel/PublishCard";
 import { QueryState, StatCard } from "@/components/painel/ui";
 import { errorMessage } from "@/lib/errors";
-import { daysLate, fmtAddress, fmtDate, fmtLong, fmtTime, num, todayISO } from "@/lib/format";
+import { daysLate, fmtAddress, fmtLong, fmtTime, num, todayISO, fmtDay } from "@/lib/format";
 import type { Appointment, Dashboard } from "@/types/api";
 import { cn } from "@/lib/utils";
 
@@ -135,7 +135,7 @@ export default function DashboardPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{i.clientName ?? i.contractTitle ?? "Parcela"}</p>
                         <p className="text-xs text-[var(--muted)]">
-                          {formatBRL(num(i.amount) - num(i.paidAmount))} · venc. {fmtDate(i.dueDate)} · <span className="text-red-600 dark:text-red-300">{i.daysLate ?? daysLate(i.dueDate)} dias de atraso</span>
+                          {formatBRL(num(i.amount) - num(i.paidAmount))} · venc. {fmtDay(i.dueDate)} · <span className="text-red-600 dark:text-red-300">{i.daysLate ?? daysLate(i.dueDate)} dias de atraso</span>
                         </p>
                       </div>
                       <Button type="button" variant="secondary" className="h-8 px-2 text-xs" onClick={() => remind.mutate(i.id)} loading={remind.isPending && remind.variables === i.id}>

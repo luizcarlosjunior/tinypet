@@ -7,7 +7,7 @@ import { Button } from "@/components/ui";
 import { DeceasedDialog } from "./deceased-dialog";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
-import { fmtDate } from "@/lib/format";
+import { fmtDay } from "@/lib/format";
 
 export function MemorialBanner({ pet }: { pet: Pet }) {
   if (pet.status !== "DECEASED") return null;
@@ -17,7 +17,7 @@ export function MemorialBanner({ pet }: { pet: Pet }) {
       <div className="flex-1">
         <p className="font-semibold">Em memória de {pet.name}</p>
         <p className="text-[var(--muted)]">
-          {pet.deceasedAt ? `Partiu em ${fmtDate(pet.deceasedAt)}.` : ""} {pet.memorialNote}
+          {pet.deceasedAt ? `Partiu em ${fmtDay(pet.deceasedAt)}.` : ""} {pet.memorialNote}
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">Ficha, galeria e histórico continuam guardados. Sem novas tarefas ou conquistas.</p>
       </div>

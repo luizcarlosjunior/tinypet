@@ -51,3 +51,15 @@ describe("misc", () => {
     expect(truncate("abcdef", 4)).toBe("abc…");
   });
 });
+
+import { fmtDay, fmtDate } from "./format";
+describe("calendar dates", () => {
+  it("fmtDay keeps the stored calendar day (no São Paulo shift)", () => {
+    expect(fmtDay("2023-03-15T00:00:00.000Z")).toBe("15/03/2023");
+    expect(fmtDay("2023-03-15")).toBe("15/03/2023");
+    expect(fmtDay(null)).toBe("—");
+  });
+  it("fmtDate converts instants to São Paulo", () => {
+    expect(fmtDate("2026-09-30T00:00:00.000Z", "dd/MM/yyyy HH:mm")).toBe("29/09/2026 21:00");
+  });
+});

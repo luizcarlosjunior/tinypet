@@ -8,7 +8,7 @@ import { formatBRL, PAYMENT_METHOD_LABEL, transactionSchema } from "@tinypet/sha
 import { Badge, Button, Input, Modal, Select } from "@/components/ui";
 import { ConfirmDialog, QueryState, Table, td, th, Pagination } from "@/components/painel/ui";
 import { useCreateTransaction, useDeleteTransaction, useTransactions } from "@/hooks/use-finance";
-import { fmtDate, num, todayISO } from "@/lib/format";
+import { num, todayISO, fmtDay } from "@/lib/format";
 
 type TransactionInput = z.infer<typeof transactionSchema>;
 const CATEGORIES = ["Serviços", "Produtos", "Cursos", "Aluguel", "Salários", "Materiais", "Combustível", "Marketing", "Impostos", "Outros"];
@@ -66,7 +66,7 @@ export function LancamentosTab({ partnerId }: { partnerId: string | null }) {
             )}
             {items.map((t) => (
               <tr key={t.id}>
-                <td className={td}>{fmtDate(t.occurredAt)}</td>
+                <td className={td}>{fmtDay(t.occurredAt)}</td>
                 <td className={td}>{t.kind === "INCOME" ? <Badge tone="green">Receita</Badge> : <Badge tone="red">Despesa</Badge>}</td>
                 <td className={td}>{t.category}</td>
                 <td className={td}>{t.description ?? "—"}</td>

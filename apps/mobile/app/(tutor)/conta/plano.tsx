@@ -4,8 +4,9 @@ import { usePlan } from "@/hooks/use-me";
 import { radius, spacing, useTheme } from "@/lib/theme";
 import { Card, ErrorState, Loading, Screen, Text } from "@/components/ui";
 import { BackHeader } from "@/components/BackHeader";
+import { planName } from "@/lib/plans";
 
-const LABEL: Record<string, string> = { owner_pets: "Pets", owner_gallery: "Galeria", owner_stories: "Stories", owner_storage_mb: "Armazenamento (MB)" };
+const LABEL: Record<string, string> = { owner_pets: "Pets", owner_gallery: "Galeria", owner_stories: "Stories", owner_storage_mb: "Armazenamento (MB)", owner_videos_per_day: "Vídeos por dia", owner_video_max_seconds: "Duração máxima do vídeo (s)" };
 
 export default function PlanScreen() {
   const t = useTheme();
@@ -19,7 +20,7 @@ export default function PlanScreen() {
         {q.data ? (
           <>
             <Card style={{ backgroundColor: t.primarySoft, borderColor: t.primary }}>
-              <Text variant="h2">Plano {q.data.planName ?? q.data.planKey}</Text>
+              <Text variant="h2">Plano {q.data.planName ?? planName(q.data.planKey)}</Text>
               <Text variant="small" tone="muted">
                 Planos pagos liberam galeria, stories e mais pets. Assinatura em breve pelo app; por enquanto, contrate pelo site.
               </Text>

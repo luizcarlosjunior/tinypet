@@ -22,6 +22,17 @@ export type UploadedMedia = {
 
 type UploadTicket = { assetId: string; uploadUrl: string; method: "PUT"; headers?: Record<string, string>; url: string };
 
+/**
+ * Dev only: the local upload sink URL is built from the server's APP_URL (e.g. http://localhost:3001), which a
+ * device/emulator can't reach (Android emulator uses 10.0.2.2). Rebase a loopback `/api/v1/media/upload/…` URL onto
+ * the API origin the app is actually using. Presigned S3 URLs are returned untouched.
+ */
+function resolveUploadUrl(uploadUrl: string): string {
+  if (!__DEV__) return uploadUrl;
+  const m = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/api\/v1\/media\/upload\/[^?#]*)$/i.exec(uploadUrl);
+  return m ? `${API_BASE}${m[3]!.slice("/api/v1".length)}` : uploadUrl;
+}
+
 export type LocalFile = {
   uri: string;
   mimeType: string;
@@ -114,8 +125,9 @@ export async function uploadFile(file: LocalFile, purpose: MediaPurpose, opts: {
   });
   // The local-dev sink lives on our API and needs the Bearer token; never send it to third-party (S3) URLs.
   const { token } = getApiContext();
-  const toOwnApi = ticket.uploadUrl.startsWith(`${API_BASE}/`);
-  const put = await fetch(ticket.uploadUrl, {
+  const uploadUrl = resolveUploadUrl(ticket.uploadUrl);
+  const toOwnApi = uploadUrl.startsWith(`${API_BASE}/`);
+  const put = await fetch(uploadUrl, {
     method: ticket.method ?? "PUT",
     headers: { "Content-Type": file.mimeType, ...(ticket.headers ?? {}), ...(toOwnApi && token ? { Authorization: `Bearer ${token}` } : {}) },
     body: blob,
@@ -185,9 +197,10 @@ async function exactSize(uri: string): Promise<number> {
 /** PUT a local file to the presigned URL with progress + cancel (streams from disk; Content-Length = file size). */
 async function putFile(ticket: UploadTicket, fileUri: string, mimeType: string, onProgress?: (p: number) => void, signal?: AbortSignal) {
   const { token } = getApiContext();
-  const toOwnApi = ticket.uploadUrl.startsWith(`${API_BASE}/`);
+  const uploadUrl = resolveUploadUrl(ticket.uploadUrl);
+  const toOwnApi = uploadUrl.startsWith(`${API_BASE}/`);
   const task = FileSystem.createUploadTask(
-    ticket.uploadUrl,
+    uploadUrl,
     fileUri,
     {
       httpMethod: "PUT",

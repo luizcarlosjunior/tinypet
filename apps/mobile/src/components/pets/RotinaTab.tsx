@@ -95,7 +95,7 @@ export function RotinaTab({ petId, canEdit, isOwner, partnerMode, canComplete = 
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
               {templates.data.map((tpl) => (
-                <Button key={tpl.title} title={tpl.title} size="sm" variant="secondary" onPress={() => { setTitle(tpl.title); setDescription(tpl.description ?? ""); if (tpl.rule?.freq) setFreq(tpl.rule.freq); if (tpl.rule?.days) setDays(tpl.rule.days); if (tpl.rule?.times?.[0]) setTime(tpl.rule.times[0]); }} />
+                <Button key={tpl.title} title={tpl.title} size="sm" variant="secondary" onPress={() => { setTitle(tpl.title); setDescription(tpl.description ?? ""); setFreq(tpl.rule?.freq === "daily" || tpl.rule?.freq === "weekly" ? tpl.rule.freq : "once"); /* API rules: daily|weekly only (seed templates may say "monthly") */ if (tpl.rule?.days) setDays(tpl.rule.days); if (tpl.rule?.times?.[0]) setTime(tpl.rule.times[0]); }} />
               ))}
             </View>
           </View>

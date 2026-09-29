@@ -3,11 +3,12 @@ import { Alert, View } from "react-native";
 import * as FileSystem from "expo-file-system";
 import { useMeasurementMutations, useMeasurements, useVaccinationMutations, useVaccinations } from "@/hooks/use-pets";
 import { API_BASE, errorMessage, getApiContext } from "@/lib/api";
-import { fmtDate, fmtWeight, todayISO } from "@/lib/format";
+import { fmtDate, fmtWeight, todayISO, fmtDay } from "@/lib/format";
 import { spacing, useTheme } from "@/lib/theme";
 import type { Measurement, MeasurementsResponse } from "@/lib/types";
 import { Badge, Button, Card, ErrorState, Input, ListItem, Loading, Section, Segmented, Sheet, Text } from "@/components/ui";
 import { WeightChart } from "./WeightChart";
+import * as Sharing from "expo-sharing";
 
 type Period = "6m" | "1y" | "all";
 
@@ -41,7 +42,11 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
         await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => {});
         throw new Error("Não foi possível exportar o histórico.");
       }
-      Alert.alert("Histórico exportado", `Arquivo salvo em:\n${res.uri}`);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(res.uri, { mimeType: "text/html", dialogTitle: "Histórico de medidas", UTI: "public.html" });
+      } else {
+        Alert.alert("Histórico exportado", `Arquivo salvo em:\n${res.uri}`);
+      }
     } catch (e) {
       Alert.alert("Erro ao exportar", errorMessage(e));
     } finally {
@@ -104,11 +109,12 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
             Nenhuma pesagem no período.
           </Text>
         ) : null}
-        {items.slice(0, 20).map((m: Measurement) => (
+        {/* API returns oldest first (chart order); list the 20 most recent. */}
+        {[...items].reverse().slice(0, 20).map((m: Measurement) => (
           <ListItem
             key={m.id}
             title={fmtWeight(m.weightG)}
-            subtitle={[fmtDate(m.measuredAt), m.heightCm ? `alt. ${m.heightCm} cm` : null, m.chestCm ? `tórax ${m.chestCm} cm` : null, m.bodyScore ? `ECC ${m.bodyScore}` : null, m.notes].filter(Boolean).join(" · ")}
+            subtitle={[fmtDay(m.measuredAt), m.heightCm ? `alt. ${m.heightCm} cm` : null, m.chestCm ? `tórax ${m.chestCm} cm` : null, m.bodyScore ? `ECC ${m.bodyScore}` : null, m.notes].filter(Boolean).join(" · ")}
             right={m.vetVerified ? <Badge label="Aferido por veterinário" tone="info" icon="checkmark-circle" /> : m.recordedBy === "PARTNER" || m.partnerId ? <Badge label="Parceiro" /> : undefined}
             chevron={false}
           />
@@ -129,7 +135,7 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
             <ListItem
               key={v.id}
               title={v.name}
-              subtitle={`${v.kind === "DEWORMING" ? "Vermífugo" : "Vacina"} · aplicada em ${fmtDate(v.appliedAt)}${v.nextDueAt ? ` · próxima ${fmtDate(v.nextDueAt)}` : ""}${v.partner ? ` · ${v.partner.tradeName}` : ""}`}
+              subtitle={`${v.kind === "DEWORMING" ? "Vermífugo" : "Vacina"} · aplicada em ${fmtDay(v.appliedAt)}${v.nextDueAt ? ` · próxima ${fmtDay(v.nextDueAt)}` : ""}${v.partner ? ` · ${v.partner.tradeName}` : ""}`}
               right={v.nextDueAt ? <Badge label={overdue ? "Atrasada" : "Em dia"} tone={overdue ? "danger" : "success"} /> : undefined}
               chevron={false}
             />

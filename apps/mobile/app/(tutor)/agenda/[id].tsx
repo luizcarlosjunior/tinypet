@@ -1,14 +1,15 @@
 import React, { useState } from "react";
 import { Alert, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { APPOINTMENT_STATUS_LABEL } from "@tinypet/shared";
+import { fromZonedTime } from "date-fns-tz";
+import { APPOINTMENT_STATUS_LABEL, DEFAULT_TIMEZONE } from "@tinypet/shared";
 import { useAppointmentActions, useMyAppointment } from "@/hooks/use-me";
 import { errorMessage } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
 import { spacing, useTheme } from "@/lib/theme";
 import { Badge, Button, Card, ErrorState, Input, KeyValue, Loading, Screen, Sheet, Text } from "@/components/ui";
 import { statusTone } from "@/components/ui/Badge";
-import { AddressBlock, LocationBadge, MapsButtons } from "@/components/appointments/AppointmentCard";
+import { AddressBlock, LocationBadge, MapsButtons, appointmentAddress } from "@/components/appointments/AppointmentCard";
 import { BackHeader } from "@/components/BackHeader";
 
 export default function TutorAppointmentDetail() {
@@ -23,7 +24,9 @@ export default function TutorAppointmentDetail() {
   const [newDate, setNewDate] = useState("");
 
   const a = q.data;
-  const canAct = a && (a.status === "REQUESTED" || a.status === "CONFIRMED");
+  // canManage=false: shared account (doesn't own every pet) — the API answers 403 to cancel/reschedule.
+  const canAct = a && a.canManage !== false && (a.status === "REQUESTED" || a.status === "CONFIRMED");
+  const address = a ? appointmentAddress(a, "owner") : null;
   const cancellationHours = a?.partner?.cancellationHours;
 
   const doCancel = async () => {
@@ -38,7 +41,8 @@ export default function TutorAppointmentDetail() {
   };
   const doReschedule = async () => {
     if (!a) return;
-    const iso = new Date(newDate.replace(" ", "T")).toISOString();
+    // Typed time is São Paulo wall-clock time, whatever the device timezone is.
+    const iso = fromZonedTime(newDate.replace(" ", "T") + ":00", DEFAULT_TIMEZONE).toISOString();
     try {
       await reschedule.mutateAsync({ id: a.id, startsAt: iso });
       setReschedOpen(false);
@@ -73,8 +77,8 @@ export default function TutorAppointmentDetail() {
             {a.locationType !== "ONLINE" ? (
               <Card>
                 <Text variant="h3">Como chegar</Text>
-                <AddressBlock address={a.address} notes={a.locationNotes} />
-                {a.address ? <MapsButtons address={a.address} /> : <Text variant="small" tone="muted">Endereço não informado.</Text>}
+                <AddressBlock address={address} notes={a.locationNotes} />
+                {address ? <MapsButtons address={address} /> : <Text variant="small" tone="muted">Endereço não informado.</Text>}
               </Card>
             ) : null}
             {a.status === "COMPLETED" && (a.report || a.nextSteps) ? (
@@ -105,7 +109,7 @@ export default function TutorAppointmentDetail() {
       </Screen>
       <Sheet visible={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancelar visita">
         <Input label="Motivo" value={reason} onChangeText={setReason} multiline placeholder="Conte ao parceiro o motivo" />
-        <Button title="Confirmar cancelamento" variant="danger" onPress={doCancel} loading={cancel.isPending} disabled={!reason.trim()} />
+        <Button title="Confirmar cancelamento" variant="danger" onPress={doCancel} loading={cancel.isPending} disabled={reason.trim().length < 2} />
       </Sheet>
       <Sheet visible={reschedOpen} onClose={() => setReschedOpen(false)} title="Pedir remarcação">
         <Input label="Novo horário" value={newDate} onChangeText={setNewDate} placeholder="AAAA-MM-DD HH:MM" hint="O parceiro receberá a proposta e precisa confirmar" />

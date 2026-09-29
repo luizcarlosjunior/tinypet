@@ -20,3 +20,12 @@ describe("isTaskDueOn", () => {
     expect(isTaskDueOn({ rule: { freq: "daily" }, dueAt: null, createdAt, status: "PAUSED" }, "2026-09-29")).toBe(false);
   });
 });
+
+describe("monthly tasks", () => {
+  it("fall on the last day of shorter months", () => {
+    const task = { rule: { freq: "monthly", dayOfMonth: 31 }, dueAt: null, createdAt: new Date("2026-01-01T12:00:00Z"), status: "ACTIVE" };
+    expect(isTaskDueOn(task, "2026-02-28")).toBe(true);
+    expect(isTaskDueOn(task, "2026-02-27")).toBe(false);
+    expect(isTaskDueOn(task, "2026-03-31")).toBe(true);
+  });
+});

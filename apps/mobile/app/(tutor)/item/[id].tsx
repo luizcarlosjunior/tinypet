@@ -81,9 +81,9 @@ export default function ItemPage() {
             <Section title="Avaliações" right={<Button title="Avaliar" size="sm" variant="secondary" onPress={() => setOpen(true)} />} style={{ marginTop: spacing.xl }}>
               {it.ratingAvg != null && it.ratingCount ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: spacing.sm }}>
-                  <Stars value={it.ratingAvg} size={18} />
+                  <Stars value={Number(it.ratingAvg)} size={18} />
                   <Text variant="small" tone="muted">
-                    {it.ratingAvg.toFixed(1)} · {it.ratingCount} avaliações
+                    {Number(it.ratingAvg).toFixed(1).replace(".", ",")} · {it.ratingCount} {it.ratingCount === 1 ? "avaliação" : "avaliações"}
                   </Text>
                 </View>
               ) : (

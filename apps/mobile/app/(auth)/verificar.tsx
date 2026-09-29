@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
+import { toE164BR } from "@tinypet/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-store";
 import { spacing } from "@/lib/theme";
@@ -21,7 +22,7 @@ export default function Verify() {
   const send = async () => {
     setSending(true);
     try {
-      await api("/auth/verify", { method: "POST", json: { channel, target: channel === "PHONE" ? target : undefined } });
+      await api("/auth/verify", { method: "POST", json: { channel, target: channel === "PHONE" && target.trim() ? toE164BR(target) : undefined } });
       setSent(true);
     } catch (e) {
       Alert.alert("Erro", errorMessage(e));
@@ -50,7 +51,7 @@ export default function Verify() {
         Enviamos um código de 6 dígitos para {channel === "EMAIL" ? user?.email ?? "seu e-mail" : "seu telefone"}.
       </Text>
       <Segmented items={[{ key: "EMAIL", label: "E-mail" }, { key: "PHONE", label: "Telefone" }]} value={channel} onChange={(c) => { setChannel(c); setSent(false); }} />
-      {channel === "PHONE" ? <Input label="Celular" keyboardType="phone-pad" value={target} onChangeText={setTarget} placeholder="(11) 99999-9999" style={{ marginTop: spacing.md }} /> : null}
+      {channel === "PHONE" ? <Input label="Celular" keyboardType="phone-pad" value={target} onChangeText={setTarget} placeholder="(11) 99999-9999" hint="Deixe em branco para usar o telefone principal da conta" style={{ marginTop: spacing.md }} /> : null}
       <Button title={sent ? "Reenviar código" : "Enviar código"} variant={sent ? "secondary" : "primary"} onPress={send} loading={sending} style={{ marginTop: spacing.lg }} />
       {sent ? (
         <>

@@ -286,7 +286,11 @@ export function isTaskDueOn(task: TaskLike, dateStr: string): boolean {
     const days = rule.days?.length ? rule.days : [created.getUTCDay()];
     return days.includes(d.getUTCDay());
   }
-  if (rule.freq === "monthly") return d.getUTCDate() === (rule.dayOfMonth ?? created.getUTCDate());
+  if (rule.freq === "monthly") {
+    const wanted = rule.dayOfMonth ?? created.getUTCDate();
+    const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    return d.getUTCDate() === Math.min(wanted, lastDay);
+  }
   return false;
 }
 

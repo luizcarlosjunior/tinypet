@@ -10,7 +10,7 @@ import { Badge, Button, Empty, Input, Modal, Select, Spinner, Textarea } from "@
 import { ConfirmDialog } from "@/components/ui/confirm";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
-import { fmtDate, fmtWeight, toDateKey } from "@/lib/format";
+import { fmtWeight, toDateKey, fmtDay } from "@/lib/format";
 import { WeightChart, type StageBand } from "./weight-chart";
 import { cn } from "@/lib/utils";
 
@@ -84,8 +84,8 @@ function Vaccinations({ petId, deceased }: { petId: string; deceased: boolean })
               <li key={v.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
                 <Badge tone={v.kind === "VACCINE" ? "green" : "amber"}>{v.kind === "VACCINE" ? "Vacina" : "Vermífugo"}</Badge>
                 <span className="flex-1 font-medium">{v.name}</span>
-                <span className="text-xs text-[var(--muted)]">Aplicada em {fmtDate(v.appliedAt)}</span>
-                {v.nextDueAt && <span className={cn("text-xs", overdue ? "font-semibold text-red-600" : "text-[var(--muted)]")}>Próxima: {fmtDate(v.nextDueAt)}{overdue ? " (atrasada)" : ""}</span>}
+                <span className="text-xs text-[var(--muted)]">Aplicada em {fmtDay(v.appliedAt)}</span>
+                {v.nextDueAt && <span className={cn("text-xs", overdue ? "font-semibold text-red-600" : "text-[var(--muted)]")}>Próxima: {fmtDay(v.nextDueAt)}{overdue ? " (atrasada)" : ""}</span>}
                 {v.partner?.tradeName && <span className="text-xs text-[var(--muted)]">{v.partner.tradeName}</span>}
                 {!deceased && (
                   <span className="flex gap-1">
@@ -124,7 +124,7 @@ function Vaccinations({ petId, deceased }: { petId: string; deceased: boolean })
           </div>
         </form>
       </Modal>
-      <ConfirmDialog open={!!del} onClose={() => setDel(null)} title="Excluir registro?" description={del ? `${del.name} de ${fmtDate(del.appliedAt)} será removida.` : ""} confirmLabel="Excluir" danger loading={remove.isPending} onConfirm={() => del && remove.mutateAsync({ path: `/${del.id}` }).then(() => setDel(null)).catch((e) => toast(errorMessage(e), "error"))} />
+      <ConfirmDialog open={!!del} onClose={() => setDel(null)} title="Excluir registro?" description={del ? `${del.name} de ${fmtDay(del.appliedAt)} será removida.` : ""} confirmLabel="Excluir" danger loading={remove.isPending} onConfirm={() => del && remove.mutateAsync({ path: `/${del.id}` }).then(() => setDel(null)).catch((e) => toast(errorMessage(e), "error"))} />
     </section>
   );
 }
@@ -220,7 +220,7 @@ function Measurements({ pet, readOnly = false }: { pet: Pet; readOnly?: boolean 
             <tbody className="divide-y">
               {items.map((m) => (
                 <tr key={m.id}>
-                  <td className="px-3 py-2">{fmtDate(m.measuredAt)}</td>
+                  <td className="px-3 py-2">{fmtDay(m.measuredAt)}</td>
                   <td className="px-3 py-2 font-medium">{fmtWeight(m.weightG)}</td>
                   <td className="hidden px-3 py-2 sm:table-cell">{m.heightCm != null ? `${m.heightCm} cm` : "—"}</td>
                   <td className="hidden px-3 py-2 sm:table-cell">{m.neckCm != null ? `${m.neckCm} cm` : "—"}</td>
@@ -285,7 +285,7 @@ function Measurements({ pet, readOnly = false }: { pet: Pet; readOnly?: boolean 
           </div>
         </form>
       </Modal>
-      <ConfirmDialog open={!!del} onClose={() => setDel(null)} title="Excluir medida?" description={del ? `Registro de ${fmtDate(del.measuredAt)} (${fmtWeight(del.weightG)}).` : ""} confirmLabel="Excluir" danger loading={remove.isPending} onConfirm={() => del && remove.mutateAsync({ path: `/${del.id}` }).then(() => setDel(null)).catch((e) => toast(errorMessage(e), "error"))} />
+      <ConfirmDialog open={!!del} onClose={() => setDel(null)} title="Excluir medida?" description={del ? `Registro de ${fmtDay(del.measuredAt)} (${fmtWeight(del.weightG)}).` : ""} confirmLabel="Excluir" danger loading={remove.isPending} onConfirm={() => del && remove.mutateAsync({ path: `/${del.id}` }).then(() => setDel(null)).catch((e) => toast(errorMessage(e), "error"))} />
     </section>
   );
 }

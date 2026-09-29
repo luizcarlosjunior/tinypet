@@ -7,7 +7,7 @@ import { paymentSchema, PAYMENT_METHOD_LABEL, formatBRL, safeHref } from "@tinyp
 import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { UploadButton } from "@/components/media/UploadButton";
 import { useRegisterPayment } from "@/hooks/use-finance";
-import { num, todayISO, fmtDate } from "@/lib/format";
+import { num, todayISO, fmtDay } from "@/lib/format";
 import type { Installment } from "@/types/api";
 
 type PaymentInput = z.infer<typeof paymentSchema>;
@@ -31,7 +31,7 @@ export function PaymentModal({ installment, onClose, partnerId }: { installment:
     <Modal open={open} onClose={onClose} title={`Baixar parcela ${installment.number}${installment.contract?.installmentsCount ? `/${installment.contract.installmentsCount}` : ""}`}>
       <p className="mb-4 text-sm text-[var(--muted)]">
         {installment.contract?.title && <span className="block font-medium text-[var(--fg)]">{installment.contract.title}</span>}
-        Vencimento {fmtDate(installment.dueDate)} · valor {formatBRL(installment.amount)}
+        Vencimento {fmtDay(installment.dueDate)} · valor {formatBRL(installment.amount)}
         {num(installment.paidAmount) > 0 && <> · já pago {formatBRL(installment.paidAmount)}</>}
       </p>
       <form className="space-y-3" onSubmit={handleSubmit((v) => mut.mutate({ id: installment.id, body: { ...v, receiptUrl: v.receiptUrl || null, notes: v.notes || null } }))} noValidate>

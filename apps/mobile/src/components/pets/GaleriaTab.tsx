@@ -3,6 +3,7 @@ import { Alert, Dimensions, Pressable, ScrollView, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { usePetMedia, usePetMediaMutations } from "@/hooks/use-pets";
+import { usePlan } from "@/hooks/use-me";
 import { ApiError, errorMessage } from "@/lib/api";
 import { pickAndUpload } from "@/lib/upload";
 import { fmtDate } from "@/lib/format";
@@ -22,6 +23,7 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
   const feed = usePetMedia(petId, false);
   const stories = usePetMedia(petId, true);
   const { create, remove } = usePetMediaMutations(petId);
+  const plan = usePlan();
   const [busy, setBusy] = useState(false);
   const [limitErr, setLimitErr] = useState<ApiError | null>(null);
   const [selected, setSelected] = useState<PetMedia | null>(null);
@@ -35,12 +37,29 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
   const width = Dimensions.get("window").width - spacing.lg * 2;
   const cell = (width - GAP * (COLS - 1)) / COLS;
 
-  const choose = (story: boolean) =>
+  /**
+   * POST /media/upload checks the uploader's own OWNER plan (owner_gallery / owner_stories): check it up front so a
+   * free plan sees the upgrade notice instead of transcoding a video that the API will then refuse.
+   */
+  const planBlock = (story: boolean): ApiError | null => {
+    const limits = plan.data?.limits;
+    if (!limits || Array.isArray(limits)) return null;
+    const key = limits.owner_gallery?.enabled === false ? "owner_gallery" : story && limits.owner_stories?.enabled === false ? "owner_stories" : null;
+    return key ? new ApiError(402, "PLAN_LIMIT", "Recurso não incluído no plano", { featureKey: key, current: 0, limit: 0, planKey: plan.data?.planKey }) : null;
+  };
+
+  const choose = (story: boolean) => {
+    const blocked = planBlock(story);
+    if (blocked) {
+      setLimitErr(blocked);
+      return;
+    }
     Alert.alert(story ? "Novo story" : "Adicionar à galeria", undefined, [
       { text: "Foto", onPress: () => add(story) },
       { text: "Vídeo", onPress: () => setVideoSheet({ story }) },
       { text: "Cancelar", style: "cancel" },
     ]);
+  };
 
   const add = async (story: boolean) => {
     setBusy(true);

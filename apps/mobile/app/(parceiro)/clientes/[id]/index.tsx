@@ -5,13 +5,14 @@ import { ageInMonths, formatAge } from "@tinypet/shared";
 import { useClient, useClientInvites, useClientMutations } from "@/hooks/use-partner";
 import { api, errorMessage } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtDay } from "@/lib/format";
 import { addressText, linksFor, openRoute } from "@/lib/nav";
 import { spacing } from "@/lib/theme";
 import { Avatar, Badge, Button, Card, ErrorState, Input, ListItem, Loading, Screen, Section, Sheet, Text } from "@/components/ui";
 import { AddressForm } from "@/components/AddressForm";
 import { BackHeader } from "@/components/BackHeader";
 import { mailtoUrl, openLocal, telUrl, whatsappUrl } from "@/lib/links";
+import { speciesKeyOf } from "@/lib/species";
 
 const PHONE_TYPE = { MOBILE: "Celular", LANDLINE: "Fixo", WHATSAPP: "WhatsApp" } as const;
 
@@ -26,7 +27,7 @@ export default function ClientDetail() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [addrOpen, setAddrOpen] = useState(false);
   const c = q.data;
-  const pendingInvite = (invites.data ?? c?.invites ?? []).find((i) => !i.acceptedAt);
+  const pendingInvite = (invites.data ?? c?.invites ?? []).find((i) => (i.status ? i.status === "PENDING" : !i.acceptedAt) && (!i.expiresAt || new Date(i.expiresAt) > new Date()));
 
   const sendInvite = async () => {
     try {
@@ -53,7 +54,7 @@ export default function ClientDetail() {
                 <Text variant="title">{c.name}</Text>
                 <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
                   {c.userId || c.user ? <Badge label="Usa o app" tone="success" icon="phone-portrait-outline" /> : pendingInvite ? <Badge label="Convite pendente" tone="warning" /> : <Badge label="Sem conta no app" />}
-                  {c.birthDate ? <Badge label={`Aniversário ${fmtDate(c.birthDate, "dd/MM")}`} icon="gift-outline" /> : null}
+                  {c.birthDate ? <Badge label={`Aniversário ${fmtDay(c.birthDate, "dd/MM")}`} icon="gift-outline" /> : null}
                   {(c.tags ?? []).map((tg) => (
                     <Badge key={tg} label={tg} />
                   ))}
@@ -79,8 +80,8 @@ export default function ClientDetail() {
                 <ListItem
                   key={p.id}
                   title={p.name}
-                  subtitle={[p.species?.label ?? p.speciesKey, p.breed?.name ?? p.breedOther, formatAge(ageInMonths(p.birthDate, p.approxAgeMonths))].filter(Boolean).join(" · ")}
-                  left={<Avatar uri={p.avatarUrl} name={p.name} species={p.speciesKey} size={44} />}
+                  subtitle={[p.species?.label ?? speciesKeyOf(p), p.breed?.name ?? p.breedOther, formatAge(ageInMonths(p.birthDate, p.approxAgeMonths))].filter(Boolean).join(" · ")}
+                  left={<Avatar uri={p.avatarUrl} name={p.name} species={speciesKeyOf(p)} size={44} />}
                   right={p.status === "DECEASED" ? <Badge label="Em memória" icon="heart" /> : undefined}
                   onPress={() => router.push(`/(parceiro)/clientes/${id}/pets/${p.id}`)}
                 />

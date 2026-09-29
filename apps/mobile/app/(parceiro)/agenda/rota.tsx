@@ -32,7 +32,7 @@ export default function DayRouteScreen() {
   const openFullRoute = () => {
     if (r?.googleMapsUrl) return openExternal(r.googleMapsUrl);
     // Fallback: build a Google Maps directions URL with waypoints from the stops.
-    const pts = (r?.stops ?? []).map((s) => (s.lat != null && s.lng != null ? `${s.lat},${s.lng}` : encodeURIComponent(addressText(s.address))));
+    const pts = (r?.stops ?? []).map((s) => (s.lat != null && s.lng != null ? `${s.lat},${s.lng}` : encodeURIComponent(s.addressText ?? addressText(s.address))));
     if (pts.length === 0) return;
     const dest = pts[pts.length - 1];
     const way = pts.slice(0, -1).join("|");
@@ -80,8 +80,7 @@ export default function DayRouteScreen() {
                 <Text variant="h3">Sugestões</Text>
                 {r.suggestions.map((s, i) => (
                   <Text key={i} variant="small" tone="muted" style={{ marginTop: 4 }}>
-                    • {s.message}
-                    {s.savesKm || s.savesMinutes ? ` (economiza ${[s.savesKm ? fmtKm(s.savesKm) : null, s.savesMinutes ? fmtMinutes(s.savesMinutes) : null].filter(Boolean).join(" e ")})` : ""}
+                    • {s.message /* already includes the savings ("economiza X km e Y min") */}
                   </Text>
                 ))}
                 <Text variant="tiny" tone="faint" style={{ marginTop: 6 }}>
@@ -92,9 +91,11 @@ export default function DayRouteScreen() {
 
             {r.stops.length === 0 ? <Empty icon="map-outline" title="Sem visitas a domicílio" description="Nenhuma parada para este dia." /> : null}
             {r.stops.map((s) => {
-              const links = mapsLinks(s.lat, s.lng, addressText(s.address));
+              const stopAddress = s.addressText ?? addressText(s.address);
+              const links = s.links ?? mapsLinks(s.lat, s.lng, stopAddress);
+              const alertText = typeof s.alert === "string" ? s.alert : (s.alert?.message ?? null);
               return (
-                <Card key={s.appointmentId} onPress={() => router.push(`/(parceiro)/agenda/${s.appointmentId}`)} style={s.alert ? { borderColor: t.warning } : undefined} accessibilityLabel={`Parada ${s.order}`}>
+                <Card key={s.appointmentId} onPress={() => router.push(`/(parceiro)/agenda/${s.appointmentId}`)} style={alertText ? { borderColor: t.warning } : undefined} accessibilityLabel={`Parada ${s.order}`}>
                   <View style={{ flexDirection: "row", gap: spacing.md }}>
                     <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: t.primary, alignItems: "center", justifyContent: "center" }}>
                       <Text style={{ color: t.onPrimary, fontWeight: "700" }}>{s.order}</Text>
@@ -104,18 +105,18 @@ export default function DayRouteScreen() {
                         {fmtTime(s.startsAt)}
                         {s.clientName ? ` · ${s.clientName}` : ""}
                       </Text>
-                      {s.petNames?.length ? (
+                      {s.petNames?.length || s.title ? (
                         <Text variant="small" tone="muted">
-                          {s.petNames.join(", ")}
+                          {s.petNames?.length ? s.petNames.join(", ") : s.title}
                         </Text>
                       ) : null}
-                      <Text variant="small">{addressText(s.address)}</Text>
-                      <Text variant="tiny" tone={s.alert ? "danger" : "faint"} style={{ marginTop: 2 }}>
+                      <Text variant="small">{stopAddress}</Text>
+                      <Text variant="tiny" tone={alertText ? "danger" : "faint"} style={{ marginTop: 2 }}>
                         {s.legDistanceKm != null ? `${fmtKm(s.legDistanceKm)} · ` : ""}
                         {s.legMinutes != null ? `${fmtMinutes(s.legMinutes)} desde a parada anterior` : ""}
                         {s.estimated ? " (estimativa)" : ""}
                       </Text>
-                      {s.alert ? <Badge label={s.alert} tone="warning" icon="warning" /> : null}
+                      {alertText ? <Badge label={alertText} tone="warning" icon="warning" /> : null}
                       <View style={{ flexDirection: "row", gap: 6, marginTop: spacing.sm, flexWrap: "wrap" }}>
                         {availableNavApps().map((a) => (
                           <Button key={a} title={NAV_APP_LABEL[a]} size="sm" variant="outline" icon="navigate-outline" onPress={() => openNav(a, links)} accessibilityLabel={`Abrir parada ${s.order} no ${NAV_APP_LABEL[a]}`} />

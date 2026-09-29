@@ -14,9 +14,12 @@ export function ConquistasTab({ petId }: { petId: string }) {
   const q = useBadges(petId);
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorState error={q.error} onRetry={q.refetch} />;
-  const earned = q.data ?? [];
+  // GET /pets/:id/badges lists every system badge with `earned`/`earnedAt` (+ partner badges already earned).
+  const all = q.data ?? [];
+  const hasFlag = all.some((b) => typeof b.earned === "boolean");
+  const earned = hasFlag ? all.filter((b) => b.earned) : all;
   const earnedKeys = new Set(earned.map((b) => b.key));
-  const locked = SYSTEM_BADGES.filter((b) => !earnedKeys.has(b.key));
+  const locked: { key: string; name: string; description?: string | null }[] = hasFlag ? all.filter((b) => !b.earned) : SYSTEM_BADGES.filter((b) => !earnedKeys.has(b.key));
   return (
     <View>
       <Text variant="small" tone="muted" style={{ marginBottom: spacing.md }}>

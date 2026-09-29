@@ -6,6 +6,7 @@ import { useNotifications } from "@/hooks/use-me";
 import { unregisterPushToken } from "@/lib/push";
 import { spacing } from "@/lib/theme";
 import { Avatar, Badge, Button, ListItem, Screen, Section, Text } from "@/components/ui";
+import { planName } from "@/lib/plans";
 
 export default function More() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function More() {
             </Text>
             <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
               {activeMembership.published === false ? <Badge label="Perfil não publicado" tone="warning" /> : null}
-              {activeMembership.plan ? <Badge label={`Plano ${activeMembership.plan}`} /> : null}
+              {activeMembership.plan ? <Badge label={`Plano ${planName(activeMembership.plan)}`} /> : null}
             </View>
           </View>
         </View>
@@ -49,7 +50,7 @@ export default function More() {
       </Section>
 
       <Section title="Ferramentas">
-        <ListItem title="Notificações" subtitle={unread ? `${unread} não lidas` : "Tudo lido"} right={unread ? <Badge label={String(unread)} tone="primary" /> : undefined} onPress={() => router.push("/(parceiro)/mais/notificacoes")} />
+        <ListItem title="Notificações" subtitle={unread ? `${unread} ${unread === 1 ? "não lida" : "não lidas"}` : "Tudo lido"} right={unread ? <Badge label={String(unread)} tone="primary" /> : undefined} onPress={() => router.push("/(parceiro)/mais/notificacoes")} />
         <ListItem title="Rota do dia" subtitle="Visitas a domicílio de hoje" onPress={() => router.push("/(parceiro)/agenda/rota")} />
         <ListItem title="Blog" subtitle="Dicas e novidades do tinyPet" onPress={() => router.push("/(parceiro)/mais/blog")} />
         <ListItem title="Catálogo, financeiro e equipe" subtitle="Disponíveis na versão web" chevron={false} />

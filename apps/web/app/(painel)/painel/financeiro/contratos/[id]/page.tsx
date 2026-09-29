@@ -8,7 +8,7 @@ import { Badge, Button, PageHeader, Spinner } from "@/components/ui";
 import { ConfirmDialog, FieldGroup, QueryState, Table, td, th } from "@/components/painel/ui";
 import { useActivePartner } from "@/hooks/use-partner";
 import { useContract, useContractStatus } from "@/hooks/use-finance";
-import { fmtDate, fmtDateTime, isoToDateKey, num } from "@/lib/format";
+import { fmtDate, fmtDateTime, isoToDateKey, num, fmtDay } from "@/lib/format";
 import { CONTRACT_TYPE_LABEL, ContractStatusBadge, FinanceGate, PERIODICITY_LABEL } from "@/components/painel/financeiro/common";
 import { InstallmentsTable } from "@/components/painel/financeiro/InstallmentsTable";
 import type { Contract } from "@/types/api";
@@ -160,7 +160,7 @@ function Inner() {
                     <Row label="Total" value={formatBRL(c.netAmount ?? num(c.totalAmount) - num(c.discount))} strong />
                     <Row label="Recebido" value={formatBRL(paid)} />
                     <Row label="Em aberto" value={formatBRL(Math.max(0, c.balance ?? num(c.totalAmount) - num(c.discount) - paid))} />
-                    <Row label="1º vencimento" value={fmtDate(c.firstDueDate)} />
+                    <Row label="1º vencimento" value={fmtDay(c.firstDueDate)} />
                     {c.sessionsCount != null && <Row label="Sessões" value={String(c.sessionsCount)} />}
                     {c.createdAt && <Row label="Criado em" value={fmtDate(c.createdAt)} />}
                   </dl>

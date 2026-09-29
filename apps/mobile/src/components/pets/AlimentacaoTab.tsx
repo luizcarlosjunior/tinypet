@@ -5,7 +5,7 @@ import { formatBRL } from "@tinypet/shared";
 import { useFoodMutations, useFoodSuggestions, useFoods } from "@/hooks/use-pets";
 import { useBrands } from "@/hooks/use-ref";
 import { errorMessage } from "@/lib/api";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtDay } from "@/lib/format";
 import { spacing } from "@/lib/theme";
 import type { PetFood } from "@/lib/types";
 import { Avatar, Button, Card, Checkbox, Empty, ErrorState, Input, ListItem, Loading, Section, Select, Sheet, Text } from "@/components/ui";
@@ -48,7 +48,7 @@ export function AlimentacaoTab({ petId, canEdit }: { petId: string; canEdit: boo
             <ListItem
               key={it.id}
               title={`${brand}${line ? ` · ${line}` : ""}`}
-              subtitle={[TYPE_LABEL[it.type], it.packageSizeG ? `${(it.packageSizeG / 1000).toLocaleString("pt-BR")} kg` : null, it.dailyGrams ? `${it.dailyGrams} g/dia` : null, it.runsOutAt ? `acaba em ${fmtDate(it.runsOutAt)}` : days && it.lastPurchaseAt ? `dura ~${days} dias` : null].filter(Boolean).join(" · ")}
+              subtitle={[TYPE_LABEL[it.type], it.packageSizeG ? `${(it.packageSizeG / 1000).toLocaleString("pt-BR")} kg` : null, it.dailyGrams ? `${it.dailyGrams} g/dia` : null, runsOut(it.lastPurchaseAt, days) ? `acaba em ~${runsOut(it.lastPurchaseAt, days)}` : days ? `dura ~${days} dias` : null].filter(Boolean).join(" · ")}
               chevron={false}
               right={canEdit ? <Button title="Remover" variant="ghost" size="sm" onPress={() => remove.mutateAsync(it.id).catch((e) => Alert.alert("Erro", errorMessage(e)))} /> : undefined}
             />
@@ -70,11 +70,11 @@ export function AlimentacaoTab({ petId, canEdit }: { petId: string; canEdit: boo
                 <View style={{ flex: 1 }}>
                   <Text variant="h3">{s.partner.tradeName}</Text>
                   <Text variant="small" tone="muted">
-                    {[s.brand?.name, s.partner.distanceKm != null ? `${s.partner.distanceKm.toFixed(1)} km` : null].filter(Boolean).join(" · ")}
+                    {[Array.from(new Set(s.items.map((x) => x.brand?.name).filter(Boolean))).join(", "), s.distanceKm != null ? `${s.distanceKm.toFixed(1).replace(".", ",")} km` : s.partner.city].filter(Boolean).join(" · ")}
                   </Text>
                 </View>
               </View>
-              {s.promos?.map((p) => (
+              {s.offers?.map((p) => (
                 <Text key={p.id} variant="small" tone="primary" style={{ marginTop: 6 }}>
                   Oferta: {p.name} {p.promoPrice != null ? `por ${formatBRL(p.promoPrice)}` : ""}
                 </Text>
@@ -97,4 +97,13 @@ export function AlimentacaoTab({ petId, canEdit }: { petId: string; canEdit: boo
       </Sheet>
     </View>
   );
+}
+
+/** Estimated end of the package: last purchase + package / daily grams (dd/MM), or null. */
+function runsOut(lastPurchaseAt: string | null | undefined, days: number | null): string | null {
+  if (!lastPurchaseAt || !days) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(lastPurchaseAt);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days);
+  return fmtDay(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, "dd/MM");
 }

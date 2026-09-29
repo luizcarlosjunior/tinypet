@@ -14,15 +14,16 @@ import { Avatar, Button, Card, Checkbox, Empty, ErrorState, Loading, Screen, Sec
 import { AppointmentCard } from "@/components/appointments/AppointmentCard";
 import { describeRule } from "@/components/pets/RotinaTab";
 import { PostRow } from "@/components/blog/PostCard";
+import { speciesKeyOf } from "@/lib/species";
 
 function TaskRow({ task }: { task: PetTask }) {
   const petId = task.petId ?? task.pet?.id ?? "";
   const { complete } = useTaskMutations(petId);
   return (
     <Checkbox
-      checked={!!task.completedToday}
-      disabled={!!task.completedToday || !petId}
-      onChange={() => complete.mutateAsync({ tid: task.id }).catch((e) => Alert.alert("Erro", errorMessage(e)))}
+      checked={!!(task.completedToday ?? task.completed)}
+      disabled={!!(task.completedToday ?? task.completed) || !petId}
+      onChange={() => complete.mutateAsync({ tid: task.id, forDate: task.forDate }).catch((e) => Alert.alert("Erro", errorMessage(e)))}
       label={task.title}
       description={[task.pet?.name, describeRule(task.rule, task.dueAt)].filter(Boolean).join(" · ")}
     />
@@ -61,7 +62,7 @@ export default function Home() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, marginBottom: spacing.xl }}>
               {q.data.pets.map((p) => (
                 <View key={p.id} style={{ alignItems: "center", width: 64 }}>
-                  <Avatar uri={p.avatarUrl} name={p.name} species={p.speciesKey} size={56} />
+                  <Avatar uri={p.avatarUrl} name={p.name} species={speciesKeyOf(p)} size={56} />
                   <Text variant="tiny" tone="muted" numberOfLines={1} style={{ marginTop: 4 }} onPress={() => router.push(`/(tutor)/pets/${p.id}`)}>
                     {p.name}
                   </Text>
@@ -119,10 +120,10 @@ export default function Home() {
           {q.data.recentBadges?.length ? (
             <Section title="Conquistas recentes">
               {q.data.recentBadges.map((b, i) => (
-                <Card key={`${b.key}-${i}`} onPress={b.pet ? () => router.push(`/(tutor)/pets/${b.pet!.id}`) : undefined}>
-                  <Text variant="h3">{b.name}</Text>
+                <Card key={b.id ?? `${b.badge?.key ?? b.key}-${i}`} onPress={b.pet ? () => router.push(`/(tutor)/pets/${b.pet!.id}`) : undefined}>
+                  <Text variant="h3">{b.badge?.name ?? b.name}</Text>
                   <Text variant="small" tone="muted">
-                    {[b.pet?.name, b.earnedAt ? fmtDate(b.earnedAt) : null, b.description].filter(Boolean).join(" · ")}
+                    {[b.pet?.name, b.earnedAt ? fmtDate(b.earnedAt) : null, b.badge?.description ?? b.description].filter(Boolean).join(" · ")}
                   </Text>
                 </Card>
               ))}

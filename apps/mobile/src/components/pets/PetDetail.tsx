@@ -39,7 +39,7 @@ const PARTNER_TABS = OWNER_TABS.filter((t) => t.key !== "alimentacao" && t.key !
 export function PetDetail({ petId, mode, partnerTypes = [], initialTab = "ficha" }: { petId: string; mode: "owner" | "partner"; partnerTypes?: string[]; initialTab?: TabKey }) {
   const [tab, setTab] = useState<TabKey>(initialTab);
   const q = usePet(petId);
-  const { user } = useAuth();
+  const { user, activePartnerId } = useAuth();
   const role = mode === "owner" ? petRoleOf(q.data, user?.id) : null;
   // Only needed for the "Compartilhado por @user" header on shared pets (deduped with the Compartilhamento tab).
   const sharing = useSharing(petId, role === "shared");
@@ -51,13 +51,15 @@ export function PetDetail({ petId, mode, partnerTypes = [], initialTab = "ficha"
   const readOnly = isOwner && role === "shared";
   const canEdit = !readOnly && pet.status === "ACTIVE";
   const canValidate = mode === "partner" && partnerTypes.includes("trainer");
+  // API (canEditPetProfile): a partner may edit the profile only of pets it created that have no owner yet.
+  const partnerOwnsProfile = mode === "partner" && pet.status === "ACTIVE" && !pet.ownerId && !!activePartnerId && pet.createdByPartnerId === activePartnerId;
 
   return (
     <Screen refreshing={q.isFetching && !q.isLoading} onRefresh={q.refetch}>
       <PetHeader pet={pet} sharedBy={readOnly ? (sharing.data?.owner ?? null) : undefined} />
       <Tabs items={isOwner ? OWNER_TABS : PARTNER_TABS} value={tab} onChange={setTab} />
       <View style={{ marginTop: spacing.md }}>
-        {tab === "ficha" ? <FichaTab pet={pet} canEdit={canEdit || (mode === "partner" && pet.status === "ACTIVE")} isOwner={isOwner && !readOnly} canRegisterDeath={!readOnly && (mode === "partner" ? !pet.ownerId : isOwner)} /> : null}
+        {tab === "ficha" ? <FichaTab pet={pet} canEdit={mode === "partner" ? partnerOwnsProfile : canEdit} isOwner={isOwner && !readOnly} canRegisterDeath={!readOnly && (mode === "partner" ? !pet.ownerId : isOwner)} /> : null}
         {tab === "galeria" ? <GaleriaTab petId={pet.id} canEdit={canEdit && isOwner} /> : null}
         {tab === "historico" ? <HistoricoTab petId={pet.id} /> : null}
         {tab === "saude" ? <SaudeTab petId={pet.id} canEdit={canEdit || mode === "partner"} /> : null}

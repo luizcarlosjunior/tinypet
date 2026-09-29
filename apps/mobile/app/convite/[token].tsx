@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-store";
 import { errorMessage } from "@/lib/api";
 import { spacing, useTheme } from "@/lib/theme";
 import { Avatar, Button, Card, ErrorState, Loading, Screen, Select, Text } from "@/components/ui";
+import { speciesKeyOf } from "@/lib/species";
 
 /** Deep link tinypet://convite/:token and https://tinypet.com.br/convite/:token — accept a partner's client invite and merge pets. */
 export default function InviteScreen() {
@@ -66,13 +67,13 @@ export default function InviteScreen() {
                   </Text>
                   {p.pets.map((pet) => (
                     <View key={pet.id} style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-                      <Avatar uri={pet.avatarUrl} name={pet.name} species={pet.speciesKey} size={40} />
+                      <Avatar uri={pet.avatarUrl} name={pet.name} species={speciesKeyOf(pet)} size={40} />
                       <View style={{ flex: 1 }}>
                         <Select
                           label={pet.name}
                           value={merges[pet.id] ?? null}
                           onChange={(v) => setMerges((m) => ({ ...m, [pet.id]: v === "__new__" ? null : v }))}
-                          options={[{ value: "__new__", label: "Adicionar como novo pet" }, ...(myPets.data ?? []).filter((mp) => mp.speciesKey === pet.speciesKey).map((mp) => ({ value: mp.id, label: `Unir com ${mp.name}` }))]}
+                          options={[{ value: "__new__", label: "Adicionar como novo pet" }, ...(myPets.data ?? []).filter((mp) => speciesKeyOf(mp) === speciesKeyOf(pet)).map((mp) => ({ value: mp.id, label: `Unir com ${mp.name}` }))]}
                           placeholder="Adicionar como novo pet"
                         />
                       </View>

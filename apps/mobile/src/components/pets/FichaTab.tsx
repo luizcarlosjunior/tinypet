@@ -3,13 +3,14 @@ import { Alert, View } from "react-native";
 import { formatAge, ageInMonths } from "@tinypet/shared";
 import { usePetMutations } from "@/hooks/use-pets";
 import { errorMessage } from "@/lib/api";
-import { fmtDate, todayISO } from "@/lib/format";
+import { fmtDate, todayISO, fmtDay } from "@/lib/format";
 import { spacing, useTheme } from "@/lib/theme";
 import type { Pet } from "@/lib/types";
 import { Button, Card, Checkbox, Input, KeyValue, Sheet, Text } from "@/components/ui";
 import { useAuth } from "@/lib/auth-store";
 import { PetForm } from "./PetForm";
 import { MicrochipLookupLinks } from "./Microchip";
+import { speciesKeyOf } from "@/lib/species";
 
 const SEX_LABEL: Record<string, string> = { MALE: "Macho", FEMALE: "Fêmea" };
 const SIZE_LABEL = { SMALL: "Pequeno", MEDIUM: "Médio", LARGE: "Grande", GIANT: "Gigante" };
@@ -54,18 +55,18 @@ export function FichaTab({ pet, canEdit, isOwner: _isOwner, canRegisterDeath = f
         <Card style={{ backgroundColor: t.surfaceAlt }}>
           <Text variant="h3">Em memória de {pet.name}</Text>
           <Text variant="small" tone="muted">
-            Faleceu em {fmtDate(pet.deceasedAt)}
+            Faleceu em {fmtDay(pet.deceasedAt)}
           </Text>
           {pet.memorialNote ? <Text style={{ marginTop: 6 }}>{pet.memorialNote}</Text> : null}
         </Card>
       ) : null}
       <Card>
-        <KeyValue k="Espécie" v={pet.species?.label ?? pet.speciesKey} />
+        <KeyValue k="Espécie" v={pet.species?.label ?? speciesKeyOf(pet)} />
         <KeyValue k="Raça" v={pet.breed?.name ?? pet.breedOther} />
         <KeyValue k="Cor / pelagem" v={pet.color} />
         <KeyValue k="Sexo" v={(pet.sex && SEX_LABEL[pet.sex]) || "Não informado"} />
         <KeyValue k="Porte" v={pet.size ? SIZE_LABEL[pet.size] : null} />
-        <KeyValue k="Nascimento" v={pet.birthDate ? fmtDate(pet.birthDate) : null} />
+        <KeyValue k="Nascimento" v={pet.birthDate ? fmtDay(pet.birthDate) : null} />
         <KeyValue k="Idade" v={formatAge(ageInMonths(pet.birthDate, pet.approxAgeMonths))} />
         <KeyValue k="Castrado" v={pet.neutered == null ? null : pet.neutered ? "Sim" : "Não"} />
         <KeyValue k="Microchip" v={pet.microchip || "Não possui"} />

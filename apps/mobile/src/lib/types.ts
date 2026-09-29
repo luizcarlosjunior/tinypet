@@ -44,7 +44,8 @@ export type Brand = { id: string; name: string; lines?: { id: string; name: stri
 export type Pet = {
   id: string;
   name: string;
-  speciesKey: string;
+  /** Never sent by the API — use speciesKeyOf(pet) (reads species.key). */
+  speciesKey?: string;
   species?: { key: string; label: string } | null;
   breedId?: string | null;
   breed?: { id: string; name: string } | null;
@@ -72,6 +73,8 @@ export type Pet = {
   /** Caller's relationship with the pet (tutor side). Shared accounts are read-only except completing routine tasks. */
   role?: PetRole;
   streakDays?: number;
+  /** GET /pets/:id only: server-computed life stage (species/size aware). */
+  lifeStage?: import("@tinypet/shared").LifeStage | null;
 };
 
 // ── pet sharing & ownership transfer ──
@@ -173,16 +176,20 @@ export type PetSkill = {
   level: "LEARNING" | "SOMETIMES" | "MASTERED";
   masteredAt?: string | null;
   validated?: boolean;
-  markedBy?: string | null;
+  /** Who marked it (GET /pets/:id/skills → `{ kind: "user" | "partner", id, name }`). */
+  markedBy?: { kind?: string; id?: string; name?: string | null; tradeName?: string | null } | string | null;
   custom?: boolean;
 };
-export type SkillsResponse = { skills: PetSkill[]; available: { id: string; name: string }[] };
+export type SkillsResponse = { skills: PetSkill[]; available: { id?: string; skillId?: string; name: string; key?: string | null }[] };
 export type SkillComparison = {
-  scope: string;
+  /** `{ label: "Brasil" | state | city…, … }` (older builds: plain string). */
+  scope: { label?: "nearMe" | "city" | "state" | "Brasil" | string | null; state?: string | null; city?: string | null; breed?: { id: string; name: string } | null } | string | null;
   groupSize: number;
   widened: boolean;
   perSkill: { skillId: string; name: string; pct: number }[];
-  summary: { mastered: number; percentile: number };
+  /** `percentile` is null while the group has no peers. */
+  summary: { mastered: number; percentile: number | null; peers?: number };
+  note?: string | null;
 };
 
 export type TaskRule = { freq: "daily" | "weekly"; days?: number[]; times?: string[] };
@@ -193,9 +200,18 @@ export type PetTask = {
   rule?: TaskRule | null;
   dueAt?: string | null;
   status: "ACTIVE" | "PROPOSED" | "PAUSED" | "DONE" | string;
+  /** Derived by useTasks from `today[]` of GET /pets/:id/tasks. */
   completedToday?: boolean;
+  /** Derived by useTasks from `completions[0]`. */
   lastCompletedAt?: string | null;
+  /** Derived by useTasks from `proposedByPartner`. */
   proposedBy?: { tradeName: string } | null;
+  proposedByPartner?: { id: string; tradeName: string } | null;
+  completions?: { forDate: string; completedAt: string; user?: { id: string; name: string } | null }[];
+  /** tasksForDate rows (GET /me/home `tasksToday`, `today[]`): completion state for `forDate`. */
+  forDate?: string;
+  completed?: boolean;
+  completedAt?: string | null;
   petId?: string;
   pet?: { id: string; name: string; avatarUrl?: string | null } | null;
 };
@@ -214,10 +230,14 @@ export type PetFood = {
   offersEnabled?: boolean;
   runsOutAt?: string | null;
 };
+type FoodSuggestionItem = { id: string; name: string; price?: number | string | null; promoPrice?: number | string | null; promoUntil?: string | null; brand?: { id: string; name: string } | null; productLine?: { id: string; name: string } | null };
+/** One partner of GET /pets/:id/foods/suggestions → `{ origin, partners: FoodSuggestion[] }` (nearest first). */
 export type FoodSuggestion = {
-  partner: { id: string; slug: string; tradeName: string; logoUrl?: string | null; distanceKm?: number | null };
-  brand?: { name: string } | null;
-  promos?: { id: string; name: string; price?: number | null; promoPrice?: number | null }[];
+  partner: { id: string; slug: string; tradeName: string; logoUrl?: string | null; city?: string | null; state?: string | null };
+  distanceKm?: number | null;
+  items: FoodSuggestionItem[];
+  /** Items with an active promo price. */
+  offers: FoodSuggestionItem[];
 };
 
 export type Badge = {
@@ -227,6 +247,9 @@ export type Badge = {
   description?: string | null;
   iconUrl?: string | null;
   earnedAt?: string | null;
+  /** GET /pets/:id/badges: false for locked system badges. */
+  earned?: boolean;
+  system?: boolean;
   partner?: { tradeName: string } | null;
 };
 
@@ -255,7 +278,8 @@ export type PartnerSummary = {
   tradeName: string;
   logoUrl?: string | null;
   types?: { key: string; label: string }[] | string[];
-  ratingAvg?: number | null;
+  /** Prisma Decimal — arrives as a string ("4.5"). */
+  ratingAvg?: number | string | null;
   ratingCount?: number;
   city?: string | null;
   state?: string | null;
@@ -265,6 +289,8 @@ export type PartnerSummary = {
   featured?: boolean;
   categories?: { key: string; label: string }[] | string[];
   cancellationHours?: number;
+  /** GET /me/appointments: partner's primary address (venue visits often have no `address` of their own). */
+  address?: Address | null;
 };
 
 export type CatalogItem = {
@@ -281,7 +307,8 @@ export type CatalogItem = {
   bookable?: boolean;
   speciesKeys?: string[];
   status?: string;
-  ratingAvg?: number | null;
+  /** Prisma Decimal — arrives as a string ("4.5"). */
+  ratingAvg?: number | string | null;
   ratingCount?: number;
   media?: { kind: "IMAGE" | "VIDEO"; url: string; thumbUrl?: string | null; isCover?: boolean }[];
   category?: { key: string; label: string } | null;
@@ -313,7 +340,8 @@ export type PublicPartner = PartnerSummary & {
   website?: string | null;
 };
 
-export type TravelLeg = { distanceKm?: number | null; minutes?: number | null; estimated?: boolean; alert?: string | null };
+/** Prisma TravelLeg: `distanceKm` is a Decimal (may arrive as a string), travel time is `durationMinutes`. */
+export type TravelLeg = { distanceKm?: number | string | null; durationMinutes?: number | null; estimated?: boolean };
 
 export type Appointment = {
   id: string;
@@ -331,12 +359,15 @@ export type Appointment = {
   reportPhotos?: string[];
   seriesId?: string | null;
   pets?: { id: string; name: string; avatarUrl?: string | null; speciesKey?: string }[];
-  client?: { id: string; name: string; phone?: string | null } | null;
+  /** Partner side: CRM phones, primary first (the owner side receives `[]`). */
+  client?: { id: string; name: string; phones?: { number: string; type?: string; isPrimary?: boolean }[] } | null;
   item?: { id: string; name: string; durationMinutes?: number | null; price?: number | string | null } | null;
   membership?: { id: string; user?: { name: string } | null; name?: string } | null;
   address?: Address | null;
   partner?: PartnerSummary | null;
   travelLeg?: TravelLeg | null;
+  /** GET /me/appointments: false when the caller doesn't own every pet (shared account → read-only). */
+  canManage?: boolean;
 };
 
 export type Contract = {
@@ -345,8 +376,14 @@ export type Contract = {
   description?: string | null;
   type: "PACKAGE" | "RECURRING" | "SINGLE" | "COURSE";
   status: "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELED";
-  total: number | string;
+  /** Gross amount (API `totalAmount`); `total` kept for older payloads. */
+  totalAmount?: number | string;
+  total?: number | string;
   discount?: number | string;
+  /** decorateContract(): totalAmount − discount, paid so far and remaining balance. */
+  netAmount?: number | string;
+  paidAmount?: number | string;
+  balance?: number | string;
   installmentsCount: number;
   sessionsCount?: number | null;
   terms?: string | null;
@@ -373,7 +410,8 @@ export type Installment = {
 export type HomeData = {
   tasksToday: PetTask[];
   upcomingAppointments: Appointment[];
-  recentBadges: (Badge & { pet?: { id: string; name: string } | null })[];
+  /** EarnedBadge rows: the badge itself is nested under `badge` (flat fields kept optional for safety). */
+  recentBadges: (Partial<Badge> & { id?: string; earnedAt?: string | null; badge?: Badge | null; pet?: { id: string; name: string } | null })[];
   pets: Pet[];
   overdueInstallments: Installment[];
   /** Pending share invites + ownership transfer requests addressed to me. */
@@ -406,7 +444,7 @@ export type Client = {
   familyMembers?: { id: string; name: string; relationship?: string | null; phone?: string | null }[];
   invites?: ClientInvite[];
 };
-export type ClientInvite = { id: string; token?: string; email?: string | null; phone?: string | null; acceptedAt?: string | null; createdAt: string };
+export type ClientInvite = { id: string; token?: string; email?: string | null; phone?: string | null; acceptedAt?: string | null; createdAt: string; status?: "PENDING" | "ACCEPTED" | "CANCELED" | "EXPIRED"; expiresAt?: string | null };
 
 export type InvitePreview = {
   partner: { id: string; tradeName: string; logoUrl?: string | null; slug?: string };
@@ -419,20 +457,29 @@ export type DayRoute = {
     appointmentId: string;
     order: number;
     address?: Address | string | null;
+    /** Server-formatted address and ready-made "Como chegar" links. */
+    addressText?: string | null;
+    links?: { google: string; waze: string; apple: string } | null;
     lat?: number | null;
     lng?: number | null;
     startsAt: string;
+    endsAt?: string;
     legDistanceKm?: number | null;
     legMinutes?: number | null;
     estimated?: boolean;
-    alert?: string | null;
+    /** Predicted delay: `{ delayMinutes, message }` (plain string on older payloads). */
+    alert?: { delayMinutes: number; message: string } | string | null;
+    /** Service / appointment title. */
+    title?: string | null;
     petNames?: string[];
-    clientName?: string;
+    clientName?: string | null;
   }[];
   totalKm: number;
   totalMinutes: number;
   googleMapsUrl?: string | null;
-  suggestions?: { message: string; savesKm?: number; savesMinutes?: number }[];
+  suggestions?: { type?: "SHIFT" | "REORDER"; message: string; savesKm?: number; savesMinutes?: number; appointmentId?: string; suggestedStartsAt?: string; order?: string[] }[];
+  estimatedCost?: number | null;
+  costPerKm?: number | null;
 };
 
 export type PlanInfo = {

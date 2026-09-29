@@ -10,7 +10,7 @@ import { Badge, Button, Spinner } from "@/components/ui";
 import { Avatar, ErrorBox, Tabs } from "@/components/painel/ui";
 import { useActivePartner } from "@/hooks/use-partner";
 import { useApiMutation, usePet } from "@/hooks/use-crm";
-import { fmtDate } from "@/lib/format";
+import { fmtDay } from "@/lib/format";
 import { PetForm, SEX_LABEL } from "@/components/painel/clientes/PetForm";
 import { HistoryTab } from "@/components/painel/clientes/pet/HistoryTab";
 import { MeasurementsTab } from "@/components/painel/clientes/pet/MeasurementsTab";
@@ -65,7 +65,7 @@ export default function PetPage() {
         <div className="min-w-0 flex-1">
           <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight">
             {pet.name}
-            {pet.status === "DECEASED" && <Badge tone="gray">Falecido{pet.deceasedAt ? ` em ${fmtDate(pet.deceasedAt)}` : ""}</Badge>}
+            {pet.status === "DECEASED" && <Badge tone="gray">Falecido{pet.deceasedAt ? ` em ${fmtDay(pet.deceasedAt)}` : ""}</Badge>}
             {stage && pet.status !== "DECEASED" && <Badge tone="blue">{LIFE_STAGE_LABEL[stage]}</Badge>}
           </h1>
           <p className="text-sm text-[var(--muted)]">
@@ -91,7 +91,7 @@ export default function PetPage() {
               <dl className="grid gap-2 sm:grid-cols-2">
                 {[
                   ["Cor/pelagem", pet.color],
-                  ["Nascimento", pet.birthDate ? fmtDate(pet.birthDate) : null],
+                  ["Nascimento", pet.birthDate ? fmtDay(pet.birthDate) : null],
                   ["Castrado", pet.neutered == null ? null : pet.neutered ? "Sim" : "Não"],
                   ["Microchip", pet.microchip],
                   ["Temperamento", pet.temperament],

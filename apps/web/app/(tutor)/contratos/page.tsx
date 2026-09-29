@@ -5,7 +5,7 @@ import { useMyContracts, useMyInstallments, type Contract, type Installment } fr
 import { Badge, Card, Empty, PageHeader, Spinner } from "@/components/ui";
 import { errorMessage } from "@/lib/errors";
 import { CONTRACT_STATUS_LABEL, CONTRACT_TYPE_LABEL } from "@/components/tutor/contract-labels";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtDay } from "@/lib/format";
 import { formatBRL, INSTALLMENT_STATUS_LABEL } from "@tinypet/shared";
 
 const STATUS_TONE = { DRAFT: "amber", ACTIVE: "green", COMPLETED: "gray", CANCELED: "red" } as const;
@@ -66,7 +66,7 @@ export default function ContratosPage() {
                       <p className="truncate">
                         {i.contract?.title ?? "Contrato"} · {i.number}ª
                       </p>
-                      <p className="text-xs text-[var(--muted)]">Vence em {fmtDate(i.dueDate)}</p>
+                      <p className="text-xs text-[var(--muted)]">Vence em {fmtDay(i.dueDate)}</p>
                     </div>
                     <span className="font-semibold">{formatBRL(i.amount)}</span>
                     <Badge tone={INST_TONE[i.status]}>{INSTALLMENT_STATUS_LABEL[i.status]}</Badge>

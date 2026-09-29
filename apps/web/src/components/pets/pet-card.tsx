@@ -3,7 +3,7 @@ import { Flame, Users } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ageInMonths, formatAge } from "@tinypet/shared";
 import type { Pet } from "@/hooks/use-pets";
-import { fmtDate } from "@/lib/format";
+import { fmtDay } from "@/lib/format";
 
 export function PetCard({ pet }: { pet: Pet }) {
   const deceased = pet.status === "DECEASED";
@@ -15,7 +15,7 @@ export function PetCard({ pet }: { pet: Pet }) {
         <p className="truncate font-semibold">{pet.name}</p>
         <p className="truncate text-xs text-[var(--muted)]">{[pet.species?.label, pet.breed?.name ?? pet.breedOther, age].filter(Boolean).join(" · ")}</p>
         {deceased ? (
-          <p className="mt-1 text-xs text-[var(--muted)]">Em memória · {fmtDate(pet.deceasedAt)}</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">Em memória · {fmtDay(pet.deceasedAt)}</p>
         ) : (
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--muted)]">
             {pet.streakDays > 0 && (

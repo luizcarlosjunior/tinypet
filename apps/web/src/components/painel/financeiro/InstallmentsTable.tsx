@@ -6,7 +6,7 @@ import { formatBRL, PAYMENT_METHOD_LABEL, safeHref } from "@tinypet/shared";
 import { Button } from "@/components/ui";
 import { ConfirmDialog, Table, td, th } from "@/components/painel/ui";
 import { useDeletePayment, useRemindInstallment } from "@/hooks/use-finance";
-import { daysLate, fmtDate, num } from "@/lib/format";
+import { daysLate, fmtDate, num, fmtDay } from "@/lib/format";
 import type { Installment } from "@/types/api";
 import { InstallmentStatusBadge } from "./common";
 import { PaymentModal } from "./PaymentModal";
@@ -85,7 +85,7 @@ export function InstallmentsTable({ items, partnerId, showContract = true, empty
                     {i.contract?.installmentsCount ? `/${i.contract.installmentsCount}` : ""}
                   </td>
                   <td className={td}>
-                    {fmtDate(i.dueDate)}
+                    {fmtDay(i.dueDate)}
                     {late > 0 && <span className="block text-xs font-medium text-red-600 dark:text-red-300">{late} {late === 1 ? "dia" : "dias"} em atraso</span>}
                   </td>
                   <td className={`${td} text-right tabular-nums`}>{formatBRL(i.amount)}</td>
@@ -107,7 +107,7 @@ export function InstallmentsTable({ items, partnerId, showContract = true, empty
                           {payments.map((p) => (
                             <li key={p.id} className="flex flex-wrap items-center gap-3 py-1.5">
                               <span className="font-medium tabular-nums">{formatBRL(p.amount)}</span>
-                              <span>{fmtDate(p.paidAt)}</span>
+                              <span>{fmtDay(p.paidAt)}</span>
                               <span className="text-[var(--muted)]">{PAYMENT_METHOD_LABEL[p.method as keyof typeof PAYMENT_METHOD_LABEL] ?? p.method}</span>
                               {p.receiptUrl && (
                                 <a href={safeHref(p.receiptUrl)} target="_blank" rel="noopener noreferrer" className="text-brand-600 underline dark:text-brand-300">

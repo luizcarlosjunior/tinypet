@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { View } from "react-native";
-import { fmtDate, fmtWeight, toDate } from "@/lib/format";
+import { fmtDate, fmtWeight, toDate, fmtDay } from "@/lib/format";
 import { radius, useTheme } from "@/lib/theme";
 import type { Measurement } from "@/lib/types";
 import { Text } from "@/components/ui";
@@ -41,7 +41,7 @@ export function WeightChart({ items, reference }: { items: Measurement[]; refere
   const py = (y: number) => y * (H - 20) + 10;
 
   return (
-    <View accessibilityLabel={`Gráfico de peso de ${fmtWeight(data.first.weightG)} em ${fmtDate(data.first.measuredAt)} até ${fmtWeight(data.last.weightG)} em ${fmtDate(data.last.measuredAt)}`}>
+    <View accessibilityLabel={`Gráfico de peso de ${fmtWeight(data.first.weightG)} em ${fmtDay(data.first.measuredAt)} até ${fmtWeight(data.last.weightG)} em ${fmtDay(data.last.measuredAt)}`}>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height: H, backgroundColor: t.surfaceAlt, borderRadius: radius.md, overflow: "hidden" }}>
         {data.refBand ? <View style={{ position: "absolute", left: 0, right: 0, top: py(data.refBand.top), height: Math.max(py(data.refBand.bottom) - py(data.refBand.top), 2), backgroundColor: t.successSoft, opacity: 0.7 }} /> : null}
         {[0.25, 0.5, 0.75].map((g) => (
@@ -73,10 +73,10 @@ export function WeightChart({ items, reference }: { items: Measurement[]; refere
       </View>
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
         <Text variant="tiny" tone="faint">
-          {fmtDate(data.first.measuredAt)}
+          {fmtDay(data.first.measuredAt)}
         </Text>
         <Text variant="tiny" tone="faint">
-          {fmtDate(data.last.measuredAt)}
+          {fmtDay(data.last.measuredAt)}
         </Text>
       </View>
       <View style={{ flexDirection: "row", gap: 12, marginTop: 6 }}>

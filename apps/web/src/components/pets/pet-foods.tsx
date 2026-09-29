@@ -12,7 +12,7 @@ import { api } from "@/lib/api-client";
 import { Button, Empty, Input, Modal, Select, Spinner } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
-import { fmtDate, fmtKm } from "@/lib/format";
+import { fmtKm, fmtDay } from "@/lib/format";
 
 type FoodInput = z.infer<typeof petFoodSchema>;
 type Food = { id: string; type: FoodInput["type"]; brandId: string | null; productLineId: string | null; brandOther: string | null; packageSizeG: number | null; dailyGrams: number | null; lastPurchaseAt: string | null; offersEnabled: boolean; brand?: { name: string } | null; productLine?: { name: string } | null };
@@ -104,7 +104,7 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
                 <p className="mt-1 text-xs text-[var(--muted)]">
                   {f.packageSizeG ? `Embalagem ${f.packageSizeG >= 1000 ? `${f.packageSizeG / 1000} kg` : `${f.packageSizeG} g`}` : ""}
                   {f.dailyGrams ? ` · ${f.dailyGrams} g/dia` : ""}
-                  {f.lastPurchaseAt ? ` · comprada em ${fmtDate(f.lastPurchaseAt)}` : ""}
+                  {f.lastPurchaseAt ? ` · comprada em ${fmtDay(f.lastPurchaseAt)}` : ""}
                 </p>
                 {left != null && <p className={`mt-1 text-xs ${left <= 5 ? "font-semibold text-amber-700 dark:text-amber-300" : "text-[var(--muted)]"}`}>{left > 0 ? `Acaba em cerca de ${left} ${left === 1 ? "dia" : "dias"}` : "Provavelmente acabou — hora de repor!"}</p>}
                 {!f.offersEnabled && <p className="mt-1 text-xs text-[var(--muted)]">Ofertas desligadas para este item</p>}

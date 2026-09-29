@@ -1,6 +1,6 @@
 "use client";
 import { useId, useState } from "react";
-import { fmtDate, fmtWeight } from "@/lib/format";
+import { fmtDate, fmtWeight, fmtDay } from "@/lib/format";
 import { LIFE_STAGE_LABEL, type LifeStage } from "@tinypet/shared";
 
 export type WeightPoint = { id: string; measuredAt: string; weightG: number; vetVerified: boolean; partnerId?: string | null };
@@ -69,7 +69,7 @@ export function WeightChart({ points, bands = [], reference = null, width = 640,
         ))}
         <path d={path} fill="none" stroke="#f95d16" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         {sorted.map((p) => (
-          <g key={p.id} onMouseEnter={() => setHover(p)} onFocus={() => setHover(p)} tabIndex={0} aria-label={`${fmtDate(p.measuredAt)}: ${fmtWeight(p.weightG)}${p.vetVerified ? ", aferido por veterinário" : ""}`}>
+          <g key={p.id} onMouseEnter={() => setHover(p)} onFocus={() => setHover(p)} tabIndex={0} aria-label={`${fmtDay(p.measuredAt)}: ${fmtWeight(p.weightG)}${p.vetVerified ? ", aferido por veterinário" : ""}`}>
             {p.vetVerified ? (
               <rect x={x(t(p.measuredAt)) - 5} y={y(p.weightG) - 5} width={10} height={10} fill="#2563eb" stroke="white" strokeWidth={1.5} transform={`rotate(45 ${x(t(p.measuredAt))} ${y(p.weightG)})`} />
             ) : (
@@ -81,7 +81,7 @@ export function WeightChart({ points, bands = [], reference = null, width = 640,
           <g pointerEvents="none">
             <rect x={Math.min(x(t(hover.measuredAt)) + 8, width - 150)} y={Math.max(pad.t, y(hover.weightG) - 34)} width={142} height={30} rx={6} fill="var(--card)" stroke="var(--border)" />
             <text x={Math.min(x(t(hover.measuredAt)) + 14, width - 144)} y={Math.max(pad.t, y(hover.weightG) - 34) + 12} fontSize={10} fill="currentColor">
-              {fmtDate(hover.measuredAt)} · {fmtWeight(hover.weightG)}
+              {fmtDay(hover.measuredAt)} · {fmtWeight(hover.weightG)}
             </text>
             <text x={Math.min(x(t(hover.measuredAt)) + 14, width - 144)} y={Math.max(pad.t, y(hover.weightG) - 34) + 24} fontSize={10} fill="currentColor" opacity={0.7}>
               {hover.vetVerified ? "Aferido por veterinário" : "Registrado pelo tutor"}

@@ -23,6 +23,18 @@ export function fmtDate(v: string | Date | null | undefined, pattern = "dd/MM/yy
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return format(d, pattern, { locale: ptBR });
   return formatInTimeZone(d, TZ, pattern, { locale: ptBR });
 }
+/**
+ * Format a calendar-date field (Prisma `@db.Date`, serialized as "YYYY-MM-DDT00:00:00.000Z" or "YYYY-MM-DD"):
+ * birthDate, deceasedAt, dueDate, appliedAt, measuredAt… Uses the calendar day as stored — converting the UTC
+ * midnight to America/Sao_Paulo would show the previous day.
+ */
+export function fmtDay(v: string | Date | null | undefined, pattern = "dd/MM/yyyy"): string {
+  if (!v) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T00:00:00(?:\.000)?Z)?$/.exec(v instanceof Date ? v.toISOString() : String(v));
+  // Anything that is not a pure calendar date (real timestamp, e.g. mixed timelines) keeps the São Paulo conversion.
+  if (!m) return fmtDate(v, pattern);
+  return format(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])), pattern, { locale: ptBR });
+}
 export function fmtDateTime(v: string | Date | null | undefined): string {
   return fmtDate(v, "dd/MM/yyyy 'às' HH:mm");
 }
@@ -70,4 +82,14 @@ export function fmtMinutes(min: number | null | undefined): string {
 export function maskCep(v: string): string {
   const d = v.replace(/\D/g, "").slice(0, 8);
   return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+}
+
+/** "+5541999990000" → "(41) 99999-0000" (non-BR / unknown formats are returned as-is). */
+export function fmtPhone(v: string | null | undefined): string {
+  if (!v) return "";
+  let d = v.replace(/\D/g, "");
+  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) d = d.slice(2);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return v;
 }

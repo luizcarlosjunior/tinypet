@@ -13,6 +13,7 @@ import { statusTone } from "@/components/ui/Badge";
 import { AddressBlock, LocationBadge, MapsButtons } from "@/components/appointments/AppointmentCard";
 import { BackHeader } from "@/components/BackHeader";
 import { openLocal, whatsappUrl } from "@/lib/links";
+import { speciesKeyOf } from "@/lib/species";
 
 export default function PartnerAppointmentDetail() {
   const t = useTheme();
@@ -28,6 +29,7 @@ export default function PartnerAppointmentDetail() {
   const [uploading, setUploading] = useState(false);
   const [reason, setReason] = useState("");
   const a = q.data;
+  const clientPhone = a?.client?.phones?.find((p) => p.isPrimary)?.number ?? a?.client?.phones?.[0]?.number ?? null;
 
   const change = async (s: NonNullable<typeof a>["status"], extra: Record<string, unknown> = {}) => {
     try {
@@ -63,16 +65,15 @@ export default function PartnerAppointmentDetail() {
             <View style={{ flexDirection: "row", gap: 6, marginVertical: spacing.md, flexWrap: "wrap" }}>
               <Badge label={APPOINTMENT_STATUS_LABEL[a.status]} tone={statusTone(a.status)} />
               <LocationBadge type={a.locationType} />
-              {a.travelLeg?.alert ? <Badge label={a.travelLeg.alert} tone="warning" icon="warning" /> : null}
             </View>
             <Card>
               {a.client ? <ListItem title={a.client.name} subtitle="Cliente" onPress={() => router.push(`/(parceiro)/clientes/${a.client!.id}`)} /> : null}
               {(a.pets ?? []).map((p) => (
-                <ListItem key={p.id} title={p.name} subtitle="Pet" left={<Avatar uri={p.avatarUrl} name={p.name} species={p.speciesKey} size={36} />} onPress={a.client ? () => router.push(`/(parceiro)/clientes/${a.client!.id}/pets/${p.id}`) : undefined} />
+                <ListItem key={p.id} title={p.name} subtitle="Pet" left={<Avatar uri={p.avatarUrl} name={p.name} species={speciesKeyOf(p)} size={36} />} onPress={a.client ? () => router.push(`/(parceiro)/clientes/${a.client!.id}/pets/${p.id}`) : undefined} />
               ))}
               <KeyValue k="Profissional" v={a.membership?.user?.name ?? a.membership?.name} />
               <KeyValue k="Observações" v={a.notes} />
-              {a.client?.phone ? <Button title="Ligar / WhatsApp" size="sm" variant="ghost" icon="call-outline" style={{ alignSelf: "flex-start" }} onPress={() => openLocal(whatsappUrl(a.client!.phone!))} /> : null}
+              {clientPhone ? <Button title="Ligar / WhatsApp" size="sm" variant="ghost" icon="call-outline" style={{ alignSelf: "flex-start" }} onPress={() => openLocal(whatsappUrl(clientPhone))} /> : null}
             </Card>
             {a.locationType !== "ONLINE" ? (
               <Card>
@@ -80,7 +81,7 @@ export default function PartnerAppointmentDetail() {
                 <AddressBlock address={a.address} notes={a.locationNotes} />
                 {a.travelLeg ? (
                   <Text variant="small" tone="muted" style={{ marginTop: 4 }}>
-                    Deslocamento: {a.travelLeg.distanceKm?.toFixed(1) ?? "?"} km · {a.travelLeg.minutes != null ? Math.round(a.travelLeg.minutes) : "?"} min{a.travelLeg.estimated ? " (estimativa)" : ""}
+                    Deslocamento: {a.travelLeg.distanceKm != null ? Number(a.travelLeg.distanceKm).toFixed(1).replace(".", ",") : "?"} km · {a.travelLeg.durationMinutes != null ? Math.round(a.travelLeg.durationMinutes) : "?"} min{a.travelLeg.estimated ? " (estimativa)" : ""}
                   </Text>
                 ) : null}
                 {a.locationType === "CLIENT_HOME" || a.locationType === "OTHER" ? <MapsButtons address={a.address} /> : null}
@@ -103,12 +104,9 @@ export default function PartnerAppointmentDetail() {
               {a.status === "REQUESTED" ? <Button title="Confirmar" icon="checkmark" onPress={() => change("CONFIRMED")} loading={status.isPending} /> : null}
               {a.status === "CONFIRMED" ? <Button title="Iniciar atendimento" icon="play" onPress={() => change("IN_PROGRESS")} loading={status.isPending} /> : null}
               {a.status === "IN_PROGRESS" || a.status === "CONFIRMED" ? <Button title="Concluir com relato" icon="checkmark-done" variant={a.status === "IN_PROGRESS" ? "primary" : "secondary"} onPress={() => setCompleteOpen(true)} /> : null}
-              {a.status === "REQUESTED" || a.status === "CONFIRMED" ? (
-                <>
-                  <Button title="Não compareceu" variant="outline" icon="person-remove-outline" onPress={() => Alert.alert("Marcar como não compareceu?", undefined, [{ text: "Voltar", style: "cancel" }, { text: "Confirmar", style: "destructive", onPress: () => change("NO_SHOW") }])} />
-                  <Button title="Cancelar atendimento" variant="ghost" onPress={() => setCancelOpen(true)} />
-                </>
-              ) : null}
+              {/* API transitions: NO_SHOW only from CONFIRMED; CANCELED from REQUESTED, CONFIRMED and IN_PROGRESS. */}
+              {a.status === "CONFIRMED" ? <Button title="Não compareceu" variant="outline" icon="person-remove-outline" onPress={() => Alert.alert("Marcar como não compareceu?", undefined, [{ text: "Voltar", style: "cancel" }, { text: "Confirmar", style: "destructive", onPress: () => change("NO_SHOW") }])} /> : null}
+              {a.status === "REQUESTED" || a.status === "CONFIRMED" || a.status === "IN_PROGRESS" ? <Button title="Cancelar atendimento" variant="ghost" onPress={() => setCancelOpen(true)} /> : null}
             </View>
           </>
         ) : null}
