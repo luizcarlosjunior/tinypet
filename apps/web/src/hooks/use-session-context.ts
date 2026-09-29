@@ -19,6 +19,8 @@ export type SessionUser = {
   birthDate?: string | null;
   /** `false` when the account never accepted the current terms (e.g. OAuth sign-up). Absent on older servers. */
   termsAccepted?: boolean;
+  /** false for Google/Apple-only accounts (sensitive actions confirmed by e-mail code). */
+  hasPassword?: boolean;
 };
 export type SessionMembership = {
   membershipId: string;

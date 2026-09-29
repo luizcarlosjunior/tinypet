@@ -286,6 +286,8 @@ export async function sessionContext(user: AuthUser) {
       emailVerified: !!dbUser?.emailVerifiedAt,
       /** false for OAuth sign-ups that haven't explicitly accepted the terms yet — UI must ask. */
       termsAccepted: !!dbUser?.termsAcceptedAt,
+      /** false for Google/Apple-only accounts: sensitive actions are then confirmed with an e-mail code. */
+      hasPassword: !!dbUser?.passwordHash,
       termsVersion: dbUser?.termsVersion ?? null,
       plan: dbUser?.subscription?.plan.key ?? "owner_free",
       marketingConsent: dbUser?.marketingConsent ?? false,

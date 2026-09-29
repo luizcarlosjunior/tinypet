@@ -48,7 +48,7 @@ export function PetDetail({ petId, mode, partnerTypes = [], initialTab = "ficha"
       <PetHeader pet={pet} />
       <Tabs items={isOwner ? OWNER_TABS : PARTNER_TABS} value={tab} onChange={setTab} />
       <View style={{ marginTop: spacing.md }}>
-        {tab === "ficha" ? <FichaTab pet={pet} canEdit={canEdit || (mode === "partner" && pet.status === "ACTIVE")} isOwner={isOwner && !readOnly} /> : null}
+        {tab === "ficha" ? <FichaTab pet={pet} canEdit={canEdit || (mode === "partner" && pet.status === "ACTIVE")} isOwner={isOwner && !readOnly} canRegisterDeath={!readOnly && (mode === "partner" ? !pet.ownerId : isOwner)} /> : null}
         {tab === "galeria" ? <GaleriaTab petId={pet.id} canEdit={canEdit && isOwner} /> : null}
         {tab === "historico" ? <HistoricoTab petId={pet.id} /> : null}
         {tab === "saude" ? <SaudeTab petId={pet.id} canEdit={canEdit || mode === "partner"} /> : null}

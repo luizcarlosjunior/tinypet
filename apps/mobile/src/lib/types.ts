@@ -28,6 +28,8 @@ export type User = {
   statsConsent?: boolean;
   publicPhotosConsent?: boolean;
   birthDate?: string | null;
+  /** false for Google/Apple-only accounts: sensitive actions are confirmed with an e-mail code. */
+  hasPassword?: boolean;
 };
 
 export type AuthPayload = { token: string; user: User; memberships: Membership[] };

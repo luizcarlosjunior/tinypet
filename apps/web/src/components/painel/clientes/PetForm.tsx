@@ -69,7 +69,7 @@ export function PetForm({ initial, partnerId, onSubmit, submitting, submitLabel 
     breedId: v.breedId && v.breedId !== "__other" ? v.breedId : null,
     breedOther: v.breedId === "__other" ? v.breedOther || null : null,
     color: v.color || null,
-    sex: v.sex || null,
+    sex: v.sex || undefined,
     size: v.size || null,
     birthDate: v.birthDate || null,
     approxAgeMonths: v.approxAgeMonths == null || Number.isNaN(v.approxAgeMonths) ? null : v.approxAgeMonths,
@@ -116,8 +116,10 @@ export function PetForm({ initial, partnerId, onSubmit, submitting, submitLabel 
         </Select>
         {breedId === "__other" && <Input id="pet-breed-other" label="Qual raça?" {...register("breedOther")} />}
         <Input id="pet-color" label="Cor" {...register("color")} />
-        <Select id="pet-sex" label="Sexo" {...register("sex")}>
-          <option value="">Não informado</option>
+        <Select id="pet-sex" label="Sexo *" required aria-required="true" error={errors.sex?.message} {...register("sex")}>
+          <option value="" disabled>
+            Selecione
+          </option>
           {Object.entries(SEX_LABEL).map(([k, l]) => (
             <option key={k} value={k}>
               {l}

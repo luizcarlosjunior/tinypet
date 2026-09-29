@@ -74,20 +74,6 @@ export function useDeletePet() {
   });
 }
 
-export function useMarkDeceased(id: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { deceasedAt: string; memorialNote?: string | null }) => api<Pet>(`/pets/${id}/deceased`, { method: "POST", json: input }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: petsKey }),
-  });
-}
-export function useUndoDeceased(id: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => api<Pet>(`/pets/${id}/deceased`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: petsKey }),
-  });
-}
 
 /** Generic helper for pet sub-resources (/pets/:id/<res>). */
 export function usePetResource<T>(petId: string, resource: string, query = "", opts: { enabled?: boolean; retry?: boolean } = {}) {

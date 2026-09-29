@@ -29,9 +29,13 @@ export function usePetMutations(id?: string) {
   const create = useMutation({ mutationFn: (input: PetInput) => api<Pet>("/pets", { method: "POST", json: input }), onSuccess: inv });
   const update = useMutation({ mutationFn: (input: Partial<PetInput>) => api<Pet>(`/pets/${id}`, { method: "PATCH", json: input }), onSuccess: inv });
   const remove = useMutation({ mutationFn: () => api(`/pets/${id}`, { method: "DELETE" }), onSuccess: inv });
-  const markDeceased = useMutation({ mutationFn: (input: { deceasedAt: string; memorialNote?: string | null }) => api(`/pets/${id}/deceased`, { method: "POST", json: input }), onSuccess: inv });
-  const undoDeceased = useMutation({ mutationFn: () => api(`/pets/${id}/deceased`, { method: "DELETE" }), onSuccess: inv });
-  return { create, update, remove, markDeceased, undoDeceased };
+  /** Irreversible. Requires `password` (or `code` from sendDeceasedCode for accounts without a password). */
+  const markDeceased = useMutation({
+    mutationFn: (input: { deceasedAt: string; memorialNote?: string | null; password?: string; code?: string }) => api(`/pets/${id}/deceased`, { method: "POST", json: input }),
+    onSuccess: inv,
+  });
+  const sendDeceasedCode = useMutation({ mutationFn: () => api(`/pets/${id}/deceased/code`, { method: "POST" }) });
+  return { create, update, remove, markDeceased, sendDeceasedCode };
 }
 
 // ── gallery ──

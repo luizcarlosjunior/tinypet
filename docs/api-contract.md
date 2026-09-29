@@ -95,8 +95,8 @@ Cover of another owner → 403; unknown cover → 404; `/media/:id/cover` on a n
 - `GET /clients/export` CSV · `POST /clients/import` (multipart `file` CSV: name,email,phone,petName,species) → `{ created, skipped }`
 
 ## Pets (owner side; partner side reads via clients)
-- `GET /pets` (mine + shared via PetAccess; `?includeDeceased`) · `POST /pets` (petSchema; assertLimit owner_pets counting `createdByPartnerId null && status ACTIVE`) · `GET|PATCH|DELETE /pets/:id` (assertPetAccess)
-- `POST /pets/:id/deceased` (markDeceasedSchema): cancels future appointments (notify partners), pauses tasks, status DECEASED · `DELETE /pets/:id/deceased` undo
+- `GET /pets` (mine + shared via PetAccess; `?includeDeceased`) · `POST /pets` (petSchema — `sex` MALE|FEMALE required on create; assertLimit owner_pets counting `createdByPartnerId null && status ACTIVE`) · `GET|PATCH|DELETE /pets/:id` (assertPetAccess)
+- `POST /pets/:id/deceased` (markDeceasedSchema: `deceasedAt`, `memorialNote?`, `password` — or `code` for accounts without a password): **irreversible** (no undo endpoint); requires the primary owner (or a linked partner for pets without an owner) to confirm with their password; rate limited (5 tries / 15 min); cancels future appointments (notify partners), pauses tasks, status DECEASED; audited (`pet.deceased`). Errors: 400 `PASSWORD_REQUIRED` / `PASSWORD_INVALID` / `CODE_REQUIRED`, 409 when already registered · `POST /pets/:id/deceased/code` sends a 10-minute e-mail code (only for accounts without a password)
 - `GET|POST /pets/:id/access` (petAccessSchema by e-mail) · `DELETE /pets/:id/access/:uid`
 - `GET /pets/:id/media?story=` · `POST /pets/:id/media` (petMediaSchema; assertFeature owner_gallery / owner_stories; story expiresAt = takenAt+24h) · `PATCH|DELETE /pets/:id/media/:mid`
 - `GET /pets/:id/history` (timeline; merges PetHistoryEvent + completed appointments + vaccinations + measurements + earned badges, sorted desc) · `POST /pets/:id/history` (historyEventSchema; partner or owner)

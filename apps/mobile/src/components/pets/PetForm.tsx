@@ -29,7 +29,7 @@ export function PetForm({ initial, onSubmit, submitLabel = "Salvar" }: Props) {
       breedId: initial?.breedId ?? null,
       breedOther: initial?.breedOther ?? null,
       color: initial?.color ?? null,
-      sex: initial?.sex ?? null,
+      sex: (initial?.sex ?? undefined) as PetInput["sex"],
       size: initial?.size ?? null,
       birthDate: initial?.birthDate?.slice(0, 10) ?? null,
       approxAgeMonths: initial?.approxAgeMonths ?? null,
@@ -107,9 +107,14 @@ export function PetForm({ initial, onSubmit, submitLabel = "Salvar" }: Props) {
       <Controller control={control} name="color" render={({ field }) => <Input label="Cor / pelagem" value={field.value ?? ""} onChangeText={field.onChange} />} />
 
       <Text variant="small" tone="muted" style={{ marginBottom: 6, fontWeight: "600" }}>
-        Sexo
+        Sexo *
       </Text>
-      <Controller control={control} name="sex" render={({ field }) => <Segmented items={SEX.map((s) => ({ key: s.key, label: s.label }))} value={(field.value ?? null) as (typeof SEX)[number]["key"] | null} onChange={(k) => field.onChange(field.value === k ? null : k)} />} />
+      <Controller control={control} name="sex" render={({ field }) => <Segmented items={SEX.map((s) => ({ key: s.key, label: s.label }))} value={(field.value ?? null) as (typeof SEX)[number]["key"] | null} onChange={(k) => field.onChange(k)} />} />
+      {formState.errors.sex?.message ? (
+        <Text variant="small" style={{ color: t.danger, marginTop: 4 }} accessibilityRole="alert">
+          {formState.errors.sex.message}
+        </Text>
+      ) : null}
       <View style={{ height: spacing.md }} />
       <Controller control={control} name="size" render={({ field }) => <Select label="Porte" value={field.value ?? null} onChange={field.onChange} options={SIZE.map((s) => ({ value: s.value, label: s.label }))} allowClear />} />
 

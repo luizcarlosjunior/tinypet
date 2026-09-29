@@ -182,7 +182,8 @@ export const petSchema = z.object({
   breedId: id.optional().nullable(),
   breedOther: z.string().max(120).optional().nullable(),
   color: z.string().max(60).optional().nullable(),
-  sex: SexEnum.optional().nullable(),
+  /** Required when creating a pet; on update it may be changed but not cleared. */
+  sex: z.enum(["MALE", "FEMALE"], { errorMap: () => ({ message: "Informe o sexo do pet" }) }),
   size: PetSizeEnum.optional().nullable(),
   birthDate: dateString.optional().nullable(),
   approxAgeMonths: z.coerce.number().int().min(0).max(600).optional().nullable(),
@@ -196,7 +197,13 @@ export const petSchema = z.object({
 export type PetInput = z.infer<typeof petSchema>;
 export const updatePetSchema = petSchema.partial();
 
-export const markDeceasedSchema = z.object({ deceasedAt: dateString, memorialNote: z.string().max(1000).optional().nullable() });
+/** Registering a death is irreversible and must be confirmed with the user's password (or an e-mail code for accounts without a password). */
+export const markDeceasedSchema = z.object({
+  deceasedAt: dateString,
+  memorialNote: z.string().max(1000).optional().nullable(),
+  password: z.string().min(1).max(200).optional(),
+  code: z.string().regex(/^\d{6}$/).optional(),
+});
 
 export const petAccessSchema = z.object({ email, level: AccessLevelEnum.default("VIEW") });
 

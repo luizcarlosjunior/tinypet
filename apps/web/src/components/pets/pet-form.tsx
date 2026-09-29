@@ -8,7 +8,7 @@ import { Button, Input, Select, Textarea } from "@/components/ui";
 import { AvatarUpload } from "@/components/media/avatar-upload";
 import type { Pet } from "@/hooks/use-pets";
 
-const SEX = [["", "Não informado"], ["MALE", "Macho"], ["FEMALE", "Fêmea"]] as const;
+const SEX = [["MALE", "Macho"], ["FEMALE", "Fêmea"]] as const;
 const SIZE = [["", "Não informado"], ["SMALL", "Pequeno"], ["MEDIUM", "Médio"], ["LARGE", "Grande"], ["GIANT", "Gigante"]] as const;
 
 function toInput(pet?: Pet | null): Partial<PetInput> {
@@ -19,7 +19,7 @@ function toInput(pet?: Pet | null): Partial<PetInput> {
     breedId: pet.breedId ?? null,
     breedOther: pet.breedOther ?? null,
     color: pet.color ?? null,
-    sex: pet.sex ?? null,
+    sex: (pet.sex ?? "") as PetInput["sex"],
     size: pet.size ?? null,
     birthDate: pet.birthDate ? pet.birthDate.slice(0, 10) : null,
     approxAgeMonths: pet.approxAgeMonths ?? null,
@@ -72,7 +72,10 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel }: { pet
         </Select>
         {(otherBreed || (!breeds.length && speciesKey)) && <Input id="pet-breed-other" label="Qual raça?" {...register("breedOther", { setValueAs: empty })} />}
         <Input id="pet-color" label="Cor / pelagem" {...register("color", { setValueAs: empty })} />
-        <Select id="pet-sex" label="Sexo" {...register("sex", { setValueAs: empty })}>
+        <Select id="pet-sex" label="Sexo *" required aria-required="true" error={errors.sex?.message} {...register("sex", { setValueAs: empty })}>
+          <option value="" disabled>
+            Selecione
+          </option>
           {SEX.map(([v, l]) => (
             <option key={v} value={v}>
               {l}

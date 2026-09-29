@@ -2,13 +2,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, HeartCrack, Undo2 } from "lucide-react";
+import { ArrowLeft, HeartCrack } from "lucide-react";
+import { DeceasedDialog } from "@/components/pets/deceased-dialog";
+import { useQueryClient } from "@tanstack/react-query";
 import { ageInMonths, formatAge, lifeStageFor, LIFE_STAGE_LABEL, type PetInput } from "@tinypet/shared";
-import { Badge, Button, Input, Modal, Spinner, Textarea } from "@/components/ui";
+import { Badge, Button, Spinner } from "@/components/ui";
 import { Avatar, ErrorBox, Tabs } from "@/components/painel/ui";
 import { useActivePartner } from "@/hooks/use-partner";
 import { useApiMutation, usePet } from "@/hooks/use-crm";
-import { fmtDate, todayISO } from "@/lib/format";
+import { fmtDate } from "@/lib/format";
 import { PetForm, SEX_LABEL } from "@/components/painel/clientes/PetForm";
 import { HistoryTab } from "@/components/painel/clientes/pet/HistoryTab";
 import { MeasurementsTab } from "@/components/painel/clientes/pet/MeasurementsTab";
@@ -35,12 +37,9 @@ export default function PetPage() {
   const { partnerId } = useActivePartner();
   const q = usePet(petId);
   const [deceasedOpen, setDeceasedOpen] = useState(false);
-  const [deceasedAt, setDeceasedAt] = useState(todayISO());
-  const [memorial, setMemorial] = useState("");
+  const qc = useQueryClient();
   const keys = [["pet", petId], ["client", clientId], ["clients"]];
   const update = useApiMutation<PetInput>({ path: () => `/pets/${petId}`, method: "PATCH", body: (v) => v, invalidate: keys, success: "Ficha salva" });
-  const markDeceased = useApiMutation<void>({ path: () => `/pets/${petId}/deceased`, body: () => ({ deceasedAt, memorialNote: memorial || null }), invalidate: keys, success: "Registro atualizado", onSuccess: () => setDeceasedOpen(false) });
-  const undoDeceased = useApiMutation<void>({ path: () => `/pets/${petId}/deceased`, method: "DELETE", invalidate: keys, success: "Registro desfeito" });
 
   if (q.isLoading)
     return (
@@ -72,13 +71,9 @@ export default function PetPage() {
             {[pet.species?.label, pet.breed?.name ?? pet.breedOther, pet.sex ? SEX_LABEL[pet.sex] : null, formatAge(months)].filter(Boolean).join(" · ")}
           </p>
         </div>
-        {tutorControlled ? null : pet.status === "DECEASED" ? (
-          <Button type="button" variant="secondary" loading={undoDeceased.isPending} onClick={() => undoDeceased.mutate()}>
-            <Undo2 className="h-4 w-4" aria-hidden /> Desfazer falecimento
-          </Button>
-        ) : (
+        {tutorControlled || pet.status === "DECEASED" ? null : (
           <Button type="button" variant="ghost" className="text-[var(--muted)]" onClick={() => setDeceasedOpen(true)}>
-            <HeartCrack className="h-4 w-4" aria-hidden /> Marcar como falecido
+            <HeartCrack className="h-4 w-4" aria-hidden /> Registrar falecimento
           </Button>
         )}
       </header>
@@ -120,27 +115,14 @@ export default function PetPage() {
       {tab === "comandos" && <SkillsTab petId={petId} />}
       {tab === "rotina" && <RoutineTab petId={petId} />}
 
-      <Modal open={deceasedOpen} onClose={() => setDeceasedOpen(false)} title={`Registrar falecimento de ${pet.name}`}>
-        <form
-          className="space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            markDeceased.mutate();
-          }}
-        >
-          <p className="text-sm text-[var(--muted)]">Agendamentos futuros serão cancelados e as rotinas pausadas. O tutor é avisado.</p>
-          <Input id="dc-date" type="date" label="Data" value={deceasedAt} onChange={(e) => setDeceasedAt(e.target.value)} required />
-          <Textarea id="dc-note" label="Nota em memória (opcional)" className="min-h-[60px]" value={memorial} onChange={(e) => setMemorial(e.target.value)} maxLength={1000} />
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setDeceasedOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="danger" loading={markDeceased.isPending}>
-              Confirmar
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      <DeceasedDialog
+        petId={petId}
+        petName={pet.name}
+        open={deceasedOpen}
+        onClose={() => setDeceasedOpen(false)}
+        partnerId={partnerId}
+        onDone={() => keys.forEach((k) => qc.invalidateQueries({ queryKey: k }))}
+      />
     </div>
   );
 }

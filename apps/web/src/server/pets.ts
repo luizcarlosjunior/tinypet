@@ -253,13 +253,6 @@ export async function markDeceased(petId: string, input: { deceasedAt: string; m
   return { canceledAppointments: future.length };
 }
 
-export async function undoDeceased(petId: string) {
-  await prisma.$transaction([
-    prisma.pet.update({ where: { id: petId }, data: { status: "ACTIVE", deceasedAt: null, memorialNote: null } }),
-    prisma.task.updateMany({ where: { petId, status: "PAUSED" }, data: { status: "ACTIVE" } }),
-  ]);
-}
-
 // ───────────────────────────── tasks & streaks ─────────────────────────────
 
 export type TaskRule = { freq?: "daily" | "weekly" | "monthly" | string; days?: number[]; times?: string[]; dayOfMonth?: number } | null;
