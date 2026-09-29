@@ -60,7 +60,7 @@ export function generateCalendarToken() {
 }
 
 export function calendarUrl(token: string) {
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001").replace(/\/$/, "");
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3033").replace(/\/$/, "");
   return `${base}/api/v1/schedule/ical/${token}`;
 }
 

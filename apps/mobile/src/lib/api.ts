@@ -6,7 +6,7 @@ function resolveBaseUrl(): string {
     // Release builds must talk to the API over TLS — never fall back to localhost/http (tokens would travel in clear).
     if (!env || !/^https:\/\/[^/\s]+/i.test(env)) throw new Error("EXPO_PUBLIC_API_URL must be set to an https:// URL in production builds");
   }
-  return (env || "http://localhost:3001").replace(/\/$/, "");
+  return (env || "http://localhost:3033").replace(/\/$/, "");
 }
 const BASE_URL = resolveBaseUrl();
 export const API_BASE = `${BASE_URL}/api/v1`;

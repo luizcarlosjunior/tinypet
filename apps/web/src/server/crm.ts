@@ -274,7 +274,7 @@ export async function updateClient(partnerId: string, id: string, body: ClientBo
 
 // ───────────────────────────── invites ─────────────────────────────
 
-const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3033";
 
 export async function createInvite(partnerId: string, clientId: string, input: { email?: string; phone?: string }) {
   await rateLimit(`invite:partner:${partnerId}`, 30, 60 * 60 * 1000); // 30 invites / hour / partner

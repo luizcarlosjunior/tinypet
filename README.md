@@ -8,7 +8,7 @@ Spec completa: `docs/tinyPet — Especificação do Produto (MVP).md`. Contrato 
 
 | Pasta | O que é |
 | --- | --- |
-| `apps/web` | Site público, área do tutor, painel do parceiro, admin e a API REST (`/api/v1`). Porta 3001. |
+| `apps/web` | Site público, área do tutor, painel do parceiro, admin e a API REST (`/api/v1`). Porta 3033. |
 | `apps/mobile` | App iOS/Android (Expo Router), consome a mesma API com JWT. |
 | `packages/db` | Prisma + MySQL: schema, seed. |
 | `packages/shared` | Schemas Zod (contrato), constantes, utilitários. |
@@ -20,7 +20,7 @@ cp .env.example .env            # ajuste se necessário
 docker compose up -d            # MySQL 8 em 127.0.0.1:3307 (root/tinypet)
 pnpm install
 pnpm db:push && pnpm db:seed    # cria tabelas e dados iniciais (o seed NÃO roda sozinho em `migrate reset`)
-pnpm dev:web                    # http://localhost:3001
+pnpm dev:web                    # http://localhost:3033
 pnpm dev:mobile                 # Expo (defina EXPO_PUBLIC_API_URL com o IP da máquina)
 ```
 
@@ -38,8 +38,8 @@ Seed: dados de referência (espécies, raças, categorias, planos, features, bad
 ## App mobile
 
 - O monorepo usa `node-linker=hoisted` (`.npmrc`), exigido pelo Metro/Expo com pnpm.
-- Em dispositivo físico, defina `EXPO_PUBLIC_API_URL` com o IP da máquina (ex.: `http://192.168.0.10:3001`). No emulador Android use `http://10.0.2.2:3001`.
-- Em desenvolvimento sem S3, as URLs de mídia usam `NEXT_PUBLIC_APP_URL`. Para ver imagens em aparelho/emulador, rode a web com `NEXT_PUBLIC_APP_URL` apontando para o mesmo IP (ex.: `http://192.168.0.10:3001`). Em produção as mídias vêm do S3.
+- Em dispositivo físico, defina `EXPO_PUBLIC_API_URL` com o IP da máquina (ex.: `http://192.168.0.10:3033`). No emulador Android use `http://10.0.2.2:3033`.
+- Em desenvolvimento sem S3, as URLs de mídia usam `NEXT_PUBLIC_APP_URL`. Para ver imagens em aparelho/emulador, rode a web com `NEXT_PUBLIC_APP_URL` apontando para o mesmo IP (ex.: `http://192.168.0.10:3033`). Em produção as mídias vêm do S3.
 - O app precisa de build de desenvolvimento (`npx expo run:ios` / `npx expo run:android` ou EAS) por causa do módulo nativo de vídeo; não roda no Expo Go.
 - iOS com Xcode 26: o plugin `plugins/with-fmt-xcode26.js` corrige a compilação do pod `fmt` do React Native 0.76.
 - Verificações: `pnpm --filter @tinypet/mobile typecheck` e `npx expo-doctor` em `apps/mobile`.

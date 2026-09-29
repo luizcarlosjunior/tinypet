@@ -17,7 +17,7 @@ export async function requireBlogEditor(req?: NextRequest): Promise<AuthUser> {
 }
 
 export function blogAppUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3001").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3033").replace(/\/$/, "");
 }
 
 /** Public URL prefix of blog media (S3 public base or local /uploads in dev) — the only allowed `<img>` source. */

@@ -3,7 +3,7 @@
 Spec: `docs/tinyPet — Especificação do Produto (MVP).md`. API contract: `docs/api-contract.md`.
 
 ## Layout
-- `apps/web` Next.js 14 App Router + Tailwind 3. UI **and** REST API (`app/api/v1/**`). Port 3001.
+- `apps/web` Next.js 14 App Router + Tailwind 3. UI **and** REST API (`app/api/v1/**`). Port 3033.
 - `apps/mobile` Expo SDK 52 + Expo Router 4, consumes the same API with JWT.
 - `packages/db` Prisma 6 + MySQL (`docker compose up -d`, port 3307). `pnpm db:push`, `pnpm db:seed`.
 - `packages/shared` Zod schemas (= API contract), constants, utils. Import as `@tinypet/shared`.

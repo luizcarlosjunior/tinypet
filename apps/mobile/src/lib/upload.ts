@@ -23,7 +23,7 @@ export type UploadedMedia = {
 type UploadTicket = { assetId: string; uploadUrl: string; method: "PUT"; headers?: Record<string, string>; url: string };
 
 /**
- * Dev only: the local upload sink URL is built from the server's APP_URL (e.g. http://localhost:3001), which a
+ * Dev only: the local upload sink URL is built from the server's APP_URL (e.g. http://localhost:3033), which a
  * device/emulator can't reach (Android emulator uses 10.0.2.2). Rebase a loopback `/api/v1/media/upload/…` URL onto
  * the API origin the app is actually using. Presigned S3 URLs are returned untouched.
  */
