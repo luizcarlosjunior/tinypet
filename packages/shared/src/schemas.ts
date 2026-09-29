@@ -55,7 +55,7 @@ export const CourseStatusEnum = z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]);
 export const MembershipRoleEnum = z.enum(["OWNER", "STAFF"]);
 export const SocialNetworkEnum = z.enum(["INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "WHATSAPP", "LINKEDIN"]);
 export const MediaPurposeEnum = z.enum([
-  "PARTNER_LOGO", "USER_AVATAR", "PET_AVATAR", "VENUE_PHOTO", "PET_GALLERY", "CATALOG", "COURSE", "ATTACHMENT", "RECEIPT",
+  "PARTNER_LOGO", "USER_AVATAR", "PET_AVATAR", "VENUE_PHOTO", "PET_GALLERY", "CATALOG", "COURSE", "ATTACHMENT", "RECEIPT", "VIDEO_COVER",
 ]);
 export const AccessLevelEnum = z.enum(["VIEW", "EDIT"]);
 export const VaccinationKindEnum = z.enum(["VACCINE", "DEWORMING"]);
@@ -480,7 +480,12 @@ export const uploadRequestSchema = z.object({
   height: z.number().int().min(1).max(20000).optional(),
   durationSeconds: z.number().min(0).max(86400).optional(),
 });
-export const uploadCompleteSchema = z.object({ assetId: id, crop: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).optional() });
+export const uploadCompleteSchema = z.object({
+  assetId: id,
+  crop: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).optional(),
+  /** For videos: a finalized VIDEO_COVER image asset (already cropped to the video aspect) used as the cover/poster. */
+  coverAssetId: id.optional(),
+});
 
 // ───────── admin ─────────
 export const ownerTermSchema = z.object({ label: z.string().min(2).max(120), isDefault: z.boolean().optional(), active: z.boolean().optional(), sortOrder: z.number().int().optional() });

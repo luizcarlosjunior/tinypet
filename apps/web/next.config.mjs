@@ -36,7 +36,10 @@ function csp() {
     "default-src 'self'",
     "img-src 'self' data: blob: https:",
     "media-src 'self' blob: https:",
-    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+    // 'wasm-unsafe-eval': client-side video transcoding (ffmpeg.wasm fallback, wasm AAC encoder).
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""}`,
+    // mediabunny / ffmpeg.wasm workers (blob: workers and /ffmpeg/worker.js).
+    "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     `connect-src ${connect.join(" ")}`,
     "font-src 'self' data:",
@@ -68,6 +71,8 @@ const nextConfig = {
     // Later entries override earlier ones for the same header key.
     return [
       { source: "/:path*", headers: securityHeaders },
+      // ffmpeg.wasm fallback core (~32 MB): cache it; the files only change when @ffmpeg/core is upgraded.
+      { source: "/ffmpeg/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }] },
       { source: "/convite/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
       { source: "/.well-known/apple-app-site-association", headers: [{ key: "Content-Type", value: "application/json" }] },
       {

@@ -58,6 +58,18 @@ Configuração do bucket:
 - **Leitura pública** das mídias pelo `S3_PUBLIC_URL` (de preferência CloudFront com o bucket privado via OAC).
 - PDFs e vídeos são gravados com `Content-Disposition: attachment`.
 
+**Vídeos** são sempre convertidos **no dispositivo** (web e app) antes do envio: MP4 H.264 + AAC, 1080p ou 720p (1920×1080, 1280×720, 1080×1920 ou 720×1280 — 16:9 ou 9:16), vídeo ≤ 1 Mbps e áudio ≤ 128 kbps (`VIDEO_OUTPUT` em `@tinypet/shared`). Com o limite de 10 MB isso dá ~70 s. Fluxo:
+1. Converter o vídeo no dispositivo e escolher a capa (um quadro do vídeo por padrão, ou uma imagem recortada em 16:9/9:16).
+2. Enviar a capa com `purpose: "VIDEO_COVER"` e `POST /media/complete { assetId, crop }` (WebP, lado maior 1280 px, sem EXIF).
+3. Enviar o vídeo (`POST /media/upload` com `mimeType: "video/mp4"`, `width`, `height`, `durationSeconds`) e fazer o PUT.
+4. `POST /media/complete { assetId, coverAssetId }` → o vídeo fica com `thumbUrl` = capa. Trocar depois: `POST /media/:assetId/cover { coverAssetId }`.
+
+A API recusa o que não seguir a regra: no passo 1 (MIME, dimensões declaradas, duração, 10 MB, limites do plano) e no `/media/complete`, lendo o MP4 com `mediabunny` (contêiner MP4, H.264/AAC, dimensões reais iguais às declaradas considerando rotação, bitrate médio medido pelas amostras com 10% de tolerância, duração real). Vídeo recusado é apagado do storage e marcado `REJECTED`; o erro vem em pt-BR com `details.reason` (ver `docs/api-contract.md`, seção Media).
+
+Limites de vídeo por plano (402 `PLAN_LIMIT`): gratuito 1 vídeo/dia e até 30 s; planos pagos 10 vídeos/dia e até 60 s (dia no fuso America/Sao_Paulo; envios pendentes há mais de 1 h não contam). `GET /api/v1/media/limits` informa os limites e o uso do dia.
+
+Fixtures de teste de vídeo: `apps/web/src/server/__fixtures__/generate.sh` (ffmpeg).
+
 ## Pagamentos
 
 Fase 3. Interface `PaymentProvider` em `apps/web/src/server/payments`, adapter Pagar.me v5 e webhook idempotente em `/api/v1/webhooks/pagarme`.

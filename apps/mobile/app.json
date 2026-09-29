@@ -11,31 +11,61 @@
     "ios": {
       "bundleIdentifier": "br.com.tinypet.app",
       "supportsTablet": false,
-      "associatedDomains": ["applinks:tinypet.com.br"],
+      "associatedDomains": [
+        "applinks:tinypet.com.br"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "Usamos a câmera para fotos e vídeos dos seus pets.",
         "NSPhotoLibraryUsageDescription": "Usamos sua galeria para enviar fotos e vídeos dos seus pets.",
         "NSLocationWhenInUseUsageDescription": "Usamos sua localização para encontrar parceiros perto de você.",
-        "LSApplicationQueriesSchemes": ["comgooglemaps", "waze", "maps"]
+        "LSApplicationQueriesSchemes": [
+          "comgooglemaps",
+          "waze",
+          "maps"
+        ],
+        "NSMicrophoneUsageDescription": "Usamos o microfone para gravar o áudio dos vídeos dos seus pets."
       }
     },
     "android": {
       "package": "br.com.tinypet.app",
-      "adaptiveIcon": { "backgroundColor": "#f95d16" },
-      "permissions": ["CAMERA", "READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+      "adaptiveIcon": {
+        "backgroundColor": "#f95d16"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "RECORD_AUDIO"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "tinypet.com.br", "pathPattern": "/convite/.*" },
-            { "scheme": "https", "host": "tinypet.com.br", "pathPattern": "/p/.*" }
+            {
+              "scheme": "https",
+              "host": "tinypet.com.br",
+              "pathPattern": "/convite/.*"
+            },
+            {
+              "scheme": "https",
+              "host": "tinypet.com.br",
+              "pathPattern": "/p/.*"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
-    "web": { "bundler": "metro", "output": "single" },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
@@ -43,16 +73,37 @@
         "expo-image-picker",
         {
           "photosPermission": "Usamos sua galeria para enviar fotos e vídeos dos seus pets.",
-          "cameraPermission": "Usamos a câmera para fotos e vídeos dos seus pets."
+          "cameraPermission": "Usamos a câmera para fotos e vídeos dos seus pets.",
+          "microphonePermission": "Usamos o microfone para gravar o áudio dos vídeos dos seus pets."
         }
       ],
       [
         "expo-location",
-        { "locationWhenInUsePermission": "Usamos sua localização para encontrar parceiros perto de você." }
+        {
+          "locationWhenInUsePermission": "Usamos sua localização para encontrar parceiros perto de você."
+        }
       ],
-      ["expo-notifications", { "color": "#f95d16" }]
+      [
+        "expo-notifications",
+        {
+          "color": "#f95d16"
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": false
+        }
+      ]
     ],
-    "experiments": { "typedRoutes": false },
-    "extra": { "router": { "origin": false } }
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      }
+    }
   }
 }

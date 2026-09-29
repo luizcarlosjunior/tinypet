@@ -1,0 +1,9 @@
+{
+  "platforms": ["ios", "android"],
+  "ios": {
+    "modules": ["VideoTranscoderModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.videotranscoder.VideoTranscoderModule"]
+  }
+}

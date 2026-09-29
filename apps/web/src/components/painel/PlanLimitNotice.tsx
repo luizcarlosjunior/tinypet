@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Crown } from "lucide-react";
 import { isPlanLimit, planLimitInfo } from "@/lib/errors";
 import { cn } from "@/lib/utils";
+import { videoPlanLimitMessage } from "@/lib/video/limits";
 
 export const FEATURE_LABEL: Record<string, string> = {
   courses: "Cursos",
@@ -22,6 +23,10 @@ export const FEATURE_LABEL: Record<string, string> = {
   owner_gallery: "Galeria",
   owner_stories: "Stories",
   owner_storage_mb: "Armazenamento (MB)",
+  videos_per_day: "Vídeos por dia",
+  video_max_seconds: "Duração máxima do vídeo (segundos)",
+  owner_videos_per_day: "Vídeos por dia",
+  owner_video_max_seconds: "Duração máxima do vídeo (segundos)",
 };
 
 /** Shows an upgrade notice when `error` is a 402 PLAN_LIMIT. Renders nothing otherwise. */
@@ -30,13 +35,16 @@ export function PlanLimitNotice({ error, className, compact }: { error?: unknown
   const info = planLimitInfo(error);
   const label = info.featureKey ? FEATURE_LABEL[info.featureKey] ?? info.featureKey : "este recurso";
   const isBool = info.limit === 0 || info.limit === null;
+  const videoMsg = videoPlanLimitMessage(info);
   return (
     <div role="alert" className={cn("flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100", className)}>
       <Crown className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
       <div className="flex-1">
         <p className="font-semibold">Limite do plano atingido</p>
         <p className="mt-0.5">
-          {isBool ? (
+          {videoMsg ? (
+            <>{videoMsg}</>
+          ) : isBool ? (
             <>
               <strong>{label}</strong> não está disponível no plano {info.planKey ?? "atual"}.
             </>

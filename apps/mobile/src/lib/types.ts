@@ -70,6 +70,8 @@ export type PetMedia = {
   kind: "IMAGE" | "VIDEO";
   url: string;
   thumbUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
   title?: string | null;
   description?: string | null;
   notes?: string | null;

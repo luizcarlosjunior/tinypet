@@ -10,7 +10,42 @@ Errors: 400 VALIDATION/BAD_REQUEST · 401 UNAUTHORIZED · 402 PLAN_LIMIT `{featu
 - `POST /auth/register` (registerSchema) → `{ token, user, memberships }` · `POST /auth/login` (loginSchema) → same
 - `GET /auth/me` → `{ user{ id,name,email,role,avatarUrl,ownerTerm,ownerTermId,emailVerified,plan,marketingConsent,statsConsent }, memberships[{ membershipId,partnerId,partnerName,slug,logoUrl,role,canSeeFinance,plan,published }] }` · `PATCH /auth/me` (updateProfileSchema) · `DELETE /auth/me` (LGPD)
 - `POST /auth/verify {channel:"EMAIL"|"PHONE", target?}` sends code · `PUT /auth/verify` (verifyCodeSchema) confirms
-- `POST /media/upload` (uploadRequestSchema) → `{ assetId, uploadUrl, method:"PUT", headers, url }` · `PUT /media/upload/:assetId` (local dev sink) · `POST /media/complete` (uploadCompleteSchema, optional crop) → `{ id,url,thumbUrl,kind,width,height,sizeBytes }`
+- `POST /media/upload` (uploadRequestSchema) → `{ assetId, uploadUrl, method:"PUT", headers, url }` · `PUT /media/upload/:assetId` (local dev sink) · `POST /media/complete` (uploadCompleteSchema, optional crop, optional coverAssetId) → `{ id,url,thumbUrl,kind,width,height,sizeBytes, durationSeconds? }` (videos only: real duration in seconds; `null` when the asset was already READY) · `POST /media/:assetId/cover { coverAssetId }` → `{ id,url,thumbUrl,kind,width,height,sizeBytes }` · `GET /media/limits` → `{ audience, planKey, videosPerDay, videosUsedToday, videoMaxSeconds, maxBytes }` — see **Media** below
+
+## Media
+Flow: `POST /media/upload` → `PUT` bytes to `uploadUrl` with exactly `headers` (S3 presigned; `Content-Length` is signed) → `POST /media/complete`. Max 10 MB (`MEDIA_MAX_BYTES`) for everything. Partner purposes (`PARTNER_LOGO`, `VENUE_PHOTO`, `CATALOG`, `COURSE`) need `X-Partner-Id`; any other purpose sent with `X-Partner-Id` also belongs to the partner.
+
+**Videos** (`PET_GALLERY`, `CATALOG`, `COURSE`) are always transcoded **on the device** (web and app) to `VIDEO_OUTPUT` before upload: MP4 · H.264 (`avc1`/`avc3`) · AAC · 1920×1080, 1280×720, 1080×1920 or 720×1280 (1080p when the source short side ≥ 1080, else 720p; 16:9 landscape / 9:16 portrait) · video ≤ 1 Mbps, audio ≤ 128 kbps. At ≤ 1.128 Mbps the 10 MB cap is ≈ 70 s.
+1. Transcode on the device; extract a frame (default) or let the user pick/crop an image for the cover.
+2. Upload the cover: `purpose:"VIDEO_COVER"` (image), then `POST /media/complete { assetId, crop }` — `crop` (or the whole image when omitted) must be 16:9 or 9:16 within 2%; stored as WebP, long side `VIDEO_COVER_MAX_PX` (1280), fit inside, EXIF stripped.
+3. Upload the video: `POST /media/upload { purpose, mimeType:"video/mp4", sizeBytes, fileName, width, height, durationSeconds }` → PUT.
+4. `POST /media/complete { assetId: <video>, coverAssetId }` → `thumbUrl` = cover `url`. Without `coverAssetId`, `thumbUrl` stays `null`. Change later with `POST /media/:assetId/cover { coverAssetId }` (video must be READY).
+
+Server checks — step 1 (`/media/upload`): `mimeType === "video/mp4"`, declared `width`/`height` one of the 4 frames, `durationSeconds > 0`, `sizeBytes ≤ 10 MB`, then plan limits. Step 2 (`/media/complete`): real size + magic bytes, then the MP4 is parsed (mediabunny): container MP4 (not QuickTime), exactly 1 video track H.264, ≤ 1 audio track AAC, no other tracks; display size (rotation matrix applied) equal to the declared `width`/`height`; measured average bitrate (sample sizes ÷ duration) video ≤ 1.1 Mbps and audio ≤ 140.8 kbps (`bitrateTolerance` 10%); whole file ≤ (1.1 + 0.1408) Mbps × duration + 64 KB; real duration ≤ plan max + 0.5 s. Any failure deletes the object, marks the asset `REJECTED` and returns an error (start over with a new `/media/upload`).
+Cover checks: `coverAssetId` must be a READY `VIDEO_COVER` image of the same owner (same user, or same partner) that the caller can access, with the video's aspect (landscape vs portrait, 2%).
+
+Errors — 400 `BAD_REQUEST` with `details.reason`:
+| reason | message (pt-BR) | when |
+|---|---|---|
+| `VIDEO_FORMAT` | Converta o vídeo para MP4 1080p ou 720p (16:9 ou 9:16) antes de enviar | mime ≠ video/mp4 (upload) or container not MP4 / magic bytes (complete) |
+| `VIDEO_FRAME` | (same as above) | declared or real frame not 1920×1080/1280×720/1080×1920/720×1280 |
+| `VIDEO_DURATION` | Informe a duração do vídeo (durationSeconds maior que zero) | missing/zero duration, or empty track |
+| `VIDEO_TOO_LARGE` | Vídeo acima de 10 MB após a conversão; envie um trecho mais curto (até ~70 s) | `sizeBytes` or real size > 10 MB |
+| `VIDEO_INVALID` | Vídeo inválido ou corrompido | unparseable MP4 |
+| `VIDEO_TRACKS` | O vídeo precisa ter exatamente uma faixa de vídeo e no máximo uma de áudio | |
+| `VIDEO_CODEC` | O vídeo precisa estar em H.264 (MP4). Converta o vídeo antes de enviar | e.g. HEVC |
+| `AUDIO_CODEC` | O áudio do vídeo precisa estar em AAC. Converta o vídeo antes de enviar | |
+| `VIDEO_DIMENSIONS_MISMATCH` | As dimensões do vídeo não correspondem às informadas no envio | real ≠ declared width/height |
+| `VIDEO_BITRATE` | Taxa de bits do vídeo acima de 1 Mbps. Converta o vídeo antes de enviar | video track or whole file over the cap |
+| `AUDIO_BITRATE` | Taxa de bits do áudio acima de 128 kbps. Converta o vídeo antes de enviar | |
+| `COVER_ASPECT` | A capa precisa ter a mesma proporção do vídeo (16:9 ou 9:16) | cover crop not 16:9/9:16, or cover aspect ≠ video aspect |
+| `COVER_PURPOSE` / `COVER_NOT_READY` | A capa precisa ser enviada com purpose VIDEO_COVER / Finalize o envio da capa antes de usá-la | |
+Cover of another owner → 403; unknown cover → 404; `/media/:id/cover` on a non-READY video → 409.
+
+**Video plan limits** — 402 `PLAN_LIMIT`, `details { featureKey, current, limit, planKey }`. Audience: partner asset (`X-Partner-Id`) → PARTNER plan (`videos_per_day`, `video_max_seconds`), else OWNER plan (`owner_videos_per_day`, `owner_video_max_seconds`). Free: 1 video/day, ≤ 30 s; paid plans: 10/day, ≤ 60 s.
+- Duration: declared `durationSeconds` > max at `/media/upload`, or real duration > max + 0.5 s at `/media/complete` (object deleted, asset REJECTED) → "Seu plano permite vídeos de até N segundos." (`current` = rounded seconds).
+- Per day: videos created since 00:00 America/Sao_Paulo with status READY/FLAGGED, or PENDING created < 1 h ago (abandoned uploads stop counting after 1 h; REJECTED never counts). When count ≥ limit at `/media/upload` → "Seu plano permite N vídeo(s) por dia. Tente novamente amanhã ou faça upgrade."
+- `GET /media/limits` (optional `X-Partner-Id`) returns the caller's `{ audience, planKey, videosPerDay, videosUsedToday, videoMaxSeconds, maxBytes }` (`null` = unlimited) so clients can check before transcoding (trim to `videoMaxSeconds`).
 - `GET /ref/species` (with breeds) · `GET /ref/categories` (with subcategories) · `GET /ref/brands` (with lines) · `POST /ref/brands {name,line?}` suggest · `GET /ref/owner-terms` · `GET /ref/partner-types` · `GET /ref/cep?cep=` · `GET /ref/cnpj?cnpj=`
 - `GET /notifications` · `PATCH /notifications` (mark all read) · `POST|DELETE /push-tokens {token,platform}`
 

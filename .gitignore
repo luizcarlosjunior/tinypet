@@ -13,3 +13,4 @@ apps/web/public/uploads
 coverage
 ios
 android
+apps/web/public/ffmpeg

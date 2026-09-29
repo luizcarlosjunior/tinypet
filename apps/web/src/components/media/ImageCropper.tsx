@@ -2,14 +2,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { Upload } from "lucide-react";
+import { clampOffset, coverScale, viewportCropRect, viewportSize } from "@/lib/video/geometry";
 
 export type CropRect = { x: number; y: number; width: number; height: number };
 
 /**
- * Canvas-based square cropper: pick a file, drag to pan, zoom with the slider.
- * Emits the crop rect in SOURCE-IMAGE pixels via `onConfirm(file, crop)`.
+ * Canvas-based cropper: pick a file, drag to pan, zoom with the slider, arrows to nudge.
+ * `aspect` = width / height of the crop (1 = square, 16/9, 9/16…); `size` is the viewport's long side.
+ * Emits the crop rect in SOURCE-IMAGE pixels (exactly `aspect`, rounded) via `onConfirm(file, crop)`.
  */
-export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, submitting, accept = "image/jpeg,image/png,image/webp", confirmLabel = "Salvar" }: { file: File | null; onFile: (f: File | null) => void; onConfirm: (file: File, crop: CropRect) => void; onCancel?: () => void; size?: number; submitting?: boolean; accept?: string; confirmLabel?: string }) {
+export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, aspect = 1, submitting, accept = "image/jpeg,image/png,image/webp", confirmLabel = "Salvar", hint }: { file: File | null; onFile: (f: File | null) => void; onConfirm: (file: File, crop: CropRect) => void; onCancel?: () => void; size?: number; aspect?: number; submitting?: boolean; accept?: string; confirmLabel?: string; hint?: string }) {
+  const view = viewportSize(size, aspect);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -32,21 +35,13 @@ export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, su
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // base scale: cover the square with the image
-  const baseScale = img ? Math.max(size / img.naturalWidth, size / img.naturalHeight) : 1;
+  // base scale: cover the viewport with the image
+  const baseScale = img ? coverScale(img.naturalWidth, img.naturalHeight, view.width, view.height) : 1;
   const scale = baseScale * zoom;
 
   const clamp = useCallback(
-    (o: { x: number; y: number }, z = zoom) => {
-      if (!img) return o;
-      const s = baseScale * z;
-      const w = img.naturalWidth * s;
-      const h = img.naturalHeight * s;
-      const maxX = Math.max(0, (w - size) / 2);
-      const maxY = Math.max(0, (h - size) / 2);
-      return { x: Math.min(maxX, Math.max(-maxX, o.x)), y: Math.min(maxY, Math.max(-maxY, o.y)) };
-    },
-    [img, baseScale, size, zoom],
+    (o: { x: number; y: number }, z = zoom) => (img ? clampOffset(o, img.naturalWidth, img.naturalHeight, view.width, view.height, baseScale * z) : o),
+    [img, baseScale, view.width, view.height, zoom],
   );
 
   useEffect(() => {
@@ -54,29 +49,20 @@ export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, su
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, size, size);
+    ctx.clearRect(0, 0, view.width, view.height);
     if (!img) return;
     const w = img.naturalWidth * scale;
     const h = img.naturalHeight * scale;
-    const x = (size - w) / 2 + offset.x;
-    const y = (size - h) / 2 + offset.y;
+    const x = (view.width - w) / 2 + offset.x;
+    const y = (view.height - h) / 2 + offset.y;
     ctx.drawImage(img, x, y, w, h);
-  }, [img, scale, offset, size]);
+  }, [img, scale, offset, view.width, view.height]);
 
   useEffect(() => setOffset((o) => clamp(o)), [zoom, clamp]);
 
   function crop(): CropRect | null {
     if (!img) return null;
-    const w = img.naturalWidth * scale;
-    const h = img.naturalHeight * scale;
-    const x0 = (size - w) / 2 + offset.x;
-    const y0 = (size - h) / 2 + offset.y;
-    const sx = Math.max(0, Math.round(-x0 / scale));
-    const sy = Math.max(0, Math.round(-y0 / scale));
-    const sw = Math.min(img.naturalWidth - sx, Math.round(size / scale));
-    const sh = Math.min(img.naturalHeight - sy, Math.round(size / scale));
-    const side = Math.min(sw, sh);
-    return { x: sx, y: sy, width: side, height: side };
+    return viewportCropRect({ imgW: img.naturalWidth, imgH: img.naturalHeight, viewW: view.width, viewH: view.height, scale, offset, aspect });
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -111,8 +97,8 @@ export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, su
           <div className="flex flex-col items-center gap-3">
             <canvas
               ref={canvasRef}
-              width={size}
-              height={size}
+              width={view.width}
+              height={view.height}
               tabIndex={0}
               role="img"
               aria-label="Área de recorte: arraste para posicionar, use as setas para ajustar"
@@ -127,7 +113,7 @@ export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, su
               <span>Zoom</span>
               <input type="range" min={1} max={4} step={0.01} value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="flex-1 accent-brand-500" aria-label="Zoom" />
             </label>
-            <p className="text-xs text-[var(--muted)]">Arraste a imagem para posicionar o recorte quadrado.</p>
+            <p className="text-xs text-[var(--muted)]">{hint ?? (aspect === 1 ? "Arraste a imagem para posicionar o recorte quadrado." : `Arraste a imagem para posicionar o recorte ${aspect > 1 ? "16:9 (horizontal)" : "9:16 (vertical)"}.`)}</p>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => onFile(null)}>

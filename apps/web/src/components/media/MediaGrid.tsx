@@ -1,11 +1,16 @@
 "use client";
-import { ArrowDown, ArrowUp, Star, Trash2, Video } from "lucide-react";
+import { useState } from "react";
+import { ArrowDown, ArrowUp, Film, ImagePlus, Star, Trash2, Video } from "lucide-react";
 import { UploadButton } from "./UploadButton";
+import { VideoUploader } from "./VideoUploader";
+import { VideoCoverEditor } from "./VideoCoverEditor";
+import { Button, Modal } from "@/components/ui";
 import type { MediaPurpose } from "@/lib/upload";
 import { cn } from "@/lib/utils";
 import { safeHref } from "@tinypet/shared";
 
-export type MediaItem = { kind: "IMAGE" | "VIDEO"; url: string; thumbUrl?: string | null; isCover?: boolean; sortOrder?: number; caption?: string | null };
+/** `assetId`/`width`/`height` are client-only (known for items uploaded in this session; used to change a video cover). */
+export type MediaItem = { kind: "IMAGE" | "VIDEO"; url: string; thumbUrl?: string | null; isCover?: boolean; sortOrder?: number; caption?: string | null; assetId?: string; width?: number | null; height?: number | null };
 
 /** Grid of up to `max` media items with cover selection and up/down ordering. */
 export function MediaGrid({ items, onChange, purpose, partnerId, max = 10, allowVideo = true, withCover = true, withCaption = false, error }: { items: MediaItem[]; onChange: (items: MediaItem[]) => void; purpose: MediaPurpose; partnerId?: string | null; max?: number; allowVideo?: boolean; withCover?: boolean; withCaption?: boolean; error?: (e: unknown) => void }) {
@@ -14,6 +19,9 @@ export function MediaGrid({ items, onChange, purpose, partnerId, max = 10, allow
     if (withCover && withOrder.length && !withOrder.some((m) => m.isCover)) withOrder[0]!.isCover = true;
     return withOrder;
   };
+  const [videoOpen, setVideoOpen] = useState(false);
+  const [coverFor, setCoverFor] = useState<number | null>(null);
+  const coverItem = coverFor != null ? items[coverFor] : undefined;
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir;
     if (j < 0 || j >= items.length) return;
@@ -49,6 +57,11 @@ export function MediaGrid({ items, onChange, purpose, partnerId, max = 10, allow
               <button type="button" className="btn-ghost h-7 w-7 p-0" aria-label="Mover para baixo" disabled={i === items.length - 1} onClick={() => move(i, 1)}>
                 <ArrowDown className="h-4 w-4" />
               </button>
+              {m.kind === "VIDEO" && m.assetId && (
+                <button type="button" className="btn-ghost h-7 w-7 p-0" aria-label="Trocar capa do vídeo" title="Trocar capa do vídeo" onClick={() => setCoverFor(i)}>
+                  <ImagePlus className="h-4 w-4" />
+                </button>
+              )}
               {withCover && (
                 <button type="button" className={cn("btn-ghost h-7 w-7 p-0", m.isCover && "text-brand-500")} aria-label="Definir como capa" aria-pressed={!!m.isCover} onClick={() => onChange(items.map((x, j) => ({ ...x, isCover: j === i })))}>
                   <Star className="h-4 w-4" />
@@ -62,12 +75,45 @@ export function MediaGrid({ items, onChange, purpose, partnerId, max = 10, allow
           </li>
         ))}
       </ul>
-      <div className="flex items-center gap-3">
-        <UploadButton purpose={purpose} partnerId={partnerId} multiple accept={allowVideo ? "image/*,video/mp4,video/quicktime" : "image/*"} disabled={items.length >= max} label="Adicionar mídia" onError={error} onUploaded={(m) => onChange(normalize([...items, { kind: m.kind, url: m.url, thumbUrl: m.thumbUrl }].slice(0, max)))} />
+      <div className="flex flex-wrap items-center gap-3">
+        <UploadButton purpose={purpose} partnerId={partnerId} multiple accept="image/*" disabled={items.length >= max} label={allowVideo ? "Adicionar fotos" : "Adicionar mídia"} onError={error} onUploaded={(m) => onChange(normalize([...items, { kind: m.kind, url: m.url, thumbUrl: m.thumbUrl, assetId: m.id, width: m.width, height: m.height }].slice(0, max)))} />
+        {allowVideo && (
+          <Button type="button" variant="secondary" disabled={items.length >= max} onClick={() => setVideoOpen(true)}>
+            <Film className="h-4 w-4" aria-hidden /> Adicionar vídeo
+          </Button>
+        )}
         <span className="text-xs text-[var(--muted)]">
-          {items.length}/{max} · até 10 MB cada{allowVideo ? "; vídeos 16:9 ou 9:16" : ""}
+          {items.length}/{max} · fotos até 10 MB{allowVideo ? "; vídeos convertidos para MP4 16:9 ou 9:16" : ""}
         </span>
       </div>
+      <Modal open={videoOpen} onClose={() => setVideoOpen(false)} title="Adicionar vídeo" className="sm:max-w-xl">
+        {videoOpen && (
+          <VideoUploader
+            purpose={purpose}
+            partnerId={partnerId}
+            onError={error}
+            onCancel={() => setVideoOpen(false)}
+            onUploaded={(m) => {
+              onChange(normalize([...items, { kind: "VIDEO" as const, url: m.url, thumbUrl: m.thumbUrl, assetId: m.id, width: m.width, height: m.height }].slice(0, max)));
+              setVideoOpen(false);
+            }}
+          />
+        )}
+      </Modal>
+      <Modal open={!!coverItem} onClose={() => setCoverFor(null)} title="Trocar capa do vídeo">
+        {coverItem?.assetId && (
+          <VideoCoverEditor
+            assetId={coverItem.assetId}
+            portrait={!!coverItem.width && !!coverItem.height && coverItem.height > coverItem.width}
+            partnerId={partnerId}
+            onCancel={() => setCoverFor(null)}
+            onSaved={(m) => {
+              onChange(items.map((x, j) => (j === coverFor ? { ...x, thumbUrl: m.thumbUrl ?? x.thumbUrl } : x)));
+              setCoverFor(null);
+            }}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

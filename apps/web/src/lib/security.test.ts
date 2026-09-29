@@ -68,13 +68,15 @@ describe("bytesMatchMime", () => {
     expect(bytesMatchMime(PNG, "image/jpeg")).toBe(false);
     expect(bytesMatchMime(JPEG, "image/png")).toBe(false);
     expect(bytesMatchMime(ftyp("heic", "mif1"), "video/mp4")).toBe(false);
+    expect(bytesMatchMime(ftyp("qt  ", "isom"), "video/mp4")).toBe(false);
     expect(bytesMatchMime(ftyp("isom", "mp41"), "image/heic")).toBe(false);
     expect(bytesMatchMime(PNG, "image/svg+xml")).toBe(false);
     expect(bytesMatchMime(new Uint8Array(), "image/png")).toBe(false);
   });
   it("extension only from the MIME allowlist", () => {
     expect(extensionForMime("image/jpeg")).toBe("jpg");
-    expect(extensionForMime("video/quicktime")).toBe("mov");
+    expect(extensionForMime("video/mp4")).toBe("mp4");
+    expect(extensionForMime("video/quicktime")).toBeNull(); // MOV is source-only; uploads are transcoded MP4
     expect(extensionForMime("text/html")).toBeNull();
     expect(extensionForMime("__proto__")).toBeNull();
   });

@@ -59,33 +59,37 @@ const FEATURES: { key: string; module: string; label: string; kind: "BOOLEAN" | 
   { key: "custom_badges", module: "engagement", label: "Badges próprias", kind: "BOOLEAN", audience: "PARTNER" },
   { key: "search_highlight", module: "catalog", label: "Destaque na busca", kind: "BOOLEAN", audience: "PARTNER" },
   { key: "advanced_reports", module: "reports", label: "Relatórios avançados", kind: "BOOLEAN", audience: "PARTNER" },
+  { key: "videos_per_day", module: "media", label: "Vídeos por dia", kind: "QUANTITY", audience: "PARTNER" },
+  { key: "video_max_seconds", module: "media", label: "Duração máxima do vídeo (s)", kind: "QUANTITY", audience: "PARTNER" },
   { key: "owner_pets", module: "pets", label: "Pets cadastrados", kind: "QUANTITY", audience: "OWNER" },
   { key: "owner_gallery", module: "pets", label: "Galeria de fotos e vídeos", kind: "BOOLEAN", audience: "OWNER" },
   { key: "owner_stories", module: "pets", label: "Stories", kind: "BOOLEAN", audience: "OWNER" },
   { key: "owner_storage_mb", module: "media", label: "Armazenamento de mídia (MB)", kind: "QUANTITY", audience: "OWNER" },
+  { key: "owner_videos_per_day", module: "media", label: "Vídeos por dia", kind: "QUANTITY", audience: "OWNER" },
+  { key: "owner_video_max_seconds", module: "media", label: "Duração máxima do vídeo (s)", kind: "QUANTITY", audience: "OWNER" },
 ];
 
 type Limit = [string, boolean, number | null];
 const PLANS: { key: string; name: string; audience: "OWNER" | "PARTNER"; priceMonthly: number | null; priceYearly: number | null; isDefault: boolean; sortOrder: number; limits: Limit[] }[] = [
   {
     key: "free", name: "Free", audience: "PARTNER", priceMonthly: 0, priceYearly: 0, isDefault: true, sortOrder: 0,
-    limits: [["courses", true, 1], ["lessons_per_course", true, 5], ["paid_courses", false, null], ["catalog_items", true, 10], ["crm_clients", true, 50], ["team_members", true, 1], ["online_booking", true, null], ["active_contracts", true, 5], ["storage_mb", true, 1024], ["whatsapp_reminders", false, null], ["custom_badges", false, null], ["search_highlight", false, null], ["advanced_reports", false, null]],
+    limits: [["courses", true, 1], ["lessons_per_course", true, 5], ["paid_courses", false, null], ["catalog_items", true, 10], ["crm_clients", true, 50], ["team_members", true, 1], ["online_booking", true, null], ["active_contracts", true, 5], ["storage_mb", true, 1024], ["whatsapp_reminders", false, null], ["custom_badges", false, null], ["search_highlight", false, null], ["advanced_reports", false, null], ["videos_per_day", true, 1], ["video_max_seconds", true, 30]],
   },
   {
     key: "pro", name: "Pro", audience: "PARTNER", priceMonthly: null, priceYearly: null, isDefault: false, sortOrder: 1,
-    limits: [["courses", true, 5], ["lessons_per_course", true, 30], ["paid_courses", true, null], ["catalog_items", true, 100], ["crm_clients", true, 1000], ["team_members", true, 5], ["online_booking", true, null], ["active_contracts", true, null], ["storage_mb", true, 20480], ["whatsapp_reminders", true, null], ["custom_badges", true, null], ["search_highlight", false, null], ["advanced_reports", true, null]],
+    limits: [["courses", true, 5], ["lessons_per_course", true, 30], ["paid_courses", true, null], ["catalog_items", true, 100], ["crm_clients", true, 1000], ["team_members", true, 5], ["online_booking", true, null], ["active_contracts", true, null], ["storage_mb", true, 20480], ["whatsapp_reminders", true, null], ["custom_badges", true, null], ["search_highlight", false, null], ["advanced_reports", true, null], ["videos_per_day", true, 10], ["video_max_seconds", true, 60]],
   },
   {
     key: "business", name: "Business", audience: "PARTNER", priceMonthly: null, priceYearly: null, isDefault: false, sortOrder: 2,
-    limits: [["courses", true, null], ["lessons_per_course", true, null], ["paid_courses", true, null], ["catalog_items", true, null], ["crm_clients", true, null], ["team_members", true, 20], ["online_booking", true, null], ["active_contracts", true, null], ["storage_mb", true, 102400], ["whatsapp_reminders", true, null], ["custom_badges", true, null], ["search_highlight", true, null], ["advanced_reports", true, null]],
+    limits: [["courses", true, null], ["lessons_per_course", true, null], ["paid_courses", true, null], ["catalog_items", true, null], ["crm_clients", true, null], ["team_members", true, 20], ["online_booking", true, null], ["active_contracts", true, null], ["storage_mb", true, 102400], ["whatsapp_reminders", true, null], ["custom_badges", true, null], ["search_highlight", true, null], ["advanced_reports", true, null], ["videos_per_day", true, 10], ["video_max_seconds", true, 60]],
   },
   {
     key: "owner_free", name: "Free", audience: "OWNER", priceMonthly: 0, priceYearly: 0, isDefault: true, sortOrder: 0,
-    limits: [["owner_pets", true, 5], ["owner_gallery", false, null], ["owner_stories", false, null], ["owner_storage_mb", true, 50]],
+    limits: [["owner_pets", true, 5], ["owner_gallery", false, null], ["owner_stories", false, null], ["owner_storage_mb", true, 50], ["owner_videos_per_day", true, 1], ["owner_video_max_seconds", true, 30]],
   },
   {
     key: "owner_plus", name: "Plus", audience: "OWNER", priceMonthly: null, priceYearly: null, isDefault: false, sortOrder: 1,
-    limits: [["owner_pets", true, 20], ["owner_gallery", true, null], ["owner_stories", true, null], ["owner_storage_mb", true, 10240]],
+    limits: [["owner_pets", true, 20], ["owner_gallery", true, null], ["owner_stories", true, null], ["owner_storage_mb", true, 10240], ["owner_videos_per_day", true, 10], ["owner_video_max_seconds", true, 60]],
   },
 ];
 

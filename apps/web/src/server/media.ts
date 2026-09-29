@@ -5,9 +5,11 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import sharp, { type Metadata, type OutputInfo } from "sharp";
 import { prisma, type MediaPurpose, type MediaAsset } from "@tinypet/db";
-import { IMAGE_MIME, VIDEO_MIME, MEDIA_MAX_BYTES, LOGO_MAX_PX, AVATAR_PX, GALLERY_MAX_PX, extensionForMime, bytesMatchMime } from "@tinypet/shared";
+import { IMAGE_MIME, VIDEO_MIME, MEDIA_MAX_BYTES, LOGO_MAX_PX, AVATAR_PX, GALLERY_MAX_PX, VIDEO_COVER_MAX_PX, extensionForMime, bytesMatchMime } from "@tinypet/shared";
 import { ApiError, Errors } from "./errors";
 import { getLimits } from "./plans";
+import { videoDurationViolation, videoOwnerOf } from "./video-limits";
+import { assertVideoUploadRequest, validateMp4, isVideoAspect, sameAspect, VideoRejectError, VIDEO_MESSAGES, type VideoRejectReason } from "./video-validate";
 
 /** Max decoded pixels accepted by sharp (≈ 6300×6300). Guards against decompression bombs. */
 export const MAX_INPUT_PIXELS = 40_000_000;
@@ -57,7 +59,24 @@ export const PURPOSE_RULES: Record<MediaPurpose, { kinds: ("IMAGE" | "VIDEO")[];
   COURSE: { kinds: ["IMAGE", "VIDEO"], maxPx: GALLERY_MAX_PX },
   ATTACHMENT: { kinds: ["IMAGE"], maxPx: GALLERY_MAX_PX },
   RECEIPT: { kinds: ["IMAGE"], maxPx: GALLERY_MAX_PX },
+  /** Poster of a video: cropped to 16:9 or 9:16, WebP, long side VIDEO_COVER_MAX_PX. */
+  VIDEO_COVER: { kinds: ["IMAGE"], maxPx: VIDEO_COVER_MAX_PX },
 };
+
+/** 400 with a pt-BR message and `details.reason` (machine-readable) for video/cover rule violations. */
+export function videoError(reason: VideoRejectReason, details: Record<string, unknown> = {}) {
+  return Errors.badRequest(VIDEO_MESSAGES[reason], { reason, ...details });
+}
+
+/** Step-1 checks for a video upload request (MP4 only, 1080p/720p 16:9 or 9:16 declared frame, duration, 10 MB). */
+export function assertVideoRequest(input: { mimeType: string; sizeBytes: number; width?: number; height?: number; durationSeconds?: number }) {
+  try {
+    assertVideoUploadRequest(input);
+  } catch (e) {
+    if (e instanceof VideoRejectError) throw videoError(e.reason, e.details);
+    throw e;
+  }
+}
 
 export function kindFor(mime: string): "IMAGE" | "VIDEO" | "DOCUMENT" | null {
   if ((IMAGE_MIME as readonly string[]).includes(mime)) return "IMAGE";
@@ -72,8 +91,23 @@ export function publicUrl(key: string) {
 }
 
 /** Creates a pending MediaAsset and returns where the client should upload. */
-export async function createUploadTarget(input: { purpose: MediaPurpose; mimeType: string; sizeBytes: number; fileName: string; userId?: string; partnerId?: string }) {
+export async function createUploadTarget(input: {
+  purpose: MediaPurpose;
+  mimeType: string;
+  sizeBytes: number;
+  fileName: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+  userId?: string;
+  partnerId?: string;
+}) {
   assertStorageConfigured();
+  // Any video/* must already be the client-transcoded MP4 (VIDEO_OUTPUT) — checked before the generic rules.
+  if (input.mimeType.startsWith("video/")) {
+    if (!PURPOSE_RULES[input.purpose].kinds.includes("VIDEO")) throw Errors.badRequest("Tipo de arquivo não permitido para este uso");
+    assertVideoRequest(input);
+  }
   const kind = kindFor(input.mimeType);
   if (!kind) throw Errors.badRequest("Formato não aceito");
   if (input.sizeBytes > MEDIA_MAX_BYTES) throw Errors.badRequest("Arquivo acima de 10 MB");
@@ -87,7 +121,20 @@ export async function createUploadTarget(input: { purpose: MediaPurpose; mimeTyp
   if (!Number.isInteger(input.sizeBytes) || input.sizeBytes < 1) throw Errors.badRequest("Tamanho inválido");
   const key = `${input.purpose.toLowerCase()}/${new Date().toISOString().slice(0, 7)}/${randomUUID()}.${ext}`;
   const asset = await prisma.mediaAsset.create({
-    data: { key, url: publicUrl(key), kind: kind === "DOCUMENT" ? "IMAGE" : kind, purpose: input.purpose, mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: "PENDING", userId: input.userId, partnerId: input.partnerId },
+    data: {
+      key,
+      url: publicUrl(key),
+      kind: kind === "DOCUMENT" ? "IMAGE" : kind,
+      purpose: input.purpose,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      status: "PENDING",
+      userId: input.userId,
+      partnerId: input.partnerId,
+      // Declared dimensions; for videos they must match the real file at /media/complete.
+      width: input.width,
+      height: input.height,
+    },
   });
 
   if (useS3 && s3) {
@@ -194,11 +241,17 @@ export async function canAccessAsset(asset: Pick<MediaAsset, "userId" | "partner
   return false;
 }
 
+export { getVideoLimits, assertVideoPlanAllowed, videoOwnerOf, type VideoLimits, type VideoOwner } from "./video-limits";
+
 /** Marks an asset REJECTED and removes its stored object. */
-async function rejectAsset(asset: Pick<MediaAsset, "id" | "key">, message: string): Promise<never> {
+async function rejectAsset(asset: Pick<MediaAsset, "id" | "key">, message: string | ApiError, details?: Record<string, unknown>): Promise<never> {
   await deleteBytes(asset.key);
   await prisma.mediaAsset.update({ where: { id: asset.id }, data: { status: "REJECTED", sizeBytes: 0 } }).catch(() => {});
-  throw Errors.badRequest(message);
+  throw typeof message === "string" ? Errors.badRequest(message, details) : message;
+}
+
+function rejectVideo(asset: Pick<MediaAsset, "id" | "key">, reason: VideoRejectReason, details: Record<string, unknown> = {}): Promise<never> {
+  return rejectAsset(asset, VIDEO_MESSAGES[reason], { reason, ...details });
 }
 
 /** Storage quota check using the real byte count (excludes the asset itself and rejected assets). */
@@ -227,28 +280,51 @@ export async function deleteBytes(key: string) {
 
 export type Crop = { x: number; y: number; width: number; height: number };
 
+/** A finalized asset; `durationSeconds` is set only for videos parsed in this call (MediaAsset has no duration column). */
+export type FinalizedAsset = MediaAsset & { durationSeconds?: number | null };
+
 /**
  * Processes an uploaded image: strips EXIF/GPS, optional crop, resizes per purpose, converts to WebP, makes a thumbnail.
- * Marks the asset READY. Videos are only validated (aspect 16:9 / 9:16 by metadata from client) and marked READY.
+ * Videos are parsed (MP4 container, H.264 + AAC, 1080p/720p 16:9 or 9:16 display frame equal to the declared one,
+ * measured bitrates within VIDEO_OUTPUT) and stored as-is. On any violation the object is deleted and the asset REJECTED.
+ * Marks the asset READY.
  */
-export async function finalizeAsset(assetId: string, crop?: Crop) {
+export async function finalizeAsset(assetId: string, crop?: Crop): Promise<FinalizedAsset> {
   const asset = await prisma.mediaAsset.findUnique({ where: { id: assetId } });
   if (!asset) throw Errors.notFound("Mídia não encontrada");
   if (asset.status === "READY") return asset;
   if (asset.status !== "PENDING") throw Errors.conflict("Esta mídia não pode mais ser finalizada");
   const rules = PURPOSE_RULES[asset.purpose];
+  const isVideo = asset.kind === "VIDEO";
 
   // Real size of what was actually stored (never trust the declared sizeBytes).
   const realSize = await statBytes(asset.key);
   if (realSize == null || realSize === 0) throw Errors.badRequest("Arquivo ainda não foi enviado");
-  if (realSize > MEDIA_MAX_BYTES) await rejectAsset(asset, "Arquivo acima de 10 MB");
+  if (realSize > MEDIA_MAX_BYTES) await (isVideo ? rejectVideo(asset, "VIDEO_TOO_LARGE", { sizeBytes: realSize }) : rejectAsset(asset, "Arquivo acima de 10 MB"));
   await assertQuota(asset, realSize);
 
   const input = await readBytes(asset.key, MEDIA_MAX_BYTES);
   // Magic bytes of the stored object must match the declared (allowlisted) MIME type — for every kind.
-  if (!bytesMatchMime(input.subarray(0, 4096), asset.mimeType)) await rejectAsset(asset, "O conteúdo do arquivo não corresponde ao formato informado");
+  if (!bytesMatchMime(input.subarray(0, 4096), asset.mimeType)) {
+    await (isVideo ? rejectVideo(asset, "VIDEO_FORMAT") : rejectAsset(asset, "O conteúdo do arquivo não corresponde ao formato informado"));
+  }
 
-  if (asset.kind === "VIDEO" || asset.mimeType === "application/pdf") {
+  if (isVideo) {
+    let info;
+    try {
+      info = await validateMp4(input, { width: asset.width, height: asset.height });
+    } catch (e) {
+      if (e instanceof VideoRejectError) return rejectVideo(asset, e.reason, e.details);
+      return rejectVideo(asset, "VIDEO_INVALID");
+    }
+    // Plan limit on the REAL duration (declared one was checked at /media/upload).
+    const owner = videoOwnerOf(asset);
+    const overLimit = owner ? await videoDurationViolation(owner, info.durationSeconds) : null;
+    if (overLimit) return rejectAsset(asset, overLimit);
+    const done = await prisma.mediaAsset.update({ where: { id: assetId }, data: { status: "READY", sizeBytes: realSize, width: info.width, height: info.height } });
+    return { ...done, durationSeconds: info.durationSeconds };
+  }
+  if (asset.mimeType === "application/pdf") {
     return prisma.mediaAsset.update({ where: { id: assetId }, data: { status: "READY", sizeBytes: realSize } });
   }
 
@@ -263,21 +339,30 @@ export async function finalizeAsset(assetId: string, crop?: Crop) {
     await rejectAsset(asset, "Imagem com dimensões inválidas ou grande demais");
   }
 
+  // Dimensions after EXIF rotation (orientation 5–8 swaps width/height)
+  const swap = (meta.orientation ?? 1) >= 5;
+  const W = swap ? meta.height! : meta.width!;
+  const H = swap ? meta.width! : meta.height!;
+  let region: { left: number; top: number; width: number; height: number } | null = null;
+  if (crop) {
+    const left = Math.max(0, Math.round(crop.x));
+    const top = Math.max(0, Math.round(crop.y));
+    const width = Math.min(W - left, Math.round(crop.width));
+    const height = Math.min(H - top, Math.round(crop.height));
+    if (width > 0 && height > 0) region = { left, top, width, height };
+  }
+  // Video cover: the (cropped) image must already have the video aspect, 16:9 or 9:16 (2% tolerance).
+  if (asset.purpose === "VIDEO_COVER") {
+    const w = region?.width ?? W;
+    const h = region?.height ?? H;
+    if (!isVideoAspect(w, h)) await rejectVideo(asset, "COVER_ASPECT", { width: w, height: h });
+  }
+
   let webp: { data: Buffer; info: OutputInfo };
   let thumb: Buffer | null = null;
   try {
     let img = sharp(input, sharpOpts).rotate(); // rotate() applies EXIF orientation; output drops EXIF (incl. GPS)
-    // Dimensions after EXIF rotation (orientation 5–8 swaps width/height)
-    const swap = (meta.orientation ?? 1) >= 5;
-    const W = swap ? meta.height! : meta.width!;
-    const H = swap ? meta.width! : meta.height!;
-    if (crop) {
-      const left = Math.max(0, Math.round(crop.x));
-      const top = Math.max(0, Math.round(crop.y));
-      const width = Math.min(W - left, Math.round(crop.width));
-      const height = Math.min(H - top, Math.round(crop.height));
-      if (width > 0 && height > 0) img = sharp(await img.png({ compressionLevel: 1 }).toBuffer(), sharpOpts).extract({ left, top, width, height });
-    }
+    if (region) img = sharp(await img.png({ compressionLevel: 1 }).toBuffer(), sharpOpts).extract(region);
     const maxPx = rules.maxPx ?? GALLERY_MAX_PX;
     if (rules.square) img = img.resize(maxPx, maxPx, { fit: "cover", position: "centre", withoutEnlargement: true });
     else img = img.resize(maxPx, maxPx, { fit: "inside", withoutEnlargement: true });
@@ -302,4 +387,35 @@ export async function finalizeAsset(assetId: string, crop?: Crop) {
 export async function storageUsed(where: { userId?: string; partnerId?: string }) {
   const agg = await prisma.mediaAsset.aggregate({ where: { ...where, status: { not: "REJECTED" } }, _sum: { sizeBytes: true } });
   return agg._sum.sizeBytes ?? 0;
+}
+
+/**
+ * Validates that `coverAssetId` can be the cover of `video`: a READY VIDEO_COVER image the user can access, owned by the
+ * same user/partner as the video, with the video's aspect (16:9 vs 9:16, 2% tolerance). Returns the cover asset.
+ * `video` dimensions may be the declared ones (before finalize) — they must equal the real ones anyway.
+ */
+export async function resolveVideoCover(video: Pick<MediaAsset, "kind" | "userId" | "partnerId" | "width" | "height">, coverAssetId: string, userId: string) {
+  if (video.kind !== "VIDEO") throw Errors.badRequest("Capa só pode ser definida para vídeos");
+  const cover = await prisma.mediaAsset.findUnique({ where: { id: coverAssetId } });
+  if (!cover) throw Errors.notFound("Capa não encontrada");
+  if (!(await canAccessAsset(cover, userId))) throw Errors.forbidden();
+  if (cover.purpose !== "VIDEO_COVER" || cover.kind !== "IMAGE") throw Errors.badRequest("A capa precisa ser enviada com purpose VIDEO_COVER", { reason: "COVER_PURPOSE" });
+  if (cover.status !== "READY") throw Errors.badRequest("Finalize o envio da capa antes de usá-la", { reason: "COVER_NOT_READY" });
+  const sameOwner = video.partnerId ? cover.partnerId === video.partnerId : !!video.userId && cover.userId === video.userId && !cover.partnerId;
+  if (!sameOwner) throw Errors.forbidden("A capa precisa pertencer ao mesmo dono do vídeo");
+  if (!cover.width || !cover.height || !video.width || !video.height || !sameAspect(cover as { width: number; height: number }, video as { width: number; height: number })) {
+    throw videoError("COVER_ASPECT", { coverWidth: cover.width, coverHeight: cover.height, videoWidth: video.width, videoHeight: video.height });
+  }
+  return cover;
+}
+
+/** Sets a READY video's poster (`thumbUrl`) to a validated cover. Returns `{ id, thumbUrl }`. */
+export async function setVideoCover(videoId: string, coverAssetId: string, userId: string) {
+  const video = await prisma.mediaAsset.findUnique({ where: { id: videoId } });
+  if (!video) throw Errors.notFound("Mídia não encontrada");
+  if (!(await canAccessAsset(video, userId))) throw Errors.forbidden();
+  if (video.status !== "READY") throw Errors.conflict("Finalize o envio do vídeo antes de definir a capa");
+  const cover = await resolveVideoCover(video, coverAssetId, userId);
+  const done = await prisma.mediaAsset.update({ where: { id: video.id }, data: { thumbUrl: cover.url } });
+  return { id: done.id, url: done.url, thumbUrl: done.thumbUrl, kind: done.kind, width: done.width, height: done.height, sizeBytes: done.sizeBytes };
 }

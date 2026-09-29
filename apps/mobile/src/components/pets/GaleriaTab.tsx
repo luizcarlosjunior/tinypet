@@ -10,6 +10,8 @@ import { radius, spacing, useTheme } from "@/lib/theme";
 import type { PetMedia } from "@/lib/types";
 import { Button, Empty, ErrorState, Input, Loading, Select, Sheet, Text } from "@/components/ui";
 import { isPlanLimit, PlanLimitNotice } from "@/components/PlanLimitNotice";
+import { VideoUploadSheet } from "@/components/media/VideoUploadSheet";
+import { VideoPreview } from "@/components/media/VideoPreview";
 
 const GAP = 3;
 const COLS = 3;
@@ -23,7 +25,8 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
   const [busy, setBusy] = useState(false);
   const [limitErr, setLimitErr] = useState<ApiError | null>(null);
   const [selected, setSelected] = useState<PetMedia | null>(null);
-  const [composer, setComposer] = useState<{ url: string; thumbUrl?: string | null; kind: "IMAGE" | "VIDEO"; sizeBytes: number } | null>(null);
+  const [composer, setComposer] = useState<{ url: string; thumbUrl?: string | null; kind: "IMAGE" | "VIDEO"; sizeBytes: number; localCover?: string } | null>(null);
+  const [videoSheet, setVideoSheet] = useState<{ story: boolean } | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<PetMedia["visibility"]>("PRIVATE");
@@ -32,10 +35,17 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
   const width = Dimensions.get("window").width - spacing.lg * 2;
   const cell = (width - GAP * (COLS - 1)) / COLS;
 
+  const choose = (story: boolean) =>
+    Alert.alert(story ? "Novo story" : "Adicionar à galeria", undefined, [
+      { text: "Foto", onPress: () => add(story) },
+      { text: "Vídeo", onPress: () => setVideoSheet({ story }) },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+
   const add = async (story: boolean) => {
     setBusy(true);
     try {
-      const up = await pickAndUpload("PET_GALLERY", { allowVideo: true });
+      const up = await pickAndUpload("PET_GALLERY");
       if (!up) return;
       setComposer({ url: up.url, thumbUrl: up.thumbUrl, kind: up.kind, sizeBytes: up.sizeBytes });
       setIsStory(story);
@@ -50,8 +60,9 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
   };
   const publish = async () => {
     if (!composer) return;
+    const { localCover: _localCover, ...media } = composer;
     try {
-      await create.mutateAsync({ ...composer, title: title || null, description: description || null, takenAt: new Date().toISOString(), isStory, visibility });
+      await create.mutateAsync({ ...media, title: title || null, description: description || null, takenAt: new Date().toISOString(), isStory, visibility });
       setComposer(null);
     } catch (e) {
       if (isPlanLimit(e)) {
@@ -74,7 +85,7 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
       {limitErr ? <PlanLimitNotice error={limitErr} /> : null}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, paddingVertical: spacing.sm }}>
         {canEdit ? (
-          <Pressable onPress={() => add(true)} accessibilityRole="button" accessibilityLabel="Adicionar story" disabled={busy} style={{ alignItems: "center" }}>
+          <Pressable onPress={() => choose(true)} accessibilityRole="button" accessibilityLabel="Adicionar story" disabled={busy} style={{ alignItems: "center" }}>
             <View style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderStyle: "dashed", borderColor: t.primary, alignItems: "center", justifyContent: "center" }}>
               <Ionicons name="add" size={26} color={t.primary} />
             </View>
@@ -100,10 +111,10 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
         ) : null}
       </ScrollView>
 
-      {canEdit ? <Button title="Adicionar foto ou vídeo" icon="images-outline" onPress={() => add(false)} loading={busy} style={{ marginVertical: spacing.sm }} /> : null}
+      {canEdit ? <Button title="Adicionar foto ou vídeo" icon="images-outline" onPress={() => choose(false)} loading={busy} style={{ marginVertical: spacing.sm }} /> : null}
 
       {items.length === 0 ? (
-        <Empty icon="images-outline" title="Galeria vazia" description="Fotos e vídeos até 10 MB; vídeos em 16:9 ou 9:16." />
+        <Empty icon="images-outline" title="Galeria vazia" description="Fotos até 10 MB. Vídeos são convertidos no aparelho (MP4 720p/1080p, 16:9 ou 9:16)." />
       ) : (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
           {items.map((m) => (
@@ -118,7 +129,11 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
       <Sheet visible={!!selected} onClose={() => setSelected(null)} title={selected?.title ?? (selected?.isStory ? "Story" : "Foto")}>
         {selected ? (
           <View>
-            <Image source={{ uri: selected.url }} style={{ width: "100%", aspectRatio: 1, borderRadius: radius.md, backgroundColor: t.surfaceAlt }} contentFit="contain" />
+            {selected.kind === "VIDEO" ? (
+              <VideoPreview uri={selected.url} aspect={selected.width && selected.height ? selected.width / selected.height : 16 / 9} />
+            ) : (
+              <Image source={{ uri: selected.url }} style={{ width: "100%", aspectRatio: 1, borderRadius: radius.md, backgroundColor: t.surfaceAlt }} contentFit="contain" />
+            )}
             <Text variant="small" tone="muted" style={{ marginTop: spacing.sm }}>
               {fmtDate(selected.takenAt, "dd/MM/yyyy HH:mm")} · {visibilityLabel(selected.visibility)}
             </Text>
@@ -147,12 +162,28 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
       </Sheet>
 
       <Sheet visible={!!composer} onClose={() => setComposer(null)} title={isStory ? "Novo story" : "Nova publicação"}>
-        {composer ? <Image source={{ uri: composer.thumbUrl ?? composer.url }} style={{ width: "100%", height: 180, borderRadius: radius.md, marginBottom: spacing.md }} contentFit="cover" /> : null}
+        {composer ? <Image source={{ uri: composer.thumbUrl ?? composer.localCover ?? composer.url }} style={{ width: "100%", height: 180, borderRadius: radius.md, marginBottom: spacing.md }} contentFit="cover" /> : null}
         {!isStory ? <Input label="Título" value={title} onChangeText={setTitle} /> : null}
         <Input label="Descrição" multiline value={description} onChangeText={setDescription} />
         <Select label="Visibilidade" value={visibility} onChange={(v) => setVisibility((v ?? "PRIVATE") as PetMedia["visibility"])} options={[{ value: "PRIVATE", label: "Privado" }, { value: "FAMILY", label: "Família" }, { value: "PARTNERS", label: "Parceiros vinculados" }]} />
         <Button title="Publicar" onPress={publish} loading={create.isPending} />
       </Sheet>
+
+      <VideoUploadSheet
+        visible={!!videoSheet}
+        onClose={() => setVideoSheet(null)}
+        purpose="PET_GALLERY"
+        partnerId={null}
+        title={videoSheet?.story ? "Story em vídeo" : "Enviar vídeo"}
+        onUploaded={(up, { coverUri }) => {
+          const story = !!videoSheet?.story;
+          setVideoSheet(null);
+          setComposer({ url: up.url, thumbUrl: up.thumbUrl, kind: up.kind, sizeBytes: up.sizeBytes, localCover: coverUri });
+          setIsStory(story);
+          setTitle("");
+          setDescription("");
+        }}
+      />
     </View>
   );
 }

@@ -153,8 +153,7 @@ export const MIME_EXTENSIONS = {
   "image/webp": "webp",
   "image/heic": "heic",
   "image/heif": "heif",
-  "video/mp4": "mp4",
-  "video/quicktime": "mov",
+  "video/mp4": "mp4", // the only accepted video: client-transcoded MP4 (VIDEO_OUTPUT); MOV/WebM/etc. are source-only
   "application/pdf": "pdf",
 } as const;
 export type AllowedMime = keyof typeof MIME_EXTENSIONS;
@@ -209,7 +208,7 @@ export function bytesMatchMime(bytes: Uint8Array, mime: string): boolean {
     }
     case "video/mp4": {
       const br = ftypBrands(b);
-      return !!br && !HEIF_BRANDS.includes(br[0]!) && br.some((x) => MP4_BRANDS.includes(x));
+      return !!br && !HEIF_BRANDS.includes(br[0]!) && !MOV_BRANDS.includes(br[0]!) && br.some((x) => MP4_BRANDS.includes(x));
     }
     case "video/quicktime": {
       const br = ftypBrands(b);

@@ -2,13 +2,14 @@
 import { useRef, useState } from "react";
 import { Image as ImageIcon, Lock, Plus, Trash2, Video } from "lucide-react";
 import { usePetMutation, usePetResource } from "@/hooks/use-pets";
-import { uploadFile } from "@/lib/upload";
+import { isVideoFile, uploadFile, type UploadedMedia } from "@/lib/upload";
+import { VideoUploader } from "@/components/media/VideoUploader";
 import { errorMessage, planLimitOf } from "@/lib/errors";
 import { fmtDate, fmtDateTime, toDateKey } from "@/lib/format";
 import { Button, Empty, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { PlanLimitNotice } from "./plan-limit-notice";
-import { MEDIA_MAX_BYTES, safeHref } from "@tinypet/shared";
+import { MEDIA_MAX_BYTES, VIDEO_SOURCE_MIME, safeHref } from "@tinypet/shared";
 import type { PlanLimitError } from "@tinypet/shared";
 import { cn } from "@/lib/utils";
 
@@ -44,29 +45,43 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
     );
   }
 
+  function resetForm() {
+    setOpen(false);
+    setFile(null);
+    setForm({ title: "", description: "", notes: "", takenAt: toDateKey(), isStory: false, visibility: "PRIVATE" });
+  }
+
+  async function createItem(up: Pick<UploadedMedia, "kind" | "url" | "thumbUrl" | "sizeBytes">) {
+    await create.mutateAsync({
+      body: { kind: up.kind, url: up.url, thumbUrl: up.thumbUrl, title: form.title || null, description: form.description || null, notes: form.notes || null, takenAt: new Date(`${form.takenAt}T12:00:00`).toISOString(), isStory: form.isStory, visibility: form.visibility, sizeBytes: up.sizeBytes },
+    });
+    toast(form.isStory ? "Story publicado por 24 h." : "Adicionado à galeria!", "success");
+    resetForm();
+  }
+
+  function handleCreateError(e: unknown) {
+    const pl = planLimitOf(e);
+    if (pl) {
+      setLimit(pl);
+      setOpen(false);
+    } else toast(errorMessage(e), "error");
+  }
+
   async function submit() {
     if (!file) return;
     setBusy(true);
     try {
       const up = await uploadFile(file, "PET_GALLERY", { onProgress: setProgress });
-      await create.mutateAsync({
-        body: { kind: up.kind, url: up.url, thumbUrl: up.thumbUrl, title: form.title || null, description: form.description || null, notes: form.notes || null, takenAt: new Date(`${form.takenAt}T12:00:00`).toISOString(), isStory: form.isStory, visibility: form.visibility, sizeBytes: up.sizeBytes },
-      });
-      toast(form.isStory ? "Story publicado por 24 h." : "Adicionado à galeria!", "success");
-      setOpen(false);
-      setFile(null);
-      setForm({ title: "", description: "", notes: "", takenAt: toDateKey(), isStory: false, visibility: "PRIVATE" });
+      await createItem(up);
     } catch (e) {
-      const pl = planLimitOf(e);
-      if (pl) {
-        setLimit(pl);
-        setOpen(false);
-      } else toast(errorMessage(e), "error");
+      handleCreateError(e);
     } finally {
       setBusy(false);
       setProgress(0);
     }
   }
+
+  const isVideo = !!file && isVideoFile(file);
 
   const items = feed.data ?? [];
   const activeStories = (stories.data ?? []).filter((s) => !s.expiresAt || new Date(s.expiresAt).getTime() > Date.now());
@@ -91,7 +106,7 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
             {activeStories.map((s) => (
               <li key={s.id} className="shrink-0">
                 <a href={safeHref(s.url)} target="_blank" rel="noopener noreferrer" className="block h-20 w-20 overflow-hidden rounded-full border-2 border-brand-500 p-0.5">
-                  {s.kind === "VIDEO" ? <video src={safeHref(s.url)} muted className="h-full w-full rounded-full object-cover" /> : /* eslint-disable-next-line @next/next/no-img-element */ <img src={safeHref(s.thumbUrl ?? s.url)} alt={s.title ?? "Story"} className="h-full w-full rounded-full object-cover" />}
+                  {s.kind === "VIDEO" ? <video src={safeHref(s.url)} poster={s.thumbUrl ? safeHref(s.thumbUrl) : undefined} muted preload="metadata" className="h-full w-full rounded-full object-cover" /> : /* eslint-disable-line @next/next/no-img-element */ <img src={safeHref(s.thumbUrl ?? s.url)} alt={s.title ?? "Story"} className="h-full w-full rounded-full object-cover" />}
                 </a>
               </li>
             ))}
@@ -109,7 +124,7 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
             {items.map((m) => (
               <li key={m.id} className="card overflow-hidden p-0">
                 <a href={safeHref(m.url)} target="_blank" rel="noopener noreferrer" className="relative block aspect-square bg-ink-100 dark:bg-ink-800">
-                  {m.kind === "VIDEO" ? <video src={safeHref(m.url)} muted className="h-full w-full object-cover" /> : /* eslint-disable-next-line @next/next/no-img-element */ <img src={safeHref(m.thumbUrl ?? m.url)} alt={m.title ?? ""} loading="lazy" className="h-full w-full object-cover" />}
+                  {m.kind === "VIDEO" ? <video src={safeHref(m.url)} poster={m.thumbUrl ? safeHref(m.thumbUrl) : undefined} muted preload="metadata" className="h-full w-full object-cover" /> : /* eslint-disable-line @next/next/no-img-element */ <img src={safeHref(m.thumbUrl ?? m.url)} alt={m.title ?? ""} loading="lazy" className="h-full w-full object-cover" />}
                   <span className="absolute left-2 top-2 rounded-full bg-black/50 p-1 text-white">{m.kind === "VIDEO" ? <Video className="h-3.5 w-3.5" aria-label="Vídeo" /> : <ImageIcon className="h-3.5 w-3.5" aria-label="Foto" />}</span>
                 </a>
                 <div className="p-3">
@@ -131,15 +146,25 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
           <input
             ref={inputRef}
             type="file"
-            accept="image/*,video/mp4,video/quicktime"
+            accept={`image/*,${VIDEO_SOURCE_MIME.join(",")},.mov,.mkv,.3gp`}
             className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0];
+              e.target.value = "";
               if (!f) return;
-              if (f.size > MEDIA_MAX_BYTES) return toast("Arquivo deve ter até 10 MB.", "error");
+              // Videos are converted in the browser (any size in; ≤ 10 MB out). Photos: 10 MB.
+              if (!isVideoFile(f) && f.size > MEDIA_MAX_BYTES) return toast("Arquivo deve ter até 10 MB.", "error");
               setFile(f);
             }}
           />
+          {isVideo ? (
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="truncate">{file.name}</span>
+              <button type="button" className="text-xs underline" onClick={() => setFile(null)}>
+                Trocar arquivo
+              </button>
+            </div>
+          ) : (
           <button type="button" onClick={() => inputRef.current?.click()} className={cn("flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-sm", file ? "border-brand-400" : "")}>
             {file ? (
               <span className="truncate">{file.name}</span>
@@ -147,10 +172,11 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
               <>
                 <ImageIcon className="h-6 w-6 text-[var(--muted)]" aria-hidden />
                 <span className="mt-1">Escolher foto ou vídeo</span>
-                <span className="text-xs text-[var(--muted)]">Fotos até 10 MB · vídeos 16:9 ou 9:16 até 10 MB</span>
+                <span className="text-xs text-[var(--muted)]">Fotos até 10 MB · vídeos são convertidos para MP4 16:9 ou 9:16</span>
               </>
             )}
           </button>
+          )}
           <Input id="g-title" label="Título" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={120} />
           <Textarea id="g-desc" label="Descrição" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <div className="grid gap-3 sm:grid-cols-2">
@@ -167,11 +193,29 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.isStory} onChange={(e) => setForm({ ...form, isStory: e.target.checked })} className="h-4 w-4 accent-brand-500" /> Publicar como story (some em 24 h)
           </label>
+          {isVideo && (
+            <VideoUploader
+              key={`${file.name}-${file.size}-${file.lastModified}`}
+              purpose="PET_GALLERY"
+              partnerId={null}
+              initialFile={file}
+              submitLabel={form.isStory ? "Publicar story" : "Enviar"}
+              onCancel={() => setFile(null)}
+              onUploaded={async (m) => {
+                try {
+                  await createItem(m);
+                } catch (e) {
+                  handleCreateError(e);
+                }
+              }}
+            />
+          )}
           {busy && (
             <div className="h-2 w-full overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full bg-brand-500 transition-all" style={{ width: `${progress}%` }} />
             </div>
           )}
+          {!isVideo && (
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={busy}>
               Cancelar
@@ -180,6 +224,7 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
               Enviar
             </Button>
           </div>
+          )}
         </div>
       </Modal>
       {items.length > 0 && <p className="text-xs text-[var(--muted)]">Último envio: {fmtDateTime(items[0]!.takenAt)}</p>}

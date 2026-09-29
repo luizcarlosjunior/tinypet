@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { Checkbox } from "@/components/painel/ui";
 import { PlanLimitNotice } from "@/components/painel/PlanLimitNotice";
 import { UploadButton } from "@/components/media/UploadButton";
+import { VideoUploader } from "@/components/media/VideoUploader";
 import { useSaveLesson } from "@/hooks/use-courses";
 import { errorMessage, isPlanLimit } from "@/lib/errors";
 import { WEEKDAYS_SHORT } from "@/lib/format";
@@ -102,9 +103,17 @@ export function LessonModal({ open, onClose, courseId, partnerId, modules, lesso
           {videoMode === "url" ? (
             <Input id="ls-video" label="URL do vídeo" placeholder="https://youtube.com/…" {...register("videoUrl")} error={errors.videoUrl?.message} />
           ) : (
-            <div className="flex flex-wrap items-center gap-3">
-              <UploadButton purpose="COURSE" partnerId={partnerId} accept="video/mp4,video/quicktime" label="Enviar vídeo (MP4/MOV)" onUploaded={(m) => setValue("videoUrl", m.url)} />
-              {videoUrl && <span className="truncate text-xs text-[var(--muted)]">{videoUrl}</span>}
+            <div className="space-y-2">
+              {videoUrl && <p className="truncate text-xs text-[var(--muted)]">Vídeo atual: {videoUrl}</p>}
+              <VideoUploader
+                purpose="COURSE"
+                partnerId={partnerId}
+                submitLabel="Enviar vídeo da aula"
+                onUploaded={(m) => {
+                  setValue("videoUrl", m.url, { shouldDirty: true });
+                  toast("Vídeo enviado", "success");
+                }}
+              />
             </div>
           )}
         </fieldset>

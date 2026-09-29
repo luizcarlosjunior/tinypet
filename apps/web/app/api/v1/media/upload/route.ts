@@ -1,15 +1,18 @@
-import { prisma } from "@tinypet/db";
 import { uploadRequestSchema } from "@tinypet/shared";
-import { handler, ok, parseBody, requireUser, requirePartner, createUploadTarget, getLimits, storageUsed, rateLimit, Errors } from "@/server";
+import { handler, ok, parseBody, requireUser, requirePartner, createUploadTarget, assertVideoRequest, assertVideoPlanAllowed, getLimits, storageUsed, rateLimit, Errors } from "@/server";
 
 /**
  * Step 1 of upload: validates and returns a presigned AWS S3 URL or the local upload endpoint.
  * Partner purposes (logo, venue, catalog, course) need X-Partner-Id. Owner purposes check the owner plan.
+ * Videos: only `video/mp4` with width/height 1920x1080, 1280x720, 1080x1920 or 720x1280 and durationSeconds > 0.
+ * VIDEO_COVER (image) follows the caller context: with X-Partner-Id it belongs to the partner, else to the user.
  */
 export const POST = handler(async (req) => {
   const user = await requireUser(req);
   await rateLimit(`upload:${user.id}`, 60, 10 * 60 * 1000);
   const body = await parseBody(req, uploadRequestSchema);
+  // Videos must already be the client-transcoded MP4 (VIDEO_OUTPUT); fail fast with a clear message before quota checks.
+  if (body.mimeType.startsWith("video/")) assertVideoRequest(body);
   const partnerPurposes = ["PARTNER_LOGO", "VENUE_PHOTO", "CATALOG", "COURSE"];
   let partnerId: string | undefined;
   if (partnerPurposes.includes(body.purpose) || req.headers.get("x-partner-id")) {
@@ -30,12 +33,10 @@ export const POST = handler(async (req) => {
       if (used + body.sizeBytes > cap.quantity * 1024 * 1024) throw Errors.planLimit({ featureKey: "owner_storage_mb", current: Math.round(used / 1024 / 1024), limit: cap.quantity, planKey });
     }
   }
-  if (body.mimeType.startsWith("video/") && body.width && body.height) {
-    const ratio = body.width / body.height;
-    const okRatio = Math.abs(ratio - 16 / 9) / (16 / 9) <= 0.02 || Math.abs(ratio - 9 / 16) / (9 / 16) <= 0.02;
-    if (!okRatio) throw Errors.badRequest("Vídeo precisa ser 16:9 ou 9:16");
+  // Video plan limits: max duration (declared; re-checked on the real file at /media/complete) and videos per day.
+  if (body.mimeType.startsWith("video/")) {
+    await assertVideoPlanAllowed(partnerId ? { audience: "PARTNER", id: partnerId } : { audience: "OWNER", id: user.id }, body.durationSeconds ?? 0);
   }
   const target = await createUploadTarget({ ...body, userId: partnerId ? undefined : user.id, partnerId });
-  await prisma.mediaAsset.update({ where: { id: target.assetId }, data: { width: body.width, height: body.height } });
   return ok(target, { status: 201 });
 });
