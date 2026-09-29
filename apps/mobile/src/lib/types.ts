@@ -17,7 +17,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  role: "USER" | "ADMIN";
+  role: "USER" | "ADMIN" | "EDITOR";
   avatarUrl: string | null;
   ownerTerm: string;
   ownerTermId?: string | null;
@@ -30,6 +30,8 @@ export type User = {
   birthDate?: string | null;
   /** false for Google/Apple-only accounts: sensitive actions are confirmed with an e-mail code. */
   hasPassword?: boolean;
+  /** Public handle (lowercase, 3–30 chars) used to find the account when sharing pets. */
+  username?: string | null;
 };
 
 export type AuthPayload = { token: string; user: User; memberships: Membership[] };
@@ -63,9 +65,47 @@ export type Pet = {
   memorialNote?: string | null;
   ownerId?: string | null;
   createdByPartnerId?: string | null;
+  /** @deprecated legacy field (never sent by the API) — use `role`. */
   accessLevel?: "OWNER" | "VIEW" | "EDIT";
+  /** Legacy access marker returned by the API ("OWNER" | "PARTNER" | "VIEW" | "EDIT"). */
+  access?: string;
+  /** Caller's relationship with the pet (tutor side). Shared accounts are read-only except completing routine tasks. */
+  role?: PetRole;
   streakDays?: number;
 };
+
+// ── pet sharing & ownership transfer ──
+export type PetRole = "owner" | "shared";
+export type AccountRef = { id: string; name: string; username?: string | null; avatarUrl?: string | null };
+export type PetShare = {
+  userId: string;
+  name: string;
+  username?: string | null;
+  avatarUrl?: string | null;
+  since: string;
+  transferEligibleAt?: string | null;
+  canTransferNow: boolean;
+};
+export type PetShareInviteOut = { id: string; to: AccountRef; createdAt: string; expiresAt?: string | null };
+export type PetSharing = {
+  role: PetRole;
+  owner: AccountRef;
+  ownerSince?: string | null;
+  /** When the current owner may transfer again (null = no restriction from a previous transfer). */
+  canTransferFrom?: string | null;
+  shares: PetShare[];
+  invites?: PetShareInviteOut[];
+  pendingTransfer?: { id: string; to: AccountRef; createdAt: string; expiresAt?: string | null } | null;
+};
+export type PetInviteIn = {
+  id: string;
+  pet: { id: string; name: string; avatarUrl?: string | null; species?: string | { key: string; label: string } | null };
+  from: AccountRef;
+  createdAt: string;
+  expiresAt?: string | null;
+};
+export type MyPetInvites = { shares: PetInviteIn[]; transfers: PetInviteIn[] };
+export type UsernameAvailability = { available: boolean; reason?: string };
 
 export type PetMedia = {
   id: string;
@@ -336,6 +376,8 @@ export type HomeData = {
   recentBadges: (Badge & { pet?: { id: string; name: string } | null })[];
   pets: Pet[];
   overdueInstallments: Installment[];
+  /** Pending share invites + ownership transfer requests addressed to me. */
+  pendingPetInvites?: number;
 };
 
 export type Notification = {
@@ -399,3 +441,71 @@ export type PlanInfo = {
   limits: { featureKey: string; enabled: boolean; quantity: number | null }[] | Record<string, { enabled: boolean; quantity: number | null }>;
   usage: Record<string, number>;
 };
+
+// ───────────────────────────── Blog (docs/blog-contract.md → Public API) ─────────────────────────────
+
+/** Active category tree from `GET /blog/categories` (max depth 2). */
+export type BlogCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  sortOrder?: number;
+  parentId?: string | null;
+  postCount?: number;
+  children?: BlogCategory[];
+};
+
+export type BlogCategoryRef = { id?: string; name: string; slug: string; parentId?: string | null };
+
+/** List item from `GET /blog/posts`. */
+export type BlogPostSummary = {
+  id: string;
+  slug: string;
+  title: string;
+  summary?: string | null;
+  coverImageRect?: string | null;
+  coverImageSquare?: string | null;
+  coverAlt?: string | null;
+  publishDate?: string | null;
+  readingMinutes?: number | null;
+  categories?: BlogCategoryRef[];
+  author?: { id?: string; name: string } | null;
+  heartsCount?: number;
+  commentsCount?: number;
+};
+
+/** Full post from `GET /blog/posts/:slug`. `content` is server-sanitized HTML. */
+export type BlogPost = BlogPostSummary & {
+  content: string;
+  tags?: string[] | string | null;
+  coverOgImage?: string | null;
+  commentsEnabled?: boolean;
+  featured?: boolean;
+  updatedAt?: string | null;
+  /** Present when logged in. */
+  viewerHearted?: boolean;
+};
+
+/** Old slug → the API answers with the new slug instead of the post. */
+export type BlogPostRedirect = { redirectTo: string };
+export type BlogPostResponse = BlogPost | BlogPostRedirect;
+
+export type BlogHeartResult = { hearted: boolean; heartsCount: number };
+
+export type BlogComment = {
+  id: string;
+  body: string;
+  createdAt: string;
+  editedAt?: string | null;
+  parentId?: string | null;
+  user: { id: string; name: string; username?: string | null; avatarUrl?: string | null };
+  heartsCount: number;
+  viewerHearted?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  /** Top-level only (one level of replies, oldest first). */
+  replies?: BlogComment[];
+};
+
+export type BlogCommentsPage = { items: BlogComment[]; nextCursor: string | null; commentsEnabled?: boolean };

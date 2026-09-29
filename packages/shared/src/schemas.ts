@@ -1,4 +1,4 @@
-import { normalizeMicrochip } from "./utils";
+import { normalizeMicrochip, normalizeUsername, usernameProblem } from "./utils";
 import { z } from "zod";
 
 // ───────── primitives ─────────
@@ -62,6 +62,17 @@ export const AccessLevelEnum = z.enum(["VIEW", "EDIT"]);
 export const VaccinationKindEnum = z.enum(["VACCINE", "DEWORMING"]);
 
 // ───────── auth ─────────
+/** Public @handle (see USERNAME_RE). Accepts a leading "@" and any case; stored lowercase. */
+export const usernameSchema = z
+  .string()
+  .max(31)
+  .transform(normalizeUsername)
+  .superRefine((v, ctx) => {
+    const p = usernameProblem(v);
+    if (p === "INVALID") ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Usuário inválido: use 3 a 30 letras minúsculas, números, ponto ou sublinhado" });
+    if (p === "RESERVED") ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Este nome de usuário é reservado" });
+  });
+
 export const registerSchema = z.object({
   name: z.string().min(2, "Informe seu nome").max(120),
   email,
@@ -69,6 +80,8 @@ export const registerSchema = z.object({
   ownerTermId: id.optional(),
   acceptTerms: z.literal(true, { errorMap: () => ({ message: "Aceite os termos para continuar" }) }),
   marketingConsent: z.boolean().optional().default(false),
+  /** Optional public @handle (others can find the account by it to share a pet). */
+  username: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), usernameSchema.optional()),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
@@ -88,6 +101,8 @@ export const updateProfileSchema = z.object({
   marketingConsent: z.boolean().optional(),
   publicPhotosConsent: z.boolean().optional(),
   statsConsent: z.boolean().optional(),
+  /** Public @handle; null removes it. 409 when taken. */
+  username: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), usernameSchema.nullable().optional()),
   /** Explicit acceptance of the current terms/privacy (used by OAuth sign-ups). */
   acceptTerms: z.literal(true).optional(),
 });
@@ -211,6 +226,15 @@ export const markDeceasedSchema = z.object({
 });
 
 export const petAccessSchema = z.object({ email, level: AccessLevelEnum.default("VIEW") });
+
+/** Pet sharing: the owner invites another account by @username or e-mail. */
+export const shareInviteSchema = z.object({ handle: z.string().trim().min(1, "Informe o usuário ou e-mail").max(254) });
+/** Ownership transfer: the owner confirms with the password (or an e-mail code for OAuth-only accounts). */
+export const ownershipTransferSchema = z.object({
+  toUserId: id,
+  password: z.string().max(200).optional().nullable(),
+  code: z.string().max(12).optional().nullable(),
+});
 
 export const petMediaSchema = z.object({
   kind: z.enum(["IMAGE", "VIDEO"]),

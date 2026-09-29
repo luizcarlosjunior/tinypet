@@ -27,9 +27,13 @@ function daysLeft(f: Food): number | null {
   return total - elapsed;
 }
 
-export function PetFoods({ petId, deceased }: { petId: string; deceased: boolean }) {
+export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { petId: string; deceased: boolean; readOnly?: boolean }) {
+  // shared accounts see the foods but can't change them
+  const deceased = isDeceased || readOnly;
   const q = usePetResource<Food[]>(petId, "foods");
-  const sug = usePetResource<Suggestion[]>(petId, "foods/suggestions");
+  const sug = usePetResource<Suggestion[] | { partners?: unknown[] }>(petId, "foods/suggestions");
+  // the API currently answers { origin, partners[] } with a different item shape; only render the legacy array form
+  const suggestions: Suggestion[] = Array.isArray(sug.data) ? sug.data : [];
   const brands = useBrands();
   const create = usePetMutation<FoodInput>(petId, "foods", "POST", ["foods"]);
   const update = usePetMutation<FoodInput>(petId, "foods", "PATCH", ["foods"]);
@@ -124,11 +128,11 @@ export function PetFoods({ petId, deceased }: { petId: string; deceased: boolean
         </h3>
         {sug.isLoading ? (
           <Spinner />
-        ) : (sug.data ?? []).length === 0 ? (
+        ) : suggestions.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">Nenhuma indicação por enquanto. Cadastre as marcas que seu pet usa e um endereço em Conta.</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
-            {(sug.data ?? []).map((s, i) => (
+            {suggestions.map((s, i) => (
               <li key={`${s.partner.id}-${s.item?.id ?? i}`} className="card text-sm">
                 <p className="font-medium">
                   <Link href={`/p/${s.partner.slug}`} className="hover:underline">

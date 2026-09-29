@@ -17,7 +17,9 @@ type Comparison = { scope: string; groupSize: number; widened: boolean; perSkill
 const LEVELS: [Level, string][] = [["LEARNING", "Aprendendo"], ["SOMETIMES", "Às vezes"], ["MASTERED", "Domina"]];
 const SCOPE_LABEL: Record<string, string> = { nearMe: "perto de você", city: "na sua cidade", state: "no seu estado", country: "no Brasil", breed: "da mesma raça" };
 
-export function PetSkills({ petId, deceased }: { petId: string; deceased: boolean }) {
+export function PetSkills({ petId, deceased: isDeceased, readOnly = false }: { petId: string; deceased: boolean; readOnly?: boolean }) {
+  // shared accounts see the skills but can't change them (same locks as a memorial profile)
+  const deceased = isDeceased || readOnly;
   const q = usePetResource<SkillsData>(petId, "skills");
   const put = usePetMutation<{ skillId?: string; customName?: string; level: Level; masteredAt?: string | null }>(petId, "skills", "PUT", ["skills", "history"]);
   const del = usePetMutation(petId, "skills", "DELETE", ["skills"]);

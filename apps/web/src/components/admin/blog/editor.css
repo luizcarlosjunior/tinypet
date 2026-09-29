@@ -1,0 +1,27 @@
+/* Blog editor + preview content styles (no @tailwindcss/typography in this project). */
+.tp-prose { line-height: 1.7; font-size: 1rem; overflow-wrap: anywhere; }
+.tp-prose::after { content: ""; display: block; clear: both; }
+.tp-prose > * + * { margin-top: 0.85em; }
+.tp-prose h2 { font-size: 1.5rem; font-weight: 700; line-height: 1.3; margin-top: 1.4em; }
+.tp-prose h3 { font-size: 1.25rem; font-weight: 700; line-height: 1.35; margin-top: 1.2em; }
+.tp-prose h4 { font-size: 1.075rem; font-weight: 600; margin-top: 1.1em; }
+.tp-prose ul { list-style: disc; padding-left: 1.5rem; }
+.tp-prose ol { list-style: decimal; padding-left: 1.5rem; }
+.tp-prose li > p { margin: 0; }
+.tp-prose blockquote { border-left: 4px solid #fb7d3c; padding-left: 1rem; color: var(--muted); font-style: italic; }
+.tp-prose a { color: #ea420c; text-decoration: underline; }
+.tp-prose code { background: rgba(104, 116, 142, 0.15); border-radius: 0.35rem; padding: 0.1em 0.35em; font-size: 0.9em; }
+.tp-prose pre { background: #171a21; color: #eceef2; border-radius: 0.75rem; padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.875rem; }
+.tp-prose pre code { background: transparent; padding: 0; color: inherit; }
+.tp-prose hr { border: 0; border-top: 1px solid rgba(104, 116, 142, 0.35); margin: 1.5em 0; }
+.tp-prose img { max-width: 100%; height: auto; border-radius: 0.75rem; }
+.tp-prose img[data-align="center"] { display: block; margin-left: auto; margin-right: auto; }
+.tp-prose div[data-youtube-video] { margin: 1rem 0; }
+.tp-prose iframe { width: 100%; aspect-ratio: 16 / 9; height: auto; border-radius: 0.75rem; border: 0; }
+.tp-prose table { border-collapse: collapse; width: 100%; }
+.tp-prose th, .tp-prose td { border: 1px solid rgba(104, 116, 142, 0.35); padding: 0.4rem 0.6rem; }
+
+.tp-editor .tiptap { outline: none; min-height: 420px; padding: 1rem 1.25rem; }
+.tp-editor .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--muted); }
+.tp-editor .tiptap img.ProseMirror-selectednode { outline: 3px solid #f95d16; outline-offset: 2px; }
+.tp-editor .tiptap div[data-youtube-video].ProseMirror-selectednode iframe { outline: 3px solid #f95d16; }

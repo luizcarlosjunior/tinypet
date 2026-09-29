@@ -279,7 +279,7 @@ async function resolveRefs(partnerId: string, refs: Refs, ownerUserId?: string |
       where: {
         id: { in: refs.petIds },
         deletedAt: null,
-        // owner-side requests: only pets the user owns or has EDIT on
+        // owner-side requests: only pets the user owns (shared accounts can't book)
         OR: ownerUserId
           ? editablePetOr(ownerUserId)
           : [client ? { clients: { some: { clientId: client.id } } } : { clients: { some: { client: { partnerId, deletedAt: null } } } }, { createdByPartnerId: partnerId }],
@@ -324,9 +324,9 @@ async function resolveRefs(partnerId: string, refs: Refs, ownerUserId?: string |
   return { client, addressId };
 }
 
-/** Pets a user may act on (book, cancel, reschedule): owned, or shared with EDIT. */
+/** Pets a user may act on (book, cancel, reschedule): owned only — shared accounts are read-only. */
 export function editablePetOr(userId: string): Prisma.PetWhereInput[] {
-  return [{ ownerId: userId }, { accesses: { some: { userId, level: "EDIT" } } }];
+  return [{ ownerId: userId }];
 }
 
 // ───────── create / update ─────────
@@ -801,7 +801,7 @@ export function ownerAppointmentWhere(userId: string): Prisma.AppointmentWhereIn
 
 /**
  * Appointments an owner may ACT on (cancel / reschedule): visible to them AND every pet on it is owned by the user
- * or shared with EDIT (VIEW-shared pets are read-only).
+ * (shared accounts are read-only).
  */
 export function ownerActionAppointmentWhere(userId: string): Prisma.AppointmentWhereInput {
   return { AND: [ownerAppointmentWhere(userId), { pets: { every: { pet: { OR: editablePetOr(userId) } } } }] };
@@ -828,7 +828,10 @@ export function decorateOwnerAppointment(a: OwnerAppointmentRow) {
 
 export async function listOwnerAppointments(userId: string, from: Date, to: Date) {
   const rows = await prisma.appointment.findMany({ where: { ...ownerAppointmentWhere(userId), startsAt: { lt: to }, endsAt: { gt: from } }, include: ownerAppointmentInclude, orderBy: { startsAt: "asc" } });
-  return rows.map(decorateOwnerAppointment);
+  const petIds = Array.from(new Set(rows.flatMap((r) => r.pets.map((p) => p.pet.id))));
+  const owned = new Set(petIds.length ? (await prisma.pet.findMany({ where: { id: { in: petIds }, ownerId: userId }, select: { id: true } })).map((p) => p.id) : []);
+  // canManage: every pet on it is owned by the user (shared accounts only view; cancel/reschedule → 403)
+  return rows.map((r) => ({ ...decorateOwnerAppointment(r), canManage: r.pets.every((p) => owned.has(p.pet.id)) }));
 }
 
 async function ownerAppointmentOrThrow(userId: string, id: string) {

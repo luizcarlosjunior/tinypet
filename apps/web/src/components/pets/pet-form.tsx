@@ -35,7 +35,8 @@ function toInput(pet?: Pet | null): Partial<PetInput> {
 
 const empty = (v: unknown) => (v === "" ? null : v);
 
-export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel }: { pet?: Pet | null; onSubmit: (v: PetInput) => void; onCancel?: () => void; loading?: boolean; submitLabel?: string }) {
+/** `readOnly`: shared accounts see the registration but can't change it (fields disabled, no photo upload / save). */
+export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel, readOnly = false }: { pet?: Pet | null; onSubmit: (v: PetInput) => void; onCancel?: () => void; loading?: boolean; submitLabel?: string; readOnly?: boolean }) {
   const species = useSpecies();
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<PetInput>({ resolver: zodResolver(petSchema), defaultValues: toInput(pet) });
   const speciesKey = watch("speciesKey");
@@ -51,8 +52,9 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel }: { pet
   }, [speciesKey, breedId, breeds, setValue]);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-      <AvatarUpload value={avatarUrl} name={watch("name")} purpose="PET_AVATAR" onChange={(url) => setValue("avatarUrl", url, { shouldDirty: true })} label={avatarUrl ? "Trocar foto" : "Adicionar foto"} />
+    <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <fieldset disabled={readOnly} className="min-w-0 space-y-4">
+      {!readOnly && <AvatarUpload value={avatarUrl} name={watch("name")} purpose="PET_AVATAR" onChange={(url) => setValue("avatarUrl", url, { shouldDirty: true })} label={avatarUrl ? "Trocar foto" : "Adicionar foto"} />}
       <div className="grid gap-3 sm:grid-cols-2">
         <Input id="pet-name" label="Nome" {...register("name")} error={errors.name?.message} />
         <Select id="pet-species" label="Espécie" {...register("speciesKey")} error={errors.speciesKey?.message}>
@@ -116,7 +118,8 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel }: { pet
       <Textarea id="pet-temperament" label="Temperamento" placeholder="Ex.: dócil, tímido com estranhos" {...register("temperament", { setValueAs: empty })} />
       <Textarea id="pet-care" label="Cuidados especiais" placeholder="Alergias, medicamentos, restrições" {...register("specialCare", { setValueAs: empty })} />
       <Textarea id="pet-feeding" label="Observações de alimentação" {...register("feedingNotes", { setValueAs: empty })} />
-      <div className="flex justify-end gap-2">
+      </fieldset>
+      {!readOnly && <div className="flex justify-end gap-2">
         {onCancel && (
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancelar
@@ -125,7 +128,7 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel }: { pet
         <Button type="submit" loading={loading}>
           {submitLabel ?? (pet ? "Salvar" : "Cadastrar pet")}
         </Button>
-      </div>
+      </div>}
     </form>
   );
 }

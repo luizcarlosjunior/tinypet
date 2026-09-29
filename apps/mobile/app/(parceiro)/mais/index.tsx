@@ -51,6 +51,7 @@ export default function More() {
       <Section title="Ferramentas">
         <ListItem title="Notificações" subtitle={unread ? `${unread} não lidas` : "Tudo lido"} right={unread ? <Badge label={String(unread)} tone="primary" /> : undefined} onPress={() => router.push("/(parceiro)/mais/notificacoes")} />
         <ListItem title="Rota do dia" subtitle="Visitas a domicílio de hoje" onPress={() => router.push("/(parceiro)/agenda/rota")} />
+        <ListItem title="Blog" subtitle="Dicas e novidades do tinyPet" onPress={() => router.push("/(parceiro)/mais/blog")} />
         <ListItem title="Catálogo, financeiro e equipe" subtitle="Disponíveis na versão web" chevron={false} />
       </Section>
 

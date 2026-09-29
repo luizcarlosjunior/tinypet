@@ -22,7 +22,7 @@ const ICON: Record<string, { icon: typeof Award; color: string; label: string }>
   ATTACHMENT: { icon: Paperclip, color: "bg-ink-100 text-ink-700 dark:bg-ink-800 dark:text-ink-200", label: "Anexo" },
 };
 
-export function PetHistory({ petId, deceased }: { petId: string; deceased: boolean }) {
+export function PetHistory({ petId, deceased, readOnly = false }: { petId: string; deceased: boolean; readOnly?: boolean }) {
   const q = usePetResource<Ev[]>(petId, "history");
   const create = usePetMutation<Record<string, unknown>>(petId, "history");
   const { toast } = useToast();
@@ -33,7 +33,7 @@ export function PetHistory({ petId, deceased }: { petId: string; deceased: boole
   const items = q.data ?? [];
   return (
     <div className="space-y-4">
-      {!deceased && (
+      {!deceased && !readOnly && (
         <div className="flex justify-end">
           <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" aria-hidden /> Anotação

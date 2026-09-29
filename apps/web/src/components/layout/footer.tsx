@@ -9,7 +9,7 @@ export function Footer() {
           <Logo />
           <p className="mt-3 text-sm text-[var(--muted)]">Conecta tutores de pets aos profissionais que cuidam deles.</p>
         </div>
-        <FooterCol title="Para tutores" links={[["/buscar", "Buscar parceiros"], ["/cursos", "Cursos"], ["/cadastro", "Criar conta"], ["/inicio", "Minha área"]]} />
+        <FooterCol title="Para tutores" links={[["/buscar", "Buscar parceiros"], ["/cursos", "Cursos"], ["/blog", "Blog"], ["/cadastro", "Criar conta"], ["/inicio", "Minha área"]]} />
         <FooterCol title="Para parceiros" links={[["/painel/novo", "Criar meu negócio"], ["/painel", "Painel do parceiro"], ["/entrar", "Entrar"]]} />
         <FooterCol title="tinyPet" links={[["/termos", "Termos de uso"], ["/privacidade", "Política de privacidade"]]} />
       </div>

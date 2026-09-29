@@ -9,6 +9,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * CSRF (cookie-authenticated, state-changing /api/v1 requests without `Authorization: Bearer`):
  * - `Origin`, when present, must be allowlisted or same-origin;
  * - body must be `application/json` (bodyless requests are fine), except multipart on /api/v1/clients/import and
+ *   /api/v1/admin/blog/media(/estimate), and
  *   raw bytes on /api/v1/media/upload/*. /api/v1/webhooks/* is exempt (server-to-server, own auth).
  */
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -68,7 +69,7 @@ export function middleware(req: NextRequest) {
       const ctOk =
         !hasBody ||
         ct === "application/json" ||
-        (ct === "multipart/form-data" && pathname === "/api/v1/clients/import") ||
+        (ct === "multipart/form-data" && (pathname === "/api/v1/clients/import" || pathname === "/api/v1/admin/blog/media" || pathname === "/api/v1/admin/blog/media/estimate")) ||
         pathname.startsWith("/api/v1/media/upload/");
       if (!ctOk) return json403("Content-Type não permitido");
     }

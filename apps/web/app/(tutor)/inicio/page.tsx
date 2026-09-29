@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Award, CalendarDays, CheckCircle2, Navigation, PawPrint, Receipt } from "lucide-react";
+import { Award, CalendarDays, CheckCircle2, Inbox, Navigation, PawPrint, Receipt } from "lucide-react";
 import { useHome } from "@/hooks/use-me";
 import { useSessionContext } from "@/hooks/use-session-context";
 import { api } from "@/lib/api-client";
@@ -35,6 +35,15 @@ export default function InicioPage() {
       <PageHeader title={firstName ? `Olá, ${firstName}!` : "Olá!"} description={fmtDate(new Date(), "EEEE, d 'de' MMMM")} />
       {home.isLoading && <Spinner />}
       {home.isError && <Empty title="Não foi possível carregar sua página inicial" description={errorMessage(home.error)} />}
+      {d && (d.pendingPetInvites ?? 0) > 0 && (
+        <Link href="/convites" className="mb-4 flex items-center gap-3 rounded-2xl border border-brand-300 bg-brand-50 p-4 text-sm transition hover:shadow-md dark:border-brand-800 dark:bg-brand-900/20">
+          <Inbox className="h-5 w-5 shrink-0 text-brand-600" aria-hidden />
+          <span className="flex-1">
+            <strong>{d.pendingPetInvites === 1 ? "Você tem 1 convite de pet pendente." : `Você tem ${d.pendingPetInvites} convites de pets pendentes.`}</strong> Veja os compartilhamentos e transferências que aguardam a sua resposta.
+          </span>
+          <span className="font-medium text-brand-600">Ver convites</span>
+        </Link>
+      )}
       {d && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card title="Tarefas de hoje" actions={<CheckCircle2 className="h-4 w-4 text-[var(--muted)]" aria-hidden />}>

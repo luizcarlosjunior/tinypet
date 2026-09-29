@@ -29,9 +29,17 @@ export type Pet = {
   memorialNote: string | null;
   streakDays: number;
   level: number;
-  access?: "owner" | "family" | "partner";
-  accessLevel?: "VIEW" | "EDIT";
+  /** @deprecated legacy field ("OWNER" | "VIEW" | "PARTNER"); use `role`. */
+  access?: string;
+  /** "owner": this account owns the pet; "shared": read-only shared account (can only mark tasks done). */
+  role?: "owner" | "shared" | "partner";
+  owner?: { id: string; name: string; username: string | null; avatarUrl: string | null } | null;
 };
+
+/** True when the signed-in account may edit the pet (owner). Shared accounts are read-only. */
+export function canEditPet(pet: Pick<Pet, "role"> | null | undefined): boolean {
+  return !pet?.role || pet.role === "owner";
+}
 
 export const petsKey = ["pets"] as const;
 export const petKey = (id: string) => ["pets", id] as const;

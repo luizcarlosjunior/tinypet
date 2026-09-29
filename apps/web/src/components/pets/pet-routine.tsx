@@ -20,8 +20,10 @@ function ruleText(r: Rule): string {
   return `Semanal (${days || "—"})${times}`;
 }
 
-export function PetRoutine({ petId, deceased }: { petId: string; deceased: boolean }) {
-  const q = usePetResource<Task[]>(petId, "tasks");
+/** `readOnly` (shared account): only the "done" checkbox works; creating/editing/accepting tasks is owner-only. */
+export function PetRoutine({ petId, deceased, readOnly = false }: { petId: string; deceased: boolean; readOnly?: boolean }) {
+  // API: { date, tasks[], today[{ id, completed }] } (older servers returned Task[])
+  const q = usePetResource<Task[] | { tasks: Task[]; today?: { id: string; completed?: boolean }[] }>(petId, "tasks");
   const templates = usePetResource<Template[]>(petId, "tasks/templates");
   const create = usePetMutation<Record<string, unknown>>(petId, "tasks");
   const patch = usePetMutation<Record<string, unknown>>(petId, "tasks", "PATCH");
@@ -34,7 +36,9 @@ export function PetRoutine({ petId, deceased }: { petId: string; deceased: boole
 
   if (q.isLoading) return <Spinner />;
   if (q.isError) return <Empty title="Não foi possível carregar a rotina" description={errorMessage(q.error)} />;
-  const tasks = q.data ?? [];
+  const raw = q.data ?? [];
+  const doneToday = new Set(Array.isArray(raw) ? [] : (raw.today ?? []).filter((t) => t.completed).map((t) => t.id));
+  const tasks = (Array.isArray(raw) ? raw : raw.tasks ?? []).map((t) => (doneToday.has(t.id) ? { ...t, doneToday: true } : t));
   const proposed = tasks.filter((t) => t.status === "PROPOSED");
   const active = tasks.filter((t) => t.status !== "PROPOSED");
 
@@ -57,7 +61,7 @@ export function PetRoutine({ petId, deceased }: { petId: string; deceased: boole
 
   return (
     <div className="space-y-6">
-      {!deceased && (
+      {!deceased && !readOnly && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">
             {(templates.data ?? []).slice(0, 8).map((t) => (
@@ -71,7 +75,7 @@ export function PetRoutine({ petId, deceased }: { petId: string; deceased: boole
           </Button>
         </div>
       )}
-      {proposed.length > 0 && (
+      {proposed.length > 0 && !readOnly && (
         <section aria-labelledby="propostas" className="rounded-2xl border border-brand-300 bg-brand-50 p-4 dark:border-brand-800 dark:bg-brand-900/20">
           <h3 id="propostas" className="text-sm font-semibold">
             Rotinas propostas por parceiros
@@ -114,7 +118,7 @@ export function PetRoutine({ petId, deceased }: { petId: string; deceased: boole
                   </p>
                 </div>
                 {t.status === "PAUSED" && <Badge tone="amber">Pausada</Badge>}
-                {!deceased && (
+                {!deceased && !readOnly && (
                   <span className="flex gap-1">
                     <Button type="button" variant="ghost" className="h-8 px-2 text-xs" onClick={() => patch.mutateAsync({ path: `/${t.id}`, body: { status: t.status === "PAUSED" ? "ACTIVE" : "PAUSED" } }).catch((e) => toast(errorMessage(e), "error"))}>
                       {t.status === "PAUSED" ? "Retomar" : "Pausar"}

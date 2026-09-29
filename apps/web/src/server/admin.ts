@@ -116,7 +116,7 @@ export const addOnSchema = z.object({
 });
 
 export const settingSchema = z.object({ value: z.unknown() });
-export const adminUserPatchSchema = z.object({ role: z.enum(["USER", "ADMIN"]).optional(), planKey: z.string().min(1).optional() });
+export const adminUserPatchSchema = z.object({ role: z.enum(["USER", "ADMIN", "EDITOR"]).optional(), planKey: z.string().min(1).optional() });
 export const adminPartnerPatchSchema = z.object({ planKey: z.string().min(1).optional(), featured: z.boolean().optional(), published: z.boolean().optional() });
 export const mediaModerationSchema = z.object({ action: z.enum(["APPROVE", "REJECT"]) });
 

@@ -74,7 +74,7 @@ export function useAdminMutations(resource: string, opts?: { invalidate?: string
 }
 
 /* ───────── specific ───────── */
-export type AdminUser = { id: string; name: string; email: string; role: "USER" | "ADMIN"; plan?: string | null; planKey?: string | null; createdAt?: string; subscription?: { plan?: { key: string } } | null };
+export type AdminUser = { id: string; name: string; email: string; role: "USER" | "ADMIN" | "EDITOR"; plan?: string | null; planKey?: string | null; createdAt?: string; subscription?: { plan?: { key: string } } | null };
 export type AdminPartner = { id: string; tradeName: string; slug: string; plan?: string | null; planKey?: string | null; featured: boolean; published: boolean; createdAt?: string; logoUrl?: string | null; subscription?: { plan?: { key: string } } | null };
 export type AdminPlan = { id: string; key: string; name: string; audience: "OWNER" | "PARTNER"; priceMonthly?: number | string | null; priceYearly?: number | string | null; trialDays?: number; visible?: boolean; isDefault?: boolean; sortOrder?: number; limits?: { featureKey: string; enabled: boolean; quantity: number | null }[] };
 export type AdminFeature = { key: string; module?: string; label?: string; kind?: "BOOLEAN" | "QUANTITY"; audience?: "OWNER" | "PARTNER" };

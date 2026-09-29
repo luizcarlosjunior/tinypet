@@ -10,6 +10,8 @@ function resolveBaseUrl(): string {
 }
 const BASE_URL = resolveBaseUrl();
 export const API_BASE = `${BASE_URL}/api/v1`;
+/** Origin of the API/web app (e.g. `https://tinypet.com.br`), used for public web links. */
+export const API_ORIGIN = BASE_URL;
 
 export type ListMeta = { page: number; pageSize: number; total: number };
 

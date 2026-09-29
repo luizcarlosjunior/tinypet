@@ -58,11 +58,17 @@ export default function UsuariosPage() {
                 <td className={td}>
                   <select aria-label={`Papel de ${u.name}`} className="input w-auto py-1" value={u.role} onChange={(e) => m.update.mutate({ id: u.id, body: { role: e.target.value } })}>
                     <option value="USER">Usuário</option>
+                    <option value="EDITOR">Editor do blog</option>
                     <option value="ADMIN">Admin</option>
                   </select>
                   {u.role === "ADMIN" && (
                     <Badge tone="brand" className="ml-2">
                       Admin
+                    </Badge>
+                  )}
+                  {(u.role as string) === "EDITOR" && (
+                    <Badge tone="blue" className="ml-2">
+                      Blog
                     </Badge>
                   )}
                 </td>

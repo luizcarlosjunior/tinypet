@@ -3,7 +3,7 @@ import { prisma } from "@tinypet/db";
 import { paginationQuery } from "@tinypet/shared";
 import { handler, ok, parseQuery, requireAdmin, paginate, serialize } from "@/server";
 
-const query = paginationQuery.extend({ q: z.string().optional(), role: z.enum(["USER", "ADMIN"]).optional() });
+const query = paginationQuery.extend({ q: z.string().optional(), role: z.enum(["USER", "ADMIN", "EDITOR"]).optional() });
 
 /** GET /admin/users?q&role&page&pageSize */
 export const GET = handler(async (req) => {

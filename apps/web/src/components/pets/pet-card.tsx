@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame } from "lucide-react";
+import { Flame, Users } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ageInMonths, formatAge } from "@tinypet/shared";
 import type { Pet } from "@/hooks/use-pets";
@@ -23,7 +23,13 @@ export function PetCard({ pet }: { pet: Pet }) {
                 <Flame className="h-3.5 w-3.5 text-brand-500" aria-hidden /> {pet.streakDays} {pet.streakDays === 1 ? "dia" : "dias"} de rotina
               </>
             )}
-            {pet.access && pet.access !== "owner" && <span className="badge bg-ink-100 dark:bg-ink-800">compartilhado</span>}
+          </p>
+        )}
+        {pet.role === "shared" && (
+          <p className="mt-1">
+            <span className="badge inline-flex items-center gap-1 bg-ink-100 dark:bg-ink-800">
+              <Users className="h-3 w-3" aria-hidden /> Compartilhado por {pet.owner?.username ? `@${pet.owner.username}` : pet.owner?.name ?? "outro tutor"}
+            </span>
           </p>
         )}
       </div>

@@ -8,8 +8,10 @@ export type HomeData = {
   tasksToday: { id: string; petId: string; petName?: string; pet?: { id: string; name: string; avatarUrl?: string | null } | null; title: string; time?: string | null; times?: string[]; done?: boolean; completed?: boolean; completedAt?: string | null }[];
   upcomingAppointments: Appointment[];
   recentBadges: { id: string; petId?: string; pet?: { id: string; name: string } | null; badge?: { key: string; name: string; description?: string | null; iconUrl?: string | null } | null; name?: string; earnedAt: string }[];
-  pets: { id: string; name: string; avatarUrl: string | null; status?: string }[];
+  pets: { id: string; name: string; avatarUrl: string | null; status?: string; role?: "owner" | "shared" }[];
   overdueInstallments: Installment[];
+  /** pending pet share invites + ownership transfer requests addressed to me */
+  pendingPetInvites?: number;
 };
 
 export type Installment = {

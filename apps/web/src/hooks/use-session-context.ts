@@ -7,8 +7,10 @@ export type SessionUser = {
   id: string;
   name: string;
   email: string;
-  role: "USER" | "ADMIN";
+  role: "USER" | "ADMIN" | "EDITOR";
   avatarUrl: string | null;
+  /** public @handle (lowercase) or null */
+  username?: string | null;
   ownerTerm: string;
   ownerTermId: string | null;
   emailVerified: boolean;

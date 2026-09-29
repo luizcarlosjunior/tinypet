@@ -52,6 +52,9 @@ export function PublicHeader({ showSearch = true }: { showSearch?: boolean }) {
           <Link href="/cursos" className="btn-ghost hidden lg:inline-flex">
             Cursos
           </Link>
+          <Link href="/blog" className="btn-ghost hidden sm:inline-flex">
+            Blog
+          </Link>
           <ThemeToggle />
           <NotificationsBell />
           <UserMenu />

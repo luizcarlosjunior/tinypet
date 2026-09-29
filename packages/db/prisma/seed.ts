@@ -157,6 +157,7 @@ async function main() {
   await seedReference();
   await seedAdmin();
   if (DEMO) await seedDemo();
+  if (DEMO) await seedBlog();
   console.log("Seed done.");
   if (DEMO && !process.env.SEED_ADMIN_PASSWORD) console.log("Logins (senha: tinypet123): admin@tinypet.local · tutor@tinypet.local · parceiro@tinypet.local");
 }
@@ -354,6 +355,71 @@ async function seedDemo() {
     });
     await prisma.address.create({ data: { userId: tutor.id, label: "Casa", zipCode: "80240-000", street: "Av. Sete de Setembro", number: "3000", district: "Batel", city: "Curitiba", state: "PR", latitude: -25.4416, longitude: -49.2883, isPrimary: true } });
     await prisma.phone.create({ data: { userId: tutor.id, number: "+5541988887777", type: "WHATSAPP", isPrimary: true, verifiedAt: new Date() } });
+  }
+}
+
+// ───────────────────────────── Blog (demo) ─────────────────────────────
+
+const BLOG_CATEGORIES: { name: string; slug: string; description: string; children: { name: string; slug: string }[] }[] = [
+  { name: "Saúde", slug: "saude", description: "Vacinas, prevenção e cuidados veterinários.", children: [{ name: "Vacinação", slug: "vacinacao" }, { name: "Nutrição", slug: "nutricao" }] },
+  { name: "Comportamento", slug: "comportamento", description: "Adestramento, socialização e bem-estar emocional.", children: [{ name: "Adestramento", slug: "adestramento" }] },
+  { name: "Dicas", slug: "dicas", description: "Rotina, passeios e o dia a dia com o seu pet.", children: [] },
+];
+
+const BLOG_POSTS = [
+  {
+    slug: "calendario-de-vacinas-para-filhotes",
+    title: "Calendário de vacinas para filhotes: o guia completo",
+    summary: "Quais vacinas o seu filhote precisa, em que idade e por que o reforço anual é tão importante.",
+    categories: ["saude", "vacinacao"],
+    tags: "vacinas,filhotes,cães",
+    featured: true,
+    daysAgo: 3,
+    content:
+      "<h2>Por que vacinar?</h2><p>As vacinas protegem o seu filhote contra doenças graves, como <strong>cinomose</strong>, <strong>parvovirose</strong> e <strong>raiva</strong>. O sistema imunológico dos filhotes ainda está em formação, por isso o esquema começa cedo.</p><h2>Calendário básico para cães</h2><ul><li><strong>45 dias:</strong> primeira dose da polivalente (V8 ou V10).</li><li><strong>66 dias:</strong> segunda dose da polivalente.</li><li><strong>87 dias:</strong> terceira dose da polivalente.</li><li><strong>A partir de 120 dias:</strong> antirrábica.</li></ul><p>Depois disso, o reforço é <em>anual</em>. Converse sempre com o seu veterinário: ele pode ajustar o calendário ao estilo de vida do seu pet.</p><blockquote><p>Dica: registre cada vacina no tinyPet e receba lembretes antes do próximo reforço.</p></blockquote><h2>E os gatos?</h2><p>Gatos também precisam da polivalente felina (V4 ou V5) e da antirrábica. Mesmo gatos que não saem de casa devem ser vacinados.</p>",
+  },
+  {
+    slug: "5-dicas-para-passeios-mais-tranquilos",
+    title: "5 dicas para passeios mais tranquilos com o seu cão",
+    summary: "Guia curto para o seu cão parar de puxar a guia e aproveitar o passeio com você.",
+    categories: ["comportamento", "adestramento"],
+    tags: "passeio,adestramento,cães",
+    featured: false,
+    daysAgo: 1,
+    content:
+      "<p>O passeio é o momento favorito do dia para muitos cães — e pode ser para você também. Veja cinco dicas simples:</p><ol><li><strong>Gaste energia antes:</strong> uma brincadeira rápida em casa deixa o cão mais calmo.</li><li><strong>Use o equipamento certo:</strong> peitorais com argola frontal ajudam a reduzir os puxões.</li><li><strong>Pare quando ele puxar:</strong> a guia frouxa é o que faz o passeio continuar.</li><li><strong>Recompense a calma:</strong> petiscos pequenos quando ele anda ao seu lado.</li><li><strong>Deixe farejar:</strong> cheirar é enriquecimento mental e cansa tanto quanto correr.</li></ol><p>Precisa de ajuda? Encontre um adestrador perto de você na <a href=\"/buscar\">busca do tinyPet</a>.</p>",
+  },
+];
+
+async function seedBlog() {
+  const admin = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL }, select: { id: true } });
+  const bySlug: Record<string, string> = {};
+  for (const [i, c] of BLOG_CATEGORIES.entries()) {
+    const root = await prisma.blogCategory.upsert({ where: { slug: c.slug }, update: {}, create: { name: c.name, slug: c.slug, description: c.description, sortOrder: i } });
+    bySlug[c.slug] = root.id;
+    for (const [j, sub] of c.children.entries()) {
+      const child = await prisma.blogCategory.upsert({ where: { slug: sub.slug }, update: {}, create: { name: sub.name, slug: sub.slug, parentId: root.id, sortOrder: j } });
+      bySlug[sub.slug] = child.id;
+    }
+  }
+  for (const p of BLOG_POSTS) {
+    if (await prisma.blogPost.findUnique({ where: { slug: p.slug }, select: { id: true } })) continue;
+    const words = p.content.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length;
+    await prisma.blogPost.create({
+      data: {
+        slug: p.slug,
+        title: p.title,
+        summary: p.summary,
+        content: p.content,
+        status: "PUBLISHED",
+        publishDate: new Date(Date.now() - p.daysAgo * 86_400_000),
+        authorId: admin?.id ?? null,
+        tags: p.tags,
+        featured: p.featured,
+        readingMinutes: Math.max(1, Math.ceil(words / 200)),
+        categories: { create: p.categories.filter((s) => bySlug[s]).map((s) => ({ categoryId: bySlug[s]! })) },
+      },
+    });
   }
 }
 

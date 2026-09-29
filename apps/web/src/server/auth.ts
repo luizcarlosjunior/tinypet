@@ -155,7 +155,7 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-export type AuthUser = { id: string; name: string; email: string; role: "USER" | "ADMIN"; avatarUrl: string | null };
+export type AuthUser = { id: string; name: string; email: string; role: "USER" | "ADMIN" | "EDITOR"; avatarUrl: string | null };
 
 // ───────────────────────────── mobile JWT ─────────────────────────────
 
@@ -245,8 +245,15 @@ export async function requirePartner(req: NextRequest, partnerIdFromRoute?: stri
   return { user, partnerId, membershipId: m.id, role: m.role, canSeeFinance: m.role === "OWNER" || m.canSeeFinance };
 }
 
-/** Owner (tutor) access to a pet: primary owner, PetAccess, or a partner membership that serves the pet. */
-export async function assertPetAccess(userId: string, petId: string, level: "VIEW" | "EDIT" = "VIEW") {
+/**
+ * Owner (tutor) access to a pet: primary owner, PetAccess (shared account), or a partner membership that serves the pet.
+ * Access levels: `VIEW` (read), `TASK` (mark routine tasks as done) and `EDIT` (any other change).
+ * Shared accounts (PetAccess, `via: "family"`) are read-only: they get VIEW and TASK, never EDIT — only the owner
+ * changes the pet's registration. `PetAccess.level` is deprecated and ignored.
+ */
+export type PetAccessLevel = "VIEW" | "TASK" | "EDIT";
+
+export async function assertPetAccess(userId: string, petId: string, level: PetAccessLevel = "VIEW") {
   const pet = await prisma.pet.findFirst({
     where: { id: petId, deletedAt: null },
     select: {
@@ -260,12 +267,13 @@ export async function assertPetAccess(userId: string, petId: string, level: "VIE
   if (!pet) throw Errors.notFound("Pet não encontrado");
   if (pet.ownerId === userId) return { pet, via: "owner" as const };
   const access = pet.accesses[0];
-  if (access && (level === "VIEW" || access.level === "EDIT")) return { pet, via: "family" as const };
+  if (access && level !== "EDIT") return { pet, via: "family" as const };
   const partnerIds = pet.clients.map((c) => c.client.partnerId);
   if (partnerIds.length) {
     const m = await prisma.membership.findFirst({ where: { userId, partnerId: { in: partnerIds } } });
     if (m) return { pet, via: "partner" as const, partnerId: m.partnerId };
   }
+  if (access) throw Errors.forbidden("Conta compartilhada: apenas o tutor dono do pet pode fazer alterações");
   throw Errors.forbidden("Sem acesso a este pet");
 }
 
@@ -283,6 +291,8 @@ export async function sessionContext(user: AuthUser) {
       avatarUrl: dbUser?.avatarUrl ?? null,
       ownerTerm: dbUser?.ownerTerm?.label ?? "Tutor",
       ownerTermId: dbUser?.ownerTermId ?? null,
+      /** Public @handle (lowercase) or null. Others find the account by it to share a pet. */
+      username: dbUser?.username ?? null,
       emailVerified: !!dbUser?.emailVerifiedAt,
       /** false for OAuth sign-ups that haven't explicitly accepted the terms yet — UI must ask. */
       termsAccepted: !!dbUser?.termsAcceptedAt,

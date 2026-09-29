@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Flower2 } from "lucide-react";
-import { useUpdatePet, type Pet } from "@/hooks/use-pets";
+import { canEditPet, useUpdatePet, type Pet } from "@/hooks/use-pets";
 import { PetForm } from "./pet-form";
 import { Button } from "@/components/ui";
 import { DeceasedDialog } from "./deceased-dialog";
@@ -29,14 +29,16 @@ export function PetFicha({ pet }: { pet: Pet }) {
   const update = useUpdatePet(pet.id);
   const { toast } = useToast();
   const [confirm, setConfirm] = useState(false);
-  // Only the primary tutor may register a death (family members, even with EDIT, cannot).
-  const isPrimaryOwner = !pet.access || pet.access === "owner";
+  // Only the owner edits the registration or registers a death; shared accounts are read-only.
+  const isPrimaryOwner = canEditPet(pet);
 
   return (
     <div className="space-y-6">
       <section className="card">
+        {!isPrimaryOwner && <p className="mb-4 text-sm text-[var(--muted)]">Pet compartilhado com você: somente o tutor dono pode alterar a ficha.</p>}
         <PetForm
           pet={pet}
+          readOnly={!isPrimaryOwner}
           loading={update.isPending}
           onSubmit={(v) =>
             update

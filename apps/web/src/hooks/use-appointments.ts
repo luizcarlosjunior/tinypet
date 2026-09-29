@@ -5,6 +5,8 @@ import { api } from "@/lib/api-client";
 export type AppointmentAddress = { id?: string; street?: string | null; number?: string | null; district?: string | null; city?: string | null; state?: string | null; complement?: string | null; latitude?: number | string | null; longitude?: number | string | null };
 export type Appointment = {
   id: string;
+  /** owner listing (/me/appointments): false when a pet on it is only shared with me (read-only). */
+  canManage?: boolean;
   partnerId: string;
   partner?: { id: string; tradeName: string; slug: string; logoUrl: string | null; cancellationHours?: number } | null;
   title: string | null;

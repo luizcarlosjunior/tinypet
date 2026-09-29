@@ -20,11 +20,12 @@ type Vac = { id: string; kind: "VACCINE" | "DEWORMING"; name: string; appliedAt:
 type Meas = { id: string; measuredAt: string; weightG: number; heightCm: number | string | null; lengthCm: number | string | null; neckCm: number | string | null; chestCm: number | string | null; abdomenCm: number | string | null; bodyScore: number | null; notes: string | null; vetVerified: boolean; partnerId: string | null; userId: string | null };
 type MeasData = { items: Meas[]; lifeStage: LifeStage | null; reference?: { minG: number; maxG: number } | null; alerts?: { type?: string; message: string }[]; bands?: StageBand[] };
 
-export function PetHealth({ pet }: { pet: Pet }) {
+/** `readOnly` (shared account): vaccinations and measurements are listed without add/edit/delete. */
+export function PetHealth({ pet, readOnly = false }: { pet: Pet; readOnly?: boolean }) {
   return (
     <div className="space-y-8">
-      <Vaccinations petId={pet.id} deceased={pet.status === "DECEASED"} />
-      <Measurements pet={pet} />
+      <Vaccinations petId={pet.id} deceased={pet.status === "DECEASED" || readOnly} />
+      <Measurements pet={pet} readOnly={readOnly} />
     </div>
   );
 }
@@ -130,7 +131,7 @@ function Vaccinations({ petId, deceased }: { petId: string; deceased: boolean })
 
 const PERIODS = [["6m", "6 meses"], ["1y", "1 ano"], ["all", "Vida toda"]] as const;
 
-function Measurements({ pet }: { pet: Pet }) {
+function Measurements({ pet, readOnly = false }: { pet: Pet; readOnly?: boolean }) {
   const [period, setPeriod] = useState<"6m" | "1y" | "all">("1y");
   const q = usePetResource<MeasData | Meas[]>(pet.id, "measurements", `?period=${period}`);
   const create = usePetMutation<MeasInput>(pet.id, "measurements");
@@ -140,7 +141,7 @@ function Measurements({ pet }: { pet: Pet }) {
   const [editing, setEditing] = useState<Meas | null | "new">(null);
   const [del, setDel] = useState<Meas | null>(null);
   const form = useForm<MeasInput>({ resolver: zodResolver(bodyMeasurementSchema), defaultValues: { measuredAt: toDateKey() } });
-  const deceased = pet.status === "DECEASED";
+  const deceased = pet.status === "DECEASED" || readOnly;
 
   const data: MeasData = Array.isArray(q.data) ? { items: q.data, lifeStage: null } : q.data ?? { items: [], lifeStage: null };
   const items = [...(data.items ?? [])].sort((a, b) => b.measuredAt.localeCompare(a.measuredAt));

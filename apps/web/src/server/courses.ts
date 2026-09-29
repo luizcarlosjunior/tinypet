@@ -234,9 +234,9 @@ async function withContract(e: EnrollmentWithCourse) {
   return { ...e, course, contract, locked: true };
 }
 
-/** Pets the user may enroll: owned, or shared with EDIT. */
+/** Pets the user may enroll: owned only (shared accounts are read-only). */
 async function assertOwnedPets(userId: string, petIds: string[]) {
-  const pets = await prisma.pet.findMany({ where: { id: { in: petIds }, deletedAt: null, status: "ACTIVE", OR: [{ ownerId: userId }, { accesses: { some: { userId, level: "EDIT" } } }] }, select: { id: true } });
+  const pets = await prisma.pet.findMany({ where: { id: { in: petIds }, deletedAt: null, status: "ACTIVE", ownerId: userId }, select: { id: true } });
   if (pets.length !== new Set(petIds).size) throw Errors.forbidden("Um dos pets não está na sua conta");
 }
 

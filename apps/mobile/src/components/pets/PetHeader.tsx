@@ -3,10 +3,11 @@ import { View } from "react-native";
 import { ageInMonths, formatAge, lifeStageFor, LIFE_STAGE_LABEL } from "@tinypet/shared";
 import { fmtDate } from "@/lib/format";
 import { spacing, useTheme } from "@/lib/theme";
-import type { Pet } from "@/lib/types";
+import type { AccountRef, Pet } from "@/lib/types";
 import { Avatar, Badge, Text } from "@/components/ui";
 
-export function PetHeader({ pet }: { pet: Pet }) {
+/** `sharedBy`: set (or null while loading) when the pet is shared with the viewer — shows "Compartilhado por @user". */
+export function PetHeader({ pet, sharedBy }: { pet: Pet; sharedBy?: AccountRef | null }) {
   const t = useTheme();
   const months = ageInMonths(pet.birthDate, pet.approxAgeMonths);
   const stage = lifeStageFor(months, pet.speciesKey, pet.size);
@@ -23,7 +24,7 @@ export function PetHeader({ pet }: { pet: Pet }) {
         <View style={{ flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
           {deceased ? <Badge label={`Em memória · ${fmtDate(pet.deceasedAt)}`} tone="neutral" icon="heart" /> : stage ? <Badge label={LIFE_STAGE_LABEL[stage]} tone="primary" /> : null}
           {pet.streakDays ? <Badge label={`${pet.streakDays} dias de rotina`} tone="success" icon="flame" /> : null}
-          {pet.accessLevel === "VIEW" ? <Badge label="Somente leitura" /> : null}
+          {sharedBy !== undefined ? <Badge label={sharedBy ? `Compartilhado por ${sharedBy.username ? `@${sharedBy.username}` : sharedBy.name}` : "Compartilhado"} tone="info" icon="people" /> : null}
         </View>
       </View>
       {deceased && pet.memorialNote ? null : <View style={{ width: 0, backgroundColor: t.border }} />}

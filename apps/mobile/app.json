@@ -53,6 +53,16 @@
               "scheme": "https",
               "host": "tinypet.com.br",
               "pathPattern": "/p/.*"
+            },
+            {
+              "scheme": "https",
+              "host": "tinypet.com.br",
+              "pathPattern": "/blog/.*"
+            },
+            {
+              "scheme": "https",
+              "host": "tinypet.com.br",
+              "path": "/blog"
             }
           ],
           "category": [

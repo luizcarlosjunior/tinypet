@@ -12,9 +12,9 @@ import { consumeVerificationCode, hashCode } from "./verification";
  * one-time code sent to the login e-mail. Codes are scoped to the action (target `action:<name>`), so they can't
  * be used to verify e-mails or for other actions.
  */
-export type ReauthAction = "pet_deceased";
+export type ReauthAction = "pet_deceased" | "pet_transfer";
 
-const ACTION_LABEL: Record<ReauthAction, string> = { pet_deceased: "registrar o falecimento de um pet" };
+const ACTION_LABEL: Record<ReauthAction, string> = { pet_deceased: "registrar o falecimento de um pet", pet_transfer: "transferir a propriedade de um pet" };
 const CODE_TTL_MS = 10 * 60 * 1000;
 
 function actionTarget(action: ReauthAction) {

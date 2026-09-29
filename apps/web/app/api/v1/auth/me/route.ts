@@ -1,6 +1,7 @@
 import { prisma } from "@tinypet/db";
 import { updateProfileSchema } from "@tinypet/shared";
-import { handler, ok, parseBody, requireUser, sessionContext, audit, clientIp, ApiError } from "@/server";
+import { handler, ok, parseBody, requireUser, sessionContext, audit, clientIp, ApiError, Errors } from "@/server";
+import { assertUsernameFree } from "@/server/sharing";
 
 export const GET = handler(async (req) => {
   const user = await requireUser(req);
@@ -15,10 +16,17 @@ export const PATCH = handler(async (req) => {
     const version = ((await prisma.setting.findUnique({ where: { key: "terms_version" } }))?.value as string | undefined) ?? "1";
     terms = { termsVersion: version, termsAcceptedAt: new Date() };
   }
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { ...body, ...terms, birthDate: body.birthDate === undefined ? undefined : body.birthDate ? new Date(body.birthDate) : null },
-  });
+  if (body.username) await assertUsernameFree(body.username, user.id);
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { ...body, ...terms, birthDate: body.birthDate === undefined ? undefined : body.birthDate ? new Date(body.birthDate) : null },
+    });
+  } catch (e) {
+    // race on the unique username index
+    if (body.username && (e as { code?: string }).code === "P2002") throw Errors.conflict("Este nome de usuário já está em uso. Escolha outro.");
+    throw e;
+  }
   if (terms) await audit({ userId: user.id, action: "terms.accept", entity: "User", entityId: user.id, data: { version: terms.termsVersion }, ip: clientIp(req) });
   return ok(await sessionContext(user));
 });
@@ -37,7 +45,7 @@ export const DELETE = handler(async (req) => {
   }
   const anon = `deleted-${user.id}@anon.tinypet`;
   await prisma.$transaction([
-    prisma.user.update({ where: { id: user.id }, data: { name: "Usuário removido", email: anon, passwordHash: null, avatarUrl: null, deletedAt: new Date(), birthDate: null, tokenVersion: { increment: 1 } } }),
+    prisma.user.update({ where: { id: user.id }, data: { name: "Usuário removido", email: anon, username: null, passwordHash: null, avatarUrl: null, deletedAt: new Date(), birthDate: null, tokenVersion: { increment: 1 } } }),
     prisma.phone.deleteMany({ where: { userId: user.id } }),
     prisma.email.deleteMany({ where: { userId: user.id } }),
     prisma.address.deleteMany({ where: { userId: user.id } }),
@@ -47,6 +55,9 @@ export const DELETE = handler(async (req) => {
     prisma.verificationCode.deleteMany({ where: { userId: user.id } }),
     prisma.membership.deleteMany({ where: { userId: user.id } }),
     prisma.pet.updateMany({ where: { ownerId: user.id }, data: { deletedAt: new Date() } }),
+    prisma.petAccess.deleteMany({ where: { userId: user.id } }),
+    prisma.petShareInvite.updateMany({ where: { OR: [{ fromUserId: user.id }, { toUserId: user.id }], status: "PENDING" }, data: { status: "CANCELED" } }),
+    prisma.petOwnershipTransfer.updateMany({ where: { OR: [{ fromUserId: user.id }, { toUserId: user.id }], status: "PENDING" }, data: { status: "CANCELED" } }),
   ]);
   await audit({ userId: user.id, action: "account.delete", entity: "User", entityId: user.id, ip: clientIp(req) });
   return ok({ deleted: true });

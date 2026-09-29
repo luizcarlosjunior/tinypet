@@ -12,6 +12,7 @@ import { useOwnerTerms } from "@/hooks/use-ref";
 import { Button, Input } from "@/components/ui";
 import { SocialButtons, safeNext } from "@/components/forms/social-buttons";
 import { OWNER_TERMS } from "@tinypet/shared";
+import { UsernameField, usernameBlocksSubmit, type UsernameStatus } from "@/components/forms/username-field";
 
 export default function CadastroPage() {
   return (
@@ -27,7 +28,8 @@ function CadastroForm() {
   const next = safeNext(sp.get("next"));
   const terms = useOwnerTerms();
   const [error, setError] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema), defaultValues: { marketingConsent: false } });
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema), defaultValues: { marketingConsent: false } });
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("empty");
 
   async function onSubmit(v: RegisterInput) {
     setError(null);
@@ -53,6 +55,12 @@ function CadastroForm() {
         <Input id="name" label="Seu nome" autoComplete="name" {...register("name")} error={errors.name?.message} />
         <Input id="email" type="email" label="E-mail" autoComplete="email" {...register("email")} error={errors.email?.message} />
         <Input id="password" type="password" label="Senha (mínimo 8 caracteres)" autoComplete="new-password" {...register("password")} error={errors.password?.message} />
+        <UsernameField label="Nome de usuário (opcional)" value={(watch("username") as string | undefined) ?? ""} onChange={(v) => setValue("username", v, { shouldValidate: false })} onStatus={setUsernameStatus} />
+        {errors.username?.message && (
+          <p className="-mt-2 text-xs text-red-600" role="alert">
+            {errors.username.message}
+          </p>
+        )}
         <div>
           <label htmlFor="ownerTermId" className="label">
             Como você quer ser chamado(a)?
@@ -95,7 +103,7 @@ function CadastroForm() {
             {error}
           </p>
         )}
-        <Button type="submit" className="w-full" loading={isSubmitting}>
+        <Button type="submit" className="w-full" loading={isSubmitting} disabled={usernameBlocksSubmit(usernameStatus)}>
           Criar conta
         </Button>
       </form>

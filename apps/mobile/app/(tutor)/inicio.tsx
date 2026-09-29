@@ -5,6 +5,7 @@ import { formatBRL } from "@tinypet/shared";
 import { useAuth } from "@/lib/auth-store";
 import { useHome } from "@/hooks/use-me";
 import { useTaskMutations } from "@/hooks/use-pets";
+import { useLatestBlogPosts } from "@/hooks/use-blog";
 import { errorMessage } from "@/lib/api";
 import { fmtDate, fmtDayLong } from "@/lib/format";
 import { spacing, useTheme } from "@/lib/theme";
@@ -12,6 +13,7 @@ import type { PetTask } from "@/lib/types";
 import { Avatar, Button, Card, Checkbox, Empty, ErrorState, Loading, Screen, Section, Text } from "@/components/ui";
 import { AppointmentCard } from "@/components/appointments/AppointmentCard";
 import { describeRule } from "@/components/pets/RotinaTab";
+import { PostRow } from "@/components/blog/PostCard";
 
 function TaskRow({ task }: { task: PetTask }) {
   const petId = task.petId ?? task.pet?.id ?? "";
@@ -24,6 +26,21 @@ function TaskRow({ task }: { task: PetTask }) {
       label={task.title}
       description={[task.pet?.name, describeRule(task.rule, task.dueAt)].filter(Boolean).join(" · ")}
     />
+  );
+}
+
+/** "Do blog": latest 3 posts. Hidden while loading, on error (e.g. API not deployed yet) or when there are no posts. */
+function FromTheBlog() {
+  const router = useRouter();
+  const q = useLatestBlogPosts(3);
+  const posts = q.data ?? [];
+  if (!posts.length) return null;
+  return (
+    <Section title="Do blog" right={<Button title="Ver tudo" size="sm" variant="ghost" onPress={() => router.push("/(tutor)/blog")} accessibilityLabel="Ver todos os posts do blog" />}>
+      {posts.slice(0, 3).map((p) => (
+        <PostRow key={p.id} p={p} onPress={() => router.push(`/(tutor)/blog/${p.slug}`)} />
+      ))}
+    </Section>
   );
 }
 
@@ -59,6 +76,17 @@ export default function Home() {
               </Text>
             </Card>
           )}
+
+          {q.data.pendingPetInvites ? (
+            <Card onPress={() => router.push("/(tutor)/convites")} accessibilityLabel="Ver convites de pets" style={{ backgroundColor: t.infoSoft, borderColor: t.info }}>
+              <Text variant="h3">
+                {q.data.pendingPetInvites} {q.data.pendingPetInvites === 1 ? "convite de pet pendente" : "convites de pets pendentes"}
+              </Text>
+              <Text variant="small" tone="muted">
+                Aceite ou recuse compartilhamentos e transferências de propriedade.
+              </Text>
+            </Card>
+          ) : null}
 
           {q.data.overdueInstallments?.length ? (
             <Card style={{ backgroundColor: t.dangerSoft, borderColor: t.danger }} onPress={() => router.push("/(tutor)/contratos")} accessibilityLabel="Ver parcelas vencidas">
@@ -100,6 +128,8 @@ export default function Home() {
               ))}
             </Section>
           ) : null}
+
+          <FromTheBlog />
         </>
       ) : null}
     </Screen>

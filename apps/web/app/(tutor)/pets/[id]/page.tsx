@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { usePet } from "@/hooks/use-pets";
+import { canEditPet, usePet } from "@/hooks/use-pets";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, Empty, Spinner } from "@/components/ui";
 import { MemorialBanner, PetFicha } from "@/components/pets/pet-ficha";
@@ -13,7 +13,7 @@ import { PetHealth } from "@/components/pets/pet-health";
 import { PetSkills } from "@/components/pets/pet-skills";
 import { PetRoutine } from "@/components/pets/pet-routine";
 import { PetFoods } from "@/components/pets/pet-foods";
-import { PetFamily } from "@/components/pets/pet-family";
+import { PetSharing } from "@/components/pets/pet-sharing";
 import { PetBadges } from "@/components/pets/pet-badges";
 import { BirthdayCard } from "@/components/pets/birthday-card";
 import { errorMessage } from "@/lib/errors";
@@ -28,7 +28,7 @@ const TABS = [
   ["comandos", "Comandos"],
   ["rotina", "Rotina"],
   ["alimentacao", "Alimentação"],
-  ["familia", "Família"],
+  ["compartilhamento", "Compartilhamento"],
   ["conquistas", "Conquistas"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -44,7 +44,8 @@ export default function PetPage({ params }: { params: { id: string } }) {
 function PetDetail({ id }: { id: string }) {
   const sp = useSearchParams();
   const router = useRouter();
-  const tab = (TABS.some((t) => t[0] === sp.get("tab")) ? sp.get("tab") : "ficha") as Tab;
+  const rawTab = sp.get("tab") === "familia" ? "compartilhamento" : sp.get("tab"); // old links
+  const tab = (TABS.some((t) => t[0] === rawTab) ? rawTab : "ficha") as Tab;
   const pet = usePet(id);
   if (pet.isLoading) return <Spinner />;
   if (pet.isError || !pet.data) return <Empty title="Pet não encontrado" description={errorMessage(pet.error)} action={<Link href="/pets" className="btn-secondary">Voltar</Link>} />;
@@ -52,7 +53,8 @@ function PetDetail({ id }: { id: string }) {
   const deceased = p.status === "DECEASED";
   const months = ageInMonths(p.birthDate, p.approxAgeMonths);
   const stage = lifeStageFor(months, p.species?.key ?? p.speciesKey ?? "dog", p.size);
-  const isOwner = p.access == null || p.access === "owner";
+  // shared accounts are read-only (they can only mark routine tasks as done)
+  const readOnly = !canEditPet(p);
 
   return (
     <div className="space-y-5">
@@ -69,6 +71,7 @@ function PetDetail({ id }: { id: string }) {
             {p.level > 1 && <Badge tone="amber">Nível {p.level}</Badge>}
             {p.streakDays > 0 && !deceased && <Badge tone="green">{p.streakDays} dias de rotina</Badge>}
             {deceased && <Badge tone="gray">Em memória</Badge>}
+            {readOnly && <Badge tone="blue">Compartilhado por {p.owner?.username ? `@${p.owner.username}` : p.owner?.name ?? "outro tutor"} · somente leitura</Badge>}
           </div>
         </div>
         {!deceased && <BirthdayCard pet={p} />}
@@ -87,13 +90,13 @@ function PetDetail({ id }: { id: string }) {
       </nav>
       <section role="tabpanel" aria-label={TABS.find((t) => t[0] === tab)?.[1]}>
         {tab === "ficha" && <PetFicha pet={p} />}
-        {tab === "galeria" && <PetGallery petId={p.id} deceased={deceased} />}
-        {tab === "historico" && <PetHistory petId={p.id} deceased={deceased} />}
-        {tab === "saude" && <PetHealth pet={p} />}
-        {tab === "comandos" && <PetSkills petId={p.id} deceased={deceased} />}
-        {tab === "rotina" && <PetRoutine petId={p.id} deceased={deceased} />}
-        {tab === "alimentacao" && <PetFoods petId={p.id} deceased={deceased} />}
-        {tab === "familia" && <PetFamily petId={p.id} isOwner={isOwner} />}
+        {tab === "galeria" && <PetGallery petId={p.id} deceased={deceased} readOnly={readOnly} />}
+        {tab === "historico" && <PetHistory petId={p.id} deceased={deceased} readOnly={readOnly} />}
+        {tab === "saude" && <PetHealth pet={p} readOnly={readOnly} />}
+        {tab === "comandos" && <PetSkills petId={p.id} deceased={deceased} readOnly={readOnly} />}
+        {tab === "rotina" && <PetRoutine petId={p.id} deceased={deceased} readOnly={readOnly} />}
+        {tab === "alimentacao" && <PetFoods petId={p.id} deceased={deceased} readOnly={readOnly} />}
+        {tab === "compartilhamento" && <PetSharing petId={p.id} petName={p.name} deceased={deceased} />}
         {tab === "conquistas" && <PetBadges petId={p.id} />}
       </section>
     </div>

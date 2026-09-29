@@ -15,15 +15,17 @@ export const GET = handler(async (req) => {
   const [pets, rules] = await Promise.all([
     prisma.pet.findMany({
       where: myPetsWhere(user.id, !!includeDeceased),
-      include: { ...petInclude, accesses: { where: { userId: user.id }, select: { level: true } }, _count: { select: { earnedBadges: true, media: true } } },
+      include: { ...petInclude, _count: { select: { earnedBadges: true, media: true } } },
       orderBy: [{ status: "asc" }, { createdAt: "asc" }],
     }),
     lifeStageRules(),
   ]);
   return ok(
-    pets.map(({ accesses, ...p }) => {
+    pets.map((p) => {
       const months = petAgeMonths(p);
-      return { ...p, ageMonths: months, ageLabel: formatAge(months), lifeStage: petLifeStageSync(p, rules), access: p.ownerId === user.id ? "OWNER" : accesses[0]?.level ?? "VIEW" };
+      const owner = p.ownerId === user.id;
+      // `access` kept for compatibility (shared accounts are always read-only); `role` is the new field
+      return { ...p, ageMonths: months, ageLabel: formatAge(months), lifeStage: petLifeStageSync(p, rules), access: owner ? "OWNER" : "VIEW", role: owner ? "owner" : "shared" };
     }),
   );
 });

@@ -223,7 +223,10 @@ function AppointmentDrawer({ a, onClose }: { a: Appointment; onClose: () => void
           )}
         </dl>
 
-        {!finished && mode === "view" && (
+        {!finished && mode === "view" && a.canManage === false && (
+          <p className="mt-6 text-xs text-[var(--muted)]">Pet compartilhado com você: apenas o tutor dono pode cancelar ou remarcar.</p>
+        )}
+        {!finished && mode === "view" && a.canManage !== false && (
           <div className="mt-6 space-y-2">
             {cutoffPassed && <p className="text-xs text-amber-700 dark:text-amber-300">O prazo de cancelamento gratuito ({hours} h antes) já passou. O parceiro pode recusar o cancelamento.</p>}
             <div className="flex gap-2">

@@ -43,6 +43,8 @@ function csp() {
     "style-src 'self' 'unsafe-inline'",
     `connect-src ${connect.join(" ")}`,
     "font-src 'self' data:",
+    // Blog posts may embed YouTube (privacy-enhanced domain first).
+    "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -85,7 +87,7 @@ const nextConfig = {
         ],
       },
       {
-        source: "/uploads/:file(.*\\.(?:webp|jpg|jpeg|png|WEBP|JPG|JPEG|PNG))",
+        source: "/uploads/:file(.*\\.(?:webp|jpg|jpeg|png|gif|WEBP|JPG|JPEG|PNG|GIF))",
         headers: [{ key: "Content-Disposition", value: "inline" }],
       },
     ];

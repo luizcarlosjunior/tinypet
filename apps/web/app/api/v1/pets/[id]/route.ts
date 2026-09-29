@@ -1,14 +1,15 @@
 import { prisma } from "@tinypet/db";
 import { updatePetSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, Errors, serialize, audit, clientIp } from "@/server";
-import { petActor, petData, petWithAge, assertOwnerControlled } from "@/server/pets";
+import { petActor, petData, petWithAge, assertOwnerControlled, petRole } from "@/server/pets";
 import { awardBadge } from "@/server/badges";
 
 export const GET = handler<{ id: string }>(async (req, { params }) => {
   const actor = await petActor(req, params.id, "VIEW");
   const pet = await petWithAge(params.id);
   const [accesses, clients, foods, counts, streak] = await Promise.all([
-    prisma.petAccess.findMany({ where: { petId: pet.id }, include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } }),
+    // shared accounts only see their own row (never other accounts' e-mails); partners see none
+    prisma.petAccess.findMany({ where: { petId: pet.id, ...(actor.via === "owner" ? {} : { userId: actor.user.id }) }, include: { user: { select: { id: true, name: true, username: true, email: true, avatarUrl: true } } } }),
     // a partner viewer only sees its own link (never other partners' client names)
     prisma.clientPet.findMany({ where: { petId: pet.id, client: { deletedAt: null, partner: { deletedAt: null }, ...(actor.via === "partner" ? { partnerId: actor.partnerId } : {}) } }, select: { client: { select: { id: true, name: true, partner: { select: { id: true, slug: true, tradeName: true, logoUrl: true } } } } } }),
     prisma.petFood.findMany({ where: { petId: pet.id }, include: { brand: { select: { id: true, name: true } }, productLine: { select: { id: true, name: true } } } }),
@@ -18,7 +19,9 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
   return ok(
     serialize({
       ...pet,
-      access: actor.via === "owner" ? "OWNER" : actor.via === "partner" ? "PARTNER" : accesses.find((a) => a.userId === actor.user.id)?.level ?? "VIEW",
+      /** @deprecated use `role`; shared accounts are always read-only (VIEW). */
+      access: actor.via === "owner" ? "OWNER" : actor.via === "partner" ? "PARTNER" : "VIEW",
+      role: petRole(actor),
       accesses: actor.via === "partner" ? [] : accesses,
       partners: clients.map((c) => ({ client: { id: c.client.id, name: c.client.name }, partner: c.client.partner })),
       foods,
@@ -28,10 +31,10 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
   );
 });
 
-/** Owner / family EDIT; a partner only for pets it created that have no owner yet. */
+/** Owner only (shared accounts are read-only); a partner only for pets it created that have no owner yet. */
 export const PATCH = handler<{ id: string }>(async (req, { params }) => {
   const actor = await petActor(req, params.id, "EDIT");
-  assertOwnerControlled(actor, "Este pet tem tutor: apenas o tutor ou a família podem alterar a ficha");
+  assertOwnerControlled(actor, "Este pet tem tutor: apenas o tutor pode alterar a ficha");
   const body = await parseBody(req, updatePetSchema);
   const data = await petData(body);
   const pet = await prisma.pet.update({ where: { id: params.id }, data });

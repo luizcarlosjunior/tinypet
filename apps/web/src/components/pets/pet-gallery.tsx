@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 type Media = { id: string; kind: "IMAGE" | "VIDEO"; url: string; thumbUrl: string | null; title: string | null; description: string | null; notes: string | null; takenAt: string; isStory: boolean; expiresAt: string | null; visibility: string };
 const VIS = [["PRIVATE", "Privado"], ["FAMILY", "Família"], ["PARTNERS", "Parceiros vinculados"], ["PUBLIC", "Público"]] as const;
 
-export function PetGallery({ petId, deceased }: { petId: string; deceased: boolean }) {
+export function PetGallery({ petId, deceased, readOnly = false }: { petId: string; deceased: boolean; readOnly?: boolean }) {
   const feed = usePetResource<Media[]>(petId, "media");
   const stories = usePetResource<Media[]>(petId, "media", "?story=1");
   const create = usePetMutation<Record<string, unknown>>(petId, "media");
@@ -88,7 +88,7 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
 
   return (
     <div className="space-y-6">
-      {!deceased && (
+      {!deceased && !readOnly && (
         <div className="flex justify-end">
           <Button type="button" onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" aria-hidden /> Adicionar foto ou vídeo
@@ -131,9 +131,9 @@ export function PetGallery({ petId, deceased }: { petId: string; deceased: boole
                   <p className="truncate text-sm font-medium">{m.title ?? "Sem título"}</p>
                   <p className="text-xs text-[var(--muted)]">{fmtDate(m.takenAt)} · {VIS.find((v) => v[0] === m.visibility)?.[1] ?? m.visibility}</p>
                   {m.description && <p className="mt-1 line-clamp-2 text-xs">{m.description}</p>}
-                  <button type="button" onClick={() => remove.mutateAsync({ path: `/${m.id}` }).then(() => toast("Removido.", "info")).catch((e) => toast(errorMessage(e), "error"))} className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--muted)] hover:text-red-600" aria-label={`Remover ${m.title ?? "item"}`}>
+                  {!readOnly && <button type="button" onClick={() => remove.mutateAsync({ path: `/${m.id}` }).then(() => toast("Removido.", "info")).catch((e) => toast(errorMessage(e), "error"))} className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--muted)] hover:text-red-600" aria-label={`Remover ${m.title ?? "item"}`}>
                     <Trash2 className="h-3 w-3" aria-hidden /> Remover
-                  </button>
+                  </button>}
                 </div>
               </li>
             ))}

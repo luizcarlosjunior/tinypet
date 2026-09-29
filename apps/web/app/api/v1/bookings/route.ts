@@ -15,7 +15,7 @@ export const POST = handler(async (req) => {
 
   const petIds = [...new Set(body.petIds)];
   const pets = await prisma.pet.count({ where: { id: { in: petIds }, deletedAt: null, status: "ACTIVE", OR: editablePetOr(user.id) } });
-  if (pets !== petIds.length) throw Errors.forbidden("Escolha apenas pets seus ou compartilhados com permissão de edição");
+  if (pets !== petIds.length) throw Errors.forbidden("Escolha apenas pets seus (pets compartilhados com você só o tutor dono pode agendar)");
 
   const allowed = (item.serviceLocations as string[] | null) ?? [];
   const locationType = body.locationType ?? item.defaultLocation ?? "PARTNER_VENUE";

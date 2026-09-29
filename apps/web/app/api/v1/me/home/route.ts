@@ -1,6 +1,7 @@
 import { prisma } from "@tinypet/db";
 import { handler, ok, requireUser, serialize } from "@/server";
 import { myPetsWhere, tasksForDate, todaySP, petInclude } from "@/server/pets";
+import { pendingPetInviteCount } from "@/server/sharing";
 
 /** Owner home: today's tasks, upcoming appointments (7 days), recent badges, pets and overdue installments. */
 export const GET = handler(async (req) => {
@@ -9,7 +10,7 @@ export const GET = handler(async (req) => {
   const now = new Date();
   const pets = await prisma.pet.findMany({ where: myPetsWhere(user.id), include: { ...petInclude, _count: { select: { earnedBadges: true } } }, orderBy: { createdAt: "asc" } });
   const petIds = pets.map((p) => p.id);
-  const [tasksToday, upcomingAppointments, recentBadges, overdueInstallments] = await Promise.all([
+  const [tasksToday, upcomingAppointments, recentBadges, overdueInstallments, pendingPetInvites] = await Promise.all([
     tasksForDate(petIds, today),
     petIds.length
       ? prisma.appointment.findMany({
@@ -27,6 +28,7 @@ export const GET = handler(async (req) => {
       include: { contract: { select: { id: true, title: true, partner: { select: { id: true, tradeName: true } } } } },
       orderBy: { dueDate: "asc" },
     }),
+    pendingPetInviteCount(user.id),
   ]);
   return ok(
     serialize({
@@ -34,8 +36,10 @@ export const GET = handler(async (req) => {
       tasksToday,
       upcomingAppointments: upcomingAppointments.map((a) => ({ ...a, pets: a.pets.map((p) => p.pet) })),
       recentBadges,
-      pets,
+      pets: pets.map((p) => ({ ...p, role: p.ownerId === user.id ? "owner" : "shared" })),
       overdueInstallments,
+      /** pending share invites + ownership transfer requests addressed to me (see GET /me/pet-invites) */
+      pendingPetInvites,
     }),
   );
 });

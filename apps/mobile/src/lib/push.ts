@@ -52,7 +52,7 @@ export async function unregisterPushToken(): Promise<void> {
 }
 
 /** In-app route prefixes a push notification may navigate to. */
-const ALLOWED_ROUTE_PREFIXES = ["/agenda", "/pets", "/contratos", "/inicio", "/(tutor)/", "/(parceiro)/", "/convite/"];
+const ALLOWED_ROUTE_PREFIXES = ["/agenda", "/pets", "/contratos", "/inicio", "/convites", "/blog", "/(tutor)/", "/(parceiro)/", "/convite/"];
 
 /**
  * Validates a route from a push payload: must be an in-app path (single leading "/", no "//", no scheme, no

@@ -196,6 +196,8 @@ export function bytesMatchMime(bytes: Uint8Array, mime: string): boolean {
       return b.length >= 8 && b[0] === 0x89 && ascii(b, 1, 3) === "PNG" && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a;
     case "image/webp":
       return b.length >= 12 && ascii(b, 0, 4) === "RIFF" && ascii(b, 8, 4) === "WEBP";
+    case "image/gif":
+      return b.length >= 6 && (ascii(b, 0, 6) === "GIF87a" || ascii(b, 0, 6) === "GIF89a");
     case "application/pdf":
       return ascii(b, 0, 5) === "%PDF-";
     case "image/heic": {
@@ -238,3 +240,23 @@ export function normalizeMicrochip(value: string | null | undefined): string {
 export function isValidMicrochip(value: string | null | undefined): boolean {
   return /^\d{15}$/.test(normalizeMicrochip(value));
 }
+
+// ───────── usernames (@handle) ─────────
+/** 3–30 chars, lowercase letters/digits/`.`/`_`, starting and ending with a letter or digit, no `..`. */
+export const USERNAME_RE = /^[a-z0-9](?:[a-z0-9._]{1,28}[a-z0-9])$/;
+export const RESERVED_USERNAMES = ["admin", "tinypet", "suporte", "support", "root", "api", "www", "blog", "parceiro", "tutor", "null", "undefined"] as const;
+export type UsernameProblem = "INVALID" | "RESERVED";
+
+/** Lowercases, trims and strips a leading "@". */
+export function normalizeUsername(value: string): string {
+  return value.trim().replace(/^@+/, "").toLowerCase();
+}
+
+/** null when `username` (already normalized) is acceptable; otherwise why not. */
+export function usernameProblem(username: string): UsernameProblem | null {
+  if (!USERNAME_RE.test(username) || username.includes("..")) return "INVALID";
+  if ((RESERVED_USERNAMES as readonly string[]).includes(username)) return "RESERVED";
+  return null;
+}
+
+export const USERNAME_HINT = "3 a 30 caracteres: letras minúsculas, números, ponto ou sublinhado (sem começar/terminar com . ou _ e sem ..).";

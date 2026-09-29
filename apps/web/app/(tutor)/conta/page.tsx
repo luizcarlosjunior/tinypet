@@ -16,7 +16,8 @@ import { api } from "@/lib/api-client";
 import { errorMessage } from "@/lib/errors";
 import { setActivePartnerId } from "@/lib/api-client";
 import type { AddressRow, EmailRow as PanelEmailRow, PhoneRow } from "@/types/api";
-import { safeHref } from "@tinypet/shared";
+import { normalizeUsername, safeHref } from "@tinypet/shared";
+import { UsernameField, usernameBlocksSubmit, type UsernameStatus } from "@/components/forms/username-field";
 
 const FEATURE_LABEL: Record<string, string> = {
   owner_pets: "Pets cadastrados",
@@ -70,6 +71,8 @@ function ProfileCard() {
   const update = useUpdateProfile();
   const { toast } = useToast();
   const [name, setName] = useState(user.name);
+  const [username, setUsername] = useState(user.username ?? "");
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("empty");
   const [birthDate, setBirthDate] = useState(user.birthDate?.slice(0, 10) ?? "");
   const [termId, setTermId] = useState(user.ownerTermId ?? "");
   const [cropOpen, setCropOpen] = useState(false);
@@ -79,11 +82,13 @@ function ProfileCard() {
   useEffect(() => {
     setName(user.name);
     setTermId(user.ownerTermId ?? "");
-  }, [user.name, user.ownerTermId]);
+    setUsername(user.username ?? "");
+  }, [user.name, user.ownerTermId, user.username]);
 
   async function save() {
     try {
-      await update.mutateAsync({ name, birthDate: birthDate || null, ownerTermId: termId || null });
+      const nextUsername = normalizeUsername(username) || null;
+      await update.mutateAsync({ name, birthDate: birthDate || null, ownerTermId: termId || null, ...(nextUsername !== (user.username ?? null) ? { username: nextUsername } : {}) });
       toast("Perfil atualizado", "success");
     } catch (e) {
       toast(errorMessage(e), "error");
@@ -103,13 +108,16 @@ function ProfileCard() {
         <div className="grid flex-1 gap-3 sm:grid-cols-2">
           <Input id="name" label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
           <Input id="email" label="E-mail de login" value={user.email} disabled />
+          <div className="sm:col-span-2">
+            <UsernameField value={username} onChange={setUsername} current={user.username ?? null} onStatus={setUsernameStatus} />
+          </div>
           <Input id="birth" type="date" label="Data de nascimento (opcional)" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           <Select id="term" label="Como prefere ser chamado" value={termId} onChange={(e) => setTermId(e.target.value)}>
             {(terms.data ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
           </Select>
           <div className="sm:col-span-2 flex items-center justify-between">
             {user.emailVerified ? <Badge tone="green">E-mail verificado</Badge> : <Link href="/verificar" className="text-sm text-brand-600 underline">Verificar e-mail</Link>}
-            <Button onClick={save} loading={update.isPending}>Salvar</Button>
+            <Button onClick={save} loading={update.isPending} disabled={usernameBlocksSubmit(usernameStatus)}>Salvar</Button>
           </div>
         </div>
       </div>

@@ -32,7 +32,7 @@ export type Membership = {
   plan?: string;
   published?: boolean;
 };
-export type SessionUser = { id: Id; name: string; email: string; role: "USER" | "ADMIN"; avatarUrl: string | null; ownerTerm?: string; plan?: string };
+export type SessionUser = { id: Id; name: string; email: string; role: "USER" | "ADMIN" | "EDITOR"; avatarUrl: string | null; ownerTerm?: string; plan?: string };
 export type SessionData = { user: SessionUser; memberships: Membership[] };
 
 export type PartnerTypeRef = { id: Id; key: string; label: string };

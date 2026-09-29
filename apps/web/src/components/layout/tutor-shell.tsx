@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, FileText, Home, PawPrint, UserCircle } from "lucide-react";
+import { CalendarDays, FileText, Home, Inbox, PawPrint, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./public-header";
 import { ThemeToggle } from "./theme-toggle";
@@ -9,6 +9,7 @@ import { NotificationsBell } from "./notifications-bell";
 import { UserMenu } from "./user-menu";
 import { useOwnerTerm } from "@/hooks/use-owner-term";
 import { TermsGate } from "./terms-gate";
+import { useMyPetInvites } from "@/hooks/use-sharing";
 
 const TABS = [
   { href: "/inicio", label: "Início", icon: Home },
@@ -22,6 +23,8 @@ export function TutorShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const term = useOwnerTerm();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const invites = useMyPetInvites();
+  const pendingInvites = (invites.data?.shares.length ?? 0) + (invites.data?.transfers.length ?? 0);
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 border-b bg-[var(--bg)]/90 backdrop-blur">
@@ -32,6 +35,12 @@ export function TutorShell({ children }: { children: React.ReactNode }) {
             <Link href="/buscar" className="btn-ghost hidden sm:inline-flex">
               Buscar parceiros
             </Link>
+            {pendingInvites > 0 && (
+              <Link href="/convites" className="btn-ghost relative h-10 w-10 px-0 md:hidden" aria-label={`Convites de pets (${pendingInvites} pendentes)`}>
+                <Inbox className="h-5 w-5" aria-hidden />
+                <span className="absolute right-1 top-1 min-w-[18px] rounded-full bg-brand-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{pendingInvites}</span>
+              </Link>
+            )}
             <ThemeToggle />
             <NotificationsBell />
             <UserMenu />
@@ -47,6 +56,15 @@ export function TutorShell({ children }: { children: React.ReactNode }) {
                 {label}
               </Link>
             ))}
+            <Link href="/convites" aria-current={isActive("/convites") ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition", isActive("/convites") ? "bg-brand-500 text-white" : "hover:bg-ink-100 dark:hover:bg-ink-800")}>
+              <Inbox className="h-5 w-5" aria-hidden />
+              Convites
+              {pendingInvites > 0 && (
+                <span className="ml-auto min-w-[20px] rounded-full bg-brand-500 px-1.5 text-center text-xs font-bold leading-5 text-white ring-2 ring-[var(--bg)]" aria-label={`${pendingInvites} pendentes`}>
+                  {pendingInvites}
+                </span>
+              )}
+            </Link>
           </nav>
         </aside>
         <main className="min-w-0 flex-1 pb-24 md:pb-8">{children}</main>

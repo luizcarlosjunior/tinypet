@@ -15,12 +15,16 @@ datasource db {
 enum UserRole {
   USER
   ADMIN
+  /// Blog team: can manage blog posts, categories and media only.
+  EDITOR
 }
 
 model User {
   id                  String     @id @default(cuid())
   name                String
   email               String     @unique
+  /// Public handle used to find the account (e.g. pet sharing invites). Lowercase a-z, 0-9, "." and "_".
+  username            String?    @unique @db.VarChar(30)
   emailVerifiedAt     DateTime?  @map("email_verified_at")
   passwordHash        String?    @map("password_hash")
   avatarUrl           String?    @map("avatar_url")
@@ -41,29 +45,39 @@ model User {
   updatedAt           DateTime   @updatedAt @map("updated_at")
   deletedAt           DateTime?  @map("deleted_at")
 
-  accounts              Account[]
-  sessions              Session[]
-  memberships           Membership[]
-  clients               Client[]
-  pets                  Pet[]              @relation("PrimaryOwner")
-  petAccesses           PetAccess[]
-  phones                Phone[]
-  emails                Email[]
-  addresses             Address[]
-  familyMembers         FamilyMember[]
-  reviews               Review[]
-  reports               Report[]
-  enrollments           Enrollment[]
-  subscription          Subscription?
-  taskCompletions       TaskCompletion[]
-  mediaAssets           MediaAsset[]
-  notifications         Notification[]
-  auditLogs             AuditLog[]
-  petHistoryEvents      PetHistoryEvent[]
-  bodyMeasurements      BodyMeasurement[]
-  petSkills             PetSkill[]
-  appointmentsRequested Appointment[]      @relation("RequestedBy")
-  verificationCodes     VerificationCode[]
+  accounts                Account[]
+  sessions                Session[]
+  memberships             Membership[]
+  clients                 Client[]
+  pets                    Pet[]                  @relation("PrimaryOwner")
+  petAccesses             PetAccess[]
+  phones                  Phone[]
+  emails                  Email[]
+  addresses               Address[]
+  familyMembers           FamilyMember[]
+  reviews                 Review[]
+  reports                 Report[]
+  enrollments             Enrollment[]
+  subscription            Subscription?
+  taskCompletions         TaskCompletion[]
+  mediaAssets             MediaAsset[]
+  notifications           Notification[]
+  auditLogs               AuditLog[]
+  petHistoryEvents        PetHistoryEvent[]
+  bodyMeasurements        BodyMeasurement[]
+  petSkills               PetSkill[]
+  appointmentsRequested   Appointment[]          @relation("RequestedBy")
+  verificationCodes       VerificationCode[]
+  petShareInvitesSent     PetShareInvite[]       @relation("ShareInviteFrom")
+  petShareInvitesReceived PetShareInvite[]       @relation("ShareInviteTo")
+  petTransfersSent        PetOwnershipTransfer[] @relation("TransferFrom")
+  petTransfersReceived    PetOwnershipTransfer[] @relation("TransferTo")
+  blogPosts               BlogPost[]             @relation("BlogAuthor")
+  blogMedia               BlogMedia[]
+  blogComments            BlogComment[]
+  blogPostHearts          BlogPostHeart[]
+  blogCommentHearts       BlogCommentHeart[]
+  blogCommentReports      BlogCommentReport[]
 
   @@map("users")
 }
@@ -512,6 +526,8 @@ model Pet {
   specialCare        String?   @map("special_care") @db.Text
   feedingNotes       String?   @map("feeding_notes") @db.Text
   ownerId            String?   @map("owner_id")
+  /// When the current owner became the owner (null = since creation). Ownership can be passed on again only 7 days after it.
+  ownershipSince     DateTime? @map("ownership_since")
   createdByPartnerId String?   @map("created_by_partner_id")
   status             PetStatus @default(ACTIVE)
   deceasedAt         DateTime? @map("deceased_at") @db.Date
@@ -522,22 +538,24 @@ model Pet {
   updatedAt          DateTime  @updatedAt @map("updated_at")
   deletedAt          DateTime? @map("deleted_at")
 
-  species       Species           @relation(fields: [speciesId], references: [id])
-  breed         Breed?            @relation(fields: [breedId], references: [id])
-  owner         User?             @relation("PrimaryOwner", fields: [ownerId], references: [id])
-  clients       ClientPet[]
-  accesses      PetAccess[]
-  media         PetMedia[]
-  historyEvents PetHistoryEvent[]
-  appointments  AppointmentPet[]
-  contracts     ContractPet[]
-  foods         PetFood[]
-  measurements  BodyMeasurement[]
-  skills        PetSkill[]
-  vaccinations  Vaccination[]
-  tasks         Task[]
-  earnedBadges  EarnedBadge[]
-  enrollments   EnrollmentPet[]
+  species            Species                @relation(fields: [speciesId], references: [id])
+  breed              Breed?                 @relation(fields: [breedId], references: [id])
+  owner              User?                  @relation("PrimaryOwner", fields: [ownerId], references: [id])
+  clients            ClientPet[]
+  accesses           PetAccess[]
+  shareInvites       PetShareInvite[]
+  ownershipTransfers PetOwnershipTransfer[]
+  media              PetMedia[]
+  historyEvents      PetHistoryEvent[]
+  appointments       AppointmentPet[]
+  contracts          ContractPet[]
+  foods              PetFood[]
+  measurements       BodyMeasurement[]
+  skills             PetSkill[]
+  vaccinations       Vaccination[]
+  tasks              Task[]
+  earnedBadges       EarnedBadge[]
+  enrollments        EnrollmentPet[]
 
   @@index([ownerId])
   @@index([speciesId, breedId])
@@ -560,12 +578,15 @@ enum AccessLevel {
 }
 
 model PetAccess {
-  id     String      @id @default(cuid())
-  petId  String      @map("pet_id")
-  userId String      @map("user_id")
-  level  AccessLevel @default(VIEW)
-  pet    Pet         @relation(fields: [petId], references: [id], onDelete: Cascade)
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String      @id @default(cuid())
+  petId     String      @map("pet_id")
+  userId    String      @map("user_id")
+  /// Deprecated: shared accounts are read-only on the pet profile (only the owner edits). Kept for data compatibility.
+  level     AccessLevel @default(VIEW)
+  /// When the sharing started (invite accepted). Ownership can be transferred to this account 7 days after it.
+  createdAt DateTime    @default(now()) @map("created_at")
+  pet       Pet         @relation(fields: [petId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([petId, userId])
   @@map("pet_accesses")
@@ -1716,4 +1737,274 @@ model RateLimit {
 
   @@index([resetAt])
   @@map("rate_limits")
+}
+
+enum PetShareStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+  EXPIRED
+}
+
+/// Owner invites another account (found by username or e-mail) to share a pet; the invitee accepts or declines.
+model PetShareInvite {
+  id          String         @id @default(cuid())
+  petId       String         @map("pet_id")
+  fromUserId  String         @map("from_user_id")
+  toUserId    String         @map("to_user_id")
+  status      PetShareStatus @default(PENDING)
+  expiresAt   DateTime       @map("expires_at")
+  respondedAt DateTime?      @map("responded_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  pet         Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  fromUser    User           @relation("ShareInviteFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser      User           @relation("ShareInviteTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([toUserId, status])
+  @@index([petId, status])
+  @@map("pet_share_invites")
+}
+
+/// Ownership transfer from the owner to an account the pet is shared with; the recipient accepts or declines.
+model PetOwnershipTransfer {
+  id          String         @id @default(cuid())
+  petId       String         @map("pet_id")
+  fromUserId  String         @map("from_user_id")
+  toUserId    String         @map("to_user_id")
+  status      PetShareStatus @default(PENDING)
+  expiresAt   DateTime       @map("expires_at")
+  respondedAt DateTime?      @map("responded_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  pet         Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  fromUser    User           @relation("TransferFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser      User           @relation("TransferTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([toUserId, status])
+  @@index([petId, status])
+  @@map("pet_ownership_transfers")
+}
+
+// ───────────────────────────── Blog ─────────────────────────────
+
+enum BlogPostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+/// Hierarchical blog categories: parentId null = category, otherwise subcategory.
+model BlogCategory {
+  id          String             @id @default(cuid())
+  parentId    String?            @map("parent_id")
+  name        String             @db.VarChar(120)
+  slug        String             @unique @db.VarChar(140)
+  description String?            @db.Text
+  sortOrder   Int                @default(0) @map("sort_order")
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  parent      BlogCategory?      @relation("BlogCategoryTree", fields: [parentId], references: [id])
+  children    BlogCategory[]     @relation("BlogCategoryTree")
+  posts       BlogPostCategory[]
+
+  @@index([parentId, sortOrder])
+  @@map("blog_categories")
+}
+
+model BlogPost {
+  id               String              @id @default(cuid())
+  slug             String              @unique @db.VarChar(200)
+  title            String              @db.VarChar(200)
+  summary          String?             @db.Text
+  /// Sanitized HTML produced by the TipTap editor.
+  content          String              @db.LongText
+  status           BlogPostStatus      @default(DRAFT)
+  /// Publication date (future + SCHEDULED = scheduled publish).
+  publishDate      DateTime?           @map("publish_date")
+  authorId         String?             @map("author_id")
+  coverImageRect   String?             @map("cover_image_rect") @db.VarChar(1000)
+  coverImageSquare String?             @map("cover_image_square") @db.VarChar(1000)
+  coverOgImage     String?             @map("cover_og_image") @db.VarChar(1000)
+  coverAlt         String?             @map("cover_alt") @db.VarChar(300)
+  seoTitle         String?             @map("seo_title") @db.VarChar(70)
+  seoDescription   String?             @map("seo_description") @db.VarChar(255)
+  /// Comma-separated tags.
+  tags             String?             @db.Text
+  readingMinutes   Int                 @default(1) @map("reading_minutes")
+  featured         Boolean             @default(false)
+  /// Readers can comment (and reply) on this post.
+  commentsEnabled  Boolean             @default(true) @map("comments_enabled")
+  /// Denormalized counters, updated atomically on heart toggle / comment create-delete-moderation.
+  heartsCount      Int                 @default(0) @map("hearts_count")
+  /// VISIBLE, non-deleted comments (top-level + replies).
+  commentsCount    Int                 @default(0) @map("comments_count")
+  views            Int                 @default(0)
+  viewsLast7Days   Int                 @default(0) @map("views_last_7_days")
+  viewsThisMonth   Int                 @default(0) @map("views_this_month")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  deletedAt        DateTime?           @map("deleted_at")
+  author           User?               @relation("BlogAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  categories       BlogPostCategory[]
+  slugRedirects    BlogSlugRedirect[]
+  viewLogs         BlogPostViewLog[]
+  dailyStats       BlogPostDailyStat[]
+  comments         BlogComment[]
+  hearts           BlogPostHeart[]
+
+  @@index([status, publishDate])
+  @@index([deletedAt, createdAt])
+  @@map("blog_posts")
+}
+
+model BlogPostCategory {
+  postId     String       @map("post_id")
+  categoryId String       @map("category_id")
+  post       BlogPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category   BlogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([postId, categoryId])
+  @@index([categoryId])
+  @@map("blog_post_categories")
+}
+
+/// Old slugs keep redirecting to the current post.
+model BlogSlugRedirect {
+  id        String   @id @default(cuid())
+  oldSlug   String   @unique @map("old_slug") @db.VarChar(200)
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("blog_slug_redirects")
+}
+
+/// Blog media library (images processed in the browser: WebP, max 1920 px; stored on S3).
+model BlogMedia {
+  id               String    @id @default(cuid())
+  url              String    @unique @db.VarChar(700)
+  s3Key            String    @unique @map("s3_key") @db.VarChar(500)
+  originalFilename String    @map("original_filename") @db.VarChar(255)
+  mimeType         String    @map("mime_type") @db.VarChar(100)
+  size             Int
+  width            Int?
+  height           Int?
+  alt              String?   @db.VarChar(300)
+  /// { analyzedAt, originalSize, originalFormat, estimates, isOptimized, ... }
+  metadata         Json?
+  userId           String?   @map("user_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
+  user             User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([deletedAt, createdAt])
+  @@map("blog_media")
+}
+
+/// Raw page view (processed by a job into counters and daily stats; pruned after 90 days). IP stored only as a salted hash (LGPD).
+model BlogPostViewLog {
+  id           String   @id @default(cuid())
+  postId       String   @map("post_id")
+  visitorHash  String   @map("visitor_hash") @db.VarChar(64)
+  referrerHost String?  @map("referrer_host") @db.VarChar(255)
+  device       String?  @db.VarChar(20)
+  browser      String?  @db.VarChar(40)
+  os           String?  @db.VarChar(40)
+  screenWidth  Int?     @map("screen_width")
+  screenHeight Int?     @map("screen_height")
+  processed    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  post         BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([processed, createdAt])
+  @@index([postId, createdAt])
+  @@map("blog_post_view_logs")
+}
+
+/// Aggregated per post per day (America/Sao_Paulo) for charts.
+model BlogPostDailyStat {
+  postId   String   @map("post_id")
+  day      DateTime @db.Date
+  views    Int      @default(0)
+  visitors Int      @default(0)
+  post     BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([postId, day])
+  @@index([day])
+  @@map("blog_post_daily_stats")
+}
+
+enum BlogCommentStatus {
+  VISIBLE
+  HIDDEN
+}
+
+/// Reader comments (logged-in accounts). One level of replies (parentId). Moderated by ADMIN/EDITOR.
+model BlogComment {
+  id          String              @id @default(cuid())
+  postId      String              @map("post_id")
+  userId      String              @map("user_id")
+  parentId    String?             @map("parent_id")
+  body        String              @db.Text
+  status      BlogCommentStatus   @default(VISIBLE)
+  heartsCount Int                 @default(0) @map("hearts_count")
+  editedAt    DateTime?           @map("edited_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  deletedAt   DateTime?           @map("deleted_at")
+  post        BlogPost            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent      BlogComment?        @relation("BlogCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     BlogComment[]       @relation("BlogCommentReplies")
+  hearts      BlogCommentHeart[]
+  reports     BlogCommentReport[]
+
+  @@index([postId, status, createdAt])
+  @@index([parentId])
+  @@index([userId])
+  @@map("blog_comments")
+}
+
+/// A reader marks that a post "deserves a heart" (one per account, toggle).
+model BlogPostHeart {
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId])
+  @@map("blog_post_hearts")
+}
+
+/// A reader marks that a comment "deserves a heart" (one per account, toggle).
+model BlogCommentHeart {
+  commentId String      @map("comment_id")
+  userId    String      @map("user_id")
+  createdAt DateTime    @default(now()) @map("created_at")
+  comment   BlogComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
+  @@map("blog_comment_hearts")
+}
+
+model BlogCommentReport {
+  id        String       @id @default(cuid())
+  commentId String       @map("comment_id")
+  userId    String       @map("user_id")
+  reason    String       @db.VarChar(500)
+  status    ReportStatus @default(OPEN)
+  createdAt DateTime     @default(now()) @map("created_at")
+  comment   BlogComment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([status, createdAt])
+  @@map("blog_comment_reports")
 }

@@ -12,7 +12,7 @@ import {
   type LifeStage,
 } from "@tinypet/shared";
 import { Errors } from "./errors";
-import { requireUser, requirePartner, assertPetAccess, type AuthUser } from "./auth";
+import { requireUser, requirePartner, assertPetAccess, type AuthUser, type PetAccessLevel } from "./auth";
 import { notifyPartner } from "./notify";
 import { awardBadge } from "./badges";
 
@@ -111,9 +111,10 @@ export type PetActor = {
 
 /**
  * Resolves who is acting on a pet. With `X-Partner-Id` the request runs in partner context and the pet must be
- * linked (ClientPet) to one of that partner's clients; otherwise `assertPetAccess` (owner / family / partner member).
+ * linked (ClientPet) to one of that partner's clients; otherwise `assertPetAccess` (owner / shared account / partner member).
+ * Shared accounts (`via: "family"`) only pass `VIEW` and `TASK` (mark tasks done); `EDIT` is 403 for them.
  */
-export async function petActor(req: NextRequest, petId: string, level: "VIEW" | "EDIT" = "VIEW"): Promise<PetActor> {
+export async function petActor(req: NextRequest, petId: string, level: PetAccessLevel = "VIEW"): Promise<PetActor> {
   const select = { id: true, ownerId: true, status: true, name: true, createdByPartnerId: true } as const;
   if (req.headers.get("x-partner-id")) {
     const ctx = await requirePartner(req);
@@ -131,11 +132,12 @@ export async function petActor(req: NextRequest, petId: string, level: "VIEW" | 
 }
 
 /**
- * Owner-controlled data (pet profile, deceased flag): owner / family EDIT always; a partner only for pets it created
- * that have no owner yet (`createdByPartnerId === partnerId && ownerId === null`).
+ * Owner-controlled data (pet profile, deceased flag): the owner always; shared accounts never; a partner only for pets
+ * it created that have no owner yet (`createdByPartnerId === partnerId && ownerId === null`).
  */
 export function canEditOwnerControlled(actor: PetActor): boolean {
-  if (actor.via !== "partner") return true;
+  if (actor.via === "owner") return true;
+  if (actor.via === "family") return false;
   return actor.pet.ownerId === null && !!actor.partnerId && actor.pet.createdByPartnerId === actor.partnerId;
 }
 
@@ -146,6 +148,16 @@ export function assertOwnerControlled(actor: PetActor, msg = "Apenas o tutor pod
 /** Partners may only edit/delete rows they created themselves (rows with partnerId null belong to owner/family). */
 export function assertPartnerOwnsRow(actor: PetActor, rowPartnerId: string | null | undefined, msg = "Registro do tutor ou de outro parceiro não pode ser alterado") {
   if (actor.via === "partner" && (!rowPartnerId || rowPartnerId !== actor.partnerId)) throw Errors.forbidden(msg);
+}
+
+/** Throws 403 unless the actor is the pet's owner (shared accounts and partners can't). */
+export function assertPetOwner(actor: PetActor, msg = "Apenas o tutor dono do pet pode fazer isso") {
+  if (actor.via !== "owner") throw Errors.forbidden(msg);
+}
+
+/** "owner" | "shared" | "partner" as exposed by the API (`pet.role`). */
+export function petRole(actor: Pick<PetActor, "via">): "owner" | "shared" | "partner" {
+  return actor.via === "owner" ? "owner" : actor.via === "family" ? "shared" : "partner";
 }
 
 /** Pets the user owns or can see through PetAccess. */
@@ -170,7 +182,7 @@ export function ownerPetCount(userId: string) {
 export const petInclude = {
   species: { select: { id: true, key: true, label: true } },
   breed: { select: { id: true, name: true, isMixed: true, isOther: true } },
-  owner: { select: { id: true, name: true, avatarUrl: true } },
+  owner: { select: { id: true, name: true, username: true, avatarUrl: true } },
 } satisfies Prisma.PetInclude;
 
 export async function speciesByKey(key: string) {

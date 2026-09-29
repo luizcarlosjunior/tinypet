@@ -4,7 +4,9 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-store";
 import { useOwnerTerms } from "@/hooks/use-ref";
-import { useDeleteAccount, useUpdateProfile } from "@/hooks/use-me";
+import { useDeleteAccount, useHome, useUpdateProfile } from "@/hooks/use-me";
+import { useUsernameAvailability } from "@/hooks/use-sharing";
+import { USERNAME_HINT, usernameProblem, usernameReasonText } from "@/lib/username";
 import { errorMessage } from "@/lib/api";
 import { pickAndUpload } from "@/lib/upload";
 import { unregisterPushToken } from "@/lib/push";
@@ -21,6 +23,41 @@ export default function Account() {
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
   const [uploading, setUploading] = useState(false);
+  const home = useHome();
+  const pendingInvites = home.data?.pendingPetInvites ?? 0;
+  const [usernameOpen, setUsernameOpen] = useState(false);
+  const [username, setUsername] = useState(user?.username ?? "");
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const uname = username.trim().toLowerCase();
+  const avail = useUsernameAvailability(uname, user?.username);
+  const localProblem = usernameProblem(uname);
+  const unchanged = uname === (user?.username ?? "");
+  const usernameStatus: { error?: string; hint: string } = localProblem
+    ? { error: localProblem, hint: USERNAME_HINT }
+    : usernameError
+      ? { error: usernameError, hint: USERNAME_HINT }
+      : !uname || unchanged
+        ? { hint: USERNAME_HINT }
+        : avail.checking
+          ? { hint: "Verificando disponibilidade…" }
+          : avail.error
+            ? { hint: "Não foi possível verificar agora. Você pode tentar salvar mesmo assim." }
+            : avail.data?.available === false
+              ? { error: usernameReasonText(avail.data.reason), hint: USERNAME_HINT }
+              : avail.data?.available
+                ? { hint: `@${uname} está disponível.` }
+                : { hint: USERNAME_HINT };
+  const canSaveUsername = !!uname && !unchanged && !localProblem && !avail.checking && avail.data?.available !== false;
+  const saveUsername = async () => {
+    setUsernameError(null);
+    try {
+      await update.mutateAsync({ username: uname });
+      await refresh();
+      setUsernameOpen(false);
+    } catch (e) {
+      setUsernameError(errorMessage(e));
+    }
+  };
 
   const patch = async (input: Parameters<typeof update.mutateAsync>[0]) => {
     try {
@@ -89,13 +126,35 @@ export default function Account() {
 
       <Section title="Perfil">
         <ListItem title="Nome e dados" subtitle={user.name} onPress={() => { setName(user.name); setEditOpen(true); }} />
+        <ListItem
+          title="Nome de usuário"
+          subtitle={user.username ? `@${user.username} · usado para compartilhar pets` : "Defina um @usuario para receber convites de pets"}
+          onPress={() => {
+            setUsername(user.username ?? "");
+            setUsernameError(null);
+            setUsernameOpen(true);
+          }}
+        />
         <Select label="Como quer ser chamado" value={user.ownerTermId ?? null} onChange={(v) => patch({ ownerTermId: v })} options={(terms.data ?? []).map((o) => ({ value: o.id, label: o.label }))} />
         {!user.emailVerified ? <ListItem title="Verificar e-mail ou telefone" onPress={() => router.push("/(auth)/verificar")} /> : null}
+      </Section>
+
+      <Section title="Pets compartilhados">
+        <ListItem
+          title="Convites de pets"
+          subtitle={pendingInvites > 0 ? `${pendingInvites} ${pendingInvites === 1 ? "pendente" : "pendentes"}` : "Compartilhamentos e transferências de propriedade"}
+          right={pendingInvites > 0 ? <Badge label={String(pendingInvites)} tone="primary" /> : undefined}
+          onPress={() => router.push("/(tutor)/convites")}
+        />
       </Section>
 
       <Section title="Contatos e endereços">
         <ListItem title="Telefones e e-mails" onPress={() => router.push("/(tutor)/conta/contatos")} />
         <ListItem title="Endereços" subtitle="Usados para atendimentos a domicílio e busca por perto" onPress={() => router.push("/(tutor)/conta/enderecos")} />
+      </Section>
+
+      <Section title="Conteúdo">
+        <ListItem title="Blog" subtitle="Dicas e novidades sobre o cuidado com os pets" onPress={() => router.push("/(tutor)/blog")} />
       </Section>
 
       <Section title="Plano">
@@ -124,6 +183,28 @@ export default function Account() {
       <Sheet visible={editOpen} onClose={() => setEditOpen(false)} title="Editar perfil">
         <Input label="Nome" value={name} onChangeText={setName} />
         <Button title="Salvar" onPress={() => patch({ name }).then(() => setEditOpen(false))} loading={update.isPending} disabled={name.trim().length < 2} />
+      </Sheet>
+
+      <Sheet visible={usernameOpen} onClose={() => setUsernameOpen(false)} title="Nome de usuário">
+        <Text variant="small" tone="muted" style={{ marginBottom: spacing.sm }}>
+          Outras pessoas podem encontrar você pelo @usuario (ou pelo e-mail) para compartilhar um pet.
+        </Text>
+        <Input
+          label="Usuário"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="username"
+          maxLength={30}
+          value={username}
+          onChangeText={(v: string) => {
+            setUsername(v.replace(/^@/, "").replace(/\s/g, "").toLowerCase());
+            setUsernameError(null);
+          }}
+          placeholder="seu.usuario"
+          error={usernameStatus.error}
+          hint={usernameStatus.hint}
+        />
+        <Button title="Salvar" onPress={() => void saveUsername()} loading={update.isPending} disabled={!canSaveUsername} />
       </Sheet>
     </Screen>
   );

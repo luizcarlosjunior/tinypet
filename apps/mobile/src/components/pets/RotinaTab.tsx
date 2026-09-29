@@ -17,7 +17,8 @@ export function describeRule(rule?: TaskRule | null, dueAt?: string | null): str
 }
 
 /** Rotina: task list with complete checkbox, accept proposed routines, new task from templates. */
-export function RotinaTab({ petId, canEdit, isOwner, partnerMode }: { petId: string; canEdit: boolean; isOwner: boolean; partnerMode?: boolean }) {
+/** `isOwner`: may accept proposed routines. `canComplete` (default `isOwner`): may tick tasks as done — also true for shared accounts. */
+export function RotinaTab({ petId, canEdit, isOwner, partnerMode, canComplete = isOwner }: { petId: string; canEdit: boolean; isOwner: boolean; partnerMode?: boolean; canComplete?: boolean }) {
   const q = useTasks(petId);
   const { create, complete, accept, remove } = useTaskMutations(petId);
   const [open, setOpen] = useState(false);
@@ -68,7 +69,7 @@ export function RotinaTab({ petId, canEdit, isOwner, partnerMode }: { petId: str
             <View style={{ flex: 1 }}>
               <Checkbox
                 checked={!!task.completedToday}
-                disabled={!!task.completedToday || task.status === "PAUSED" || !isOwner}
+                disabled={!!task.completedToday || task.status === "PAUSED" || !canComplete}
                 onChange={() => complete.mutateAsync({ tid: task.id }).catch((e) => Alert.alert("Erro", errorMessage(e)))}
                 label={task.title}
                 description={`${describeRule(task.rule, task.dueAt)}${task.status === "PAUSED" ? " · pausada" : ""}${task.lastCompletedAt ? ` · última ${fmtDate(task.lastCompletedAt, "dd/MM")}` : ""}`}

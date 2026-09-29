@@ -3,12 +3,15 @@ import { FlatList, RefreshControl, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ageInMonths, formatAge } from "@tinypet/shared";
 import { usePets } from "@/hooks/use-pets";
+import { petRoleOf } from "@/hooks/use-sharing";
+import { useAuth } from "@/lib/auth-store";
 import { spacing, useTheme } from "@/lib/theme";
 import { Avatar, Badge, Button, Checkbox, Empty, ErrorState, ListItem, Loading, Screen } from "@/components/ui";
 
 export default function PetsList() {
   const t = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
   const [includeDeceased, setIncludeDeceased] = useState(false);
   const q = usePets(includeDeceased);
   const pets = q.data ?? [];
@@ -33,7 +36,7 @@ export default function PetsList() {
               right={
                 <View style={{ gap: 4, alignItems: "flex-end" }}>
                   {p.status === "DECEASED" ? <Badge label="Em memória" icon="heart" /> : null}
-                  {p.accessLevel === "VIEW" || p.accessLevel === "EDIT" ? <Badge label="Compartilhado" tone="info" /> : null}
+                  {petRoleOf(p, user?.id) === "shared" ? <Badge label="Compartilhado" tone="info" icon="people" /> : null}
                 </View>
               }
               onPress={() => router.push(`/(tutor)/pets/${p.id}`)}

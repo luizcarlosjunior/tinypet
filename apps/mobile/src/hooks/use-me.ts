@@ -12,7 +12,7 @@ export function usePlan() {
 export function useUpdateProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpdateProfileInput) => api("/auth/me", { method: "PATCH", json: input }),
+    mutationFn: (input: UpdateProfileInput & { username?: string }) => api("/auth/me", { method: "PATCH", json: input }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
   });
 }
