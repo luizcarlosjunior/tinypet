@@ -9,6 +9,7 @@ import type { Pet } from "@/lib/types";
 import { Button, Card, Checkbox, Input, KeyValue, Sheet, Text } from "@/components/ui";
 import { useAuth } from "@/lib/auth-store";
 import { PetForm } from "./PetForm";
+import { MicrochipLookupLinks } from "./Microchip";
 
 const SEX_LABEL: Record<string, string> = { MALE: "Macho", FEMALE: "Fêmea" };
 const SIZE_LABEL = { SMALL: "Pequeno", MEDIUM: "Médio", LARGE: "Grande", GIANT: "Gigante" };
@@ -67,7 +68,8 @@ export function FichaTab({ pet, canEdit, isOwner: _isOwner, canRegisterDeath = f
         <KeyValue k="Nascimento" v={pet.birthDate ? fmtDate(pet.birthDate) : null} />
         <KeyValue k="Idade" v={formatAge(ageInMonths(pet.birthDate, pet.approxAgeMonths))} />
         <KeyValue k="Castrado" v={pet.neutered == null ? null : pet.neutered ? "Sim" : "Não"} />
-        <KeyValue k="Microchip" v={pet.microchip} />
+        <KeyValue k="Microchip" v={pet.microchip || "Não possui"} />
+        {pet.microchip ? <MicrochipLookupLinks chip={pet.microchip} /> : null}
         <KeyValue k="Temperamento" v={pet.temperament} />
         <KeyValue k="Cuidados especiais" v={pet.specialCare} />
         <KeyValue k="Alimentação" v={pet.feedingNotes} />

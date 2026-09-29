@@ -17,6 +17,7 @@ import { MeasurementsTab } from "@/components/painel/clientes/pet/MeasurementsTa
 import { VaccinationsTab } from "@/components/painel/clientes/pet/VaccinationsTab";
 import { SkillsTab } from "@/components/painel/clientes/pet/SkillsTab";
 import { RoutineTab } from "@/components/painel/clientes/pet/RoutineTab";
+import { MicrochipLookupLinks } from "@/components/pets/microchip";
 
 type Tab = "ficha" | "historico" | "medidas" | "vacinas" | "comandos" | "rotina";
 const TABS: { key: Tab; label: string }[] = [
@@ -103,6 +104,7 @@ export default function PetPage() {
                   </div>
                 ))}
               </dl>
+              {pet.microchip && <MicrochipLookupLinks chip={pet.microchip} />}
             </div>
           ) : (
             <PetForm key={pet.id + (pet.avatarUrl ?? "")} initial={pet} partnerId={partnerId} onSubmit={(v) => update.mutate(v)} submitting={update.isPending} />

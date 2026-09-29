@@ -7,6 +7,7 @@ import { useSpecies } from "@/hooks/use-ref";
 import { Button, Input, Select, Textarea } from "@/components/ui";
 import { AvatarUpload } from "@/components/media/avatar-upload";
 import type { Pet } from "@/hooks/use-pets";
+import { MicrochipField } from "./microchip";
 
 const SEX = [["MALE", "Macho"], ["FEMALE", "Fêmea"]] as const;
 const SIZE = [["", "Não informado"], ["SMALL", "Pequeno"], ["MEDIUM", "Médio"], ["LARGE", "Grande"], ["GIANT", "Gigante"]] as const;
@@ -110,7 +111,7 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel }: { pet
           <option value="true">Sim</option>
           <option value="false">Não</option>
         </Select>
-        <Input id="pet-microchip" label="Microchip" {...register("microchip", { setValueAs: empty })} />
+        <MicrochipField value={watch("microchip")} onChange={(v) => setValue("microchip", v, { shouldValidate: true, shouldDirty: true })} error={errors.microchip?.message} />
       </div>
       <Textarea id="pet-temperament" label="Temperamento" placeholder="Ex.: dócil, tímido com estranhos" {...register("temperament", { setValueAs: empty })} />
       <Textarea id="pet-care" label="Cuidados especiais" placeholder="Alergias, medicamentos, restrições" {...register("specialCare", { setValueAs: empty })} />

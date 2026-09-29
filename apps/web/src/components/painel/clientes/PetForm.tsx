@@ -11,6 +11,7 @@ import { uploadFile } from "@/lib/upload";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 import type { Pet } from "@/types/api";
+import { MicrochipField } from "@/components/pets/microchip";
 
 export const SEX_LABEL = { MALE: "Macho", FEMALE: "Fêmea" };
 export const SIZE_LABEL = { SMALL: "Pequeno", MEDIUM: "Médio", LARGE: "Grande", GIANT: "Gigante" };
@@ -135,7 +136,7 @@ export function PetForm({ initial, partnerId, onSubmit, submitting, submitLabel 
         </Select>
         <Input id="pet-birth" type="date" label="Nascimento" {...register("birthDate")} error={errors.birthDate?.message} />
         <Input id="pet-age" type="number" min={0} label="Idade aproximada (meses), se não souber a data" {...register("approxAgeMonths", { setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)) })} error={errors.approxAgeMonths?.message} />
-        <Input id="pet-chip" label="Microchip" {...register("microchip")} />
+        <MicrochipField id="pet-chip" value={watch("microchip")} onChange={(v) => setValue("microchip", v, { shouldValidate: true, shouldDirty: true })} error={errors.microchip?.message} />
         <div className="flex items-end pb-2">
           <Checkbox label="Castrado(a)" {...register("neutered")} />
         </div>

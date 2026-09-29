@@ -171,3 +171,51 @@ export const VIDEO_LIMIT_FEATURES = {
 } as const;
 /** Tolerance on the measured duration vs the plan limit (encoder rounding). */
 export const VIDEO_DURATION_TOLERANCE_SECONDS = 0.5;
+
+/** Pet microchips follow ISO 11784/11785: exactly 15 digits. */
+export const MICROCHIP_DIGITS = 15;
+
+export type MicrochipLookup = { key: string; group: string; groupDescription: string; name: string; description?: string; url: string };
+
+/**
+ * Where a microchip number can be checked. None of these services accepts the number in the URL, so clients open the
+ * page and offer a one-tap "copy number" next to the link.
+ */
+export const MICROCHIP_LOOKUPS: readonly MicrochipLookup[] = [
+  {
+    key: "sinpatinhas",
+    group: "Nacional (Brasil)",
+    groupDescription: "Cadastro oficial do governo federal.",
+    name: "SinPatinhas (MMA)",
+    description: "Base do Sistema do Cadastro Nacional de Animais Domésticos. Acesso com a conta gov.br.",
+    url: "https://sinpatinhas.mma.gov.br/",
+  },
+  {
+    key: "aaha",
+    group: "Internacional / Global",
+    groupDescription: "Ferramenta que varre os principais registros do mundo para checar onde o chip está cadastrado.",
+    name: "AAHA Universal Pet Microchip Lookup",
+    url: "https://www.aaha.org/for-veterinary-professionals/microchip-registry-lookup-tool-aaha-find-your-pets-microchip-registry/",
+  },
+  {
+    key: "tagmeupet",
+    group: "Bancos privados",
+    groupDescription: "Úteis para checar o prontuário privado fornecido pelo fabricante ou por clínicas integradas.",
+    name: "Tag MeuPet",
+    url: "https://tagmeupet.com.br/buscar-chip/",
+  },
+  {
+    key: "petlink",
+    group: "Bancos privados",
+    groupDescription: "Úteis para checar o prontuário privado fornecido pelo fabricante ou por clínicas integradas.",
+    name: "PetLink",
+    url: "https://www.petlink.net/microchip-search/",
+  },
+  {
+    key: "animalltag",
+    group: "Bancos privados",
+    groupDescription: "Úteis para checar o prontuário privado fornecido pelo fabricante ou por clínicas integradas.",
+    name: "Animalltag",
+    url: "https://animalltag.com.br/pet/",
+  },
+];

@@ -9,6 +9,7 @@ import { pickAndUpload } from "@/lib/upload";
 import { errorMessage } from "@/lib/api";
 import { spacing, useTheme } from "@/lib/theme";
 import type { Pet } from "@/lib/types";
+import { MicrochipField } from "./Microchip";
 import { Avatar, Button, Input, Segmented, Select, Text } from "@/components/ui";
 
 const SEX = [{ key: "MALE", label: "Macho" }, { key: "FEMALE", label: "Fêmea" }] as const;
@@ -126,7 +127,7 @@ export function PetForm({ initial, onSubmit, submitLabel = "Salvar" }: Props) {
       </Text>
       <Controller control={control} name="neutered" render={({ field }) => <Segmented items={[{ key: "yes", label: "Sim" }, { key: "no", label: "Não" }, { key: "na", label: "Não sei" }]} value={field.value === true ? "yes" : field.value === false ? "no" : "na"} onChange={(k) => field.onChange(k === "yes" ? true : k === "no" ? false : null)} />} />
       <View style={{ height: spacing.md }} />
-      <Controller control={control} name="microchip" render={({ field }) => <Input label="Microchip" value={field.value ?? ""} onChangeText={field.onChange} />} />
+      <Controller control={control} name="microchip" render={({ field, fieldState }) => <MicrochipField value={field.value} onChange={field.onChange} error={fieldState.error?.message} />} />
       <Controller control={control} name="temperament" render={({ field }) => <Input label="Temperamento" multiline value={field.value ?? ""} onChangeText={field.onChange} />} />
       <Controller control={control} name="specialCare" render={({ field }) => <Input label="Cuidados especiais" multiline value={field.value ?? ""} onChangeText={field.onChange} />} />
       <Controller control={control} name="feedingNotes" render={({ field }) => <Input label="Observações de alimentação" multiline value={field.value ?? ""} onChangeText={field.onChange} />} />

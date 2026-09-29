@@ -228,3 +228,13 @@ export function withHttps(input: string | null | undefined): string {
   if (/^[a-z][a-z0-9+.-]*:/i.test(v) && !/^[^:/]+\.[^:/]+:\d/.test(v)) return v; // has a scheme (not "host.tld:port")
   return `https://${v.replace(/^\/+/, "")}`;
 }
+
+/** Removes spaces, dots and dashes people type while reading a chip number. Letters are kept (and then rejected). */
+export function normalizeMicrochip(value: string | null | undefined): string {
+  return (value ?? "").replace(/[\s.\-]/g, "");
+}
+
+/** ISO 11784/11785 microchip: exactly 15 digits. */
+export function isValidMicrochip(value: string | null | undefined): boolean {
+  return /^\d{15}$/.test(normalizeMicrochip(value));
+}

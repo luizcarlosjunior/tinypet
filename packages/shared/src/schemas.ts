@@ -1,3 +1,4 @@
+import { normalizeMicrochip } from "./utils";
 import { z } from "zod";
 
 // ───────── primitives ─────────
@@ -188,7 +189,11 @@ export const petSchema = z.object({
   birthDate: dateString.optional().nullable(),
   approxAgeMonths: z.coerce.number().int().min(0).max(600).optional().nullable(),
   neutered: z.boolean().optional().nullable(),
-  microchip: z.string().max(40).optional().nullable(),
+  /** Null when the pet has no microchip; otherwise exactly 15 digits (spaces, dots and dashes are ignored). */
+  microchip: z.preprocess(
+    (v) => (typeof v === "string" ? normalizeMicrochip(v) || null : v),
+    z.string().regex(/^\d{15}$/, "O microchip deve ter 15 dígitos").nullable(),
+  ).optional(),
   avatarUrl: httpUrl.optional().nullable(),
   temperament: z.string().max(2000).optional().nullable(),
   specialCare: z.string().max(5000).optional().nullable(),
