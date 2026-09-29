@@ -8,7 +8,7 @@ export type Appointment = {
   /** owner listing (/me/appointments): false when a pet on it is only shared with me (read-only). */
   canManage?: boolean;
   partnerId: string;
-  partner?: { id: string; tradeName: string; slug: string; logoUrl: string | null; cancellationHours?: number } | null;
+  partner?: { id: string; tradeName: string; slug: string; logoUrl: string | null; cancellationHours?: number; address?: AppointmentAddress | null } | null;
   title: string | null;
   startsAt: string;
   endsAt: string;

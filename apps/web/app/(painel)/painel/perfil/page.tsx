@@ -11,6 +11,7 @@ import { ConfirmDialog, FieldGroup, QueryState, Tabs } from "@/components/painel
 import { ContactsEditor } from "@/components/forms/ContactsEditor";
 import { PublishCard } from "@/components/painel/PublishCard";
 import { PartnerDataForm } from "@/components/painel/perfil/PartnerDataForm";
+import { useCatalog } from "@/hooks/use-catalog";
 import { LogoCard, VenuePhotosCard } from "@/components/painel/perfil/LogoAndPhotos";
 import { BusinessHoursCard, SocialLinksCard } from "@/components/painel/perfil/SocialAndHours";
 import { VerifyButton } from "@/components/painel/perfil/VerifyContacts";
@@ -29,6 +30,7 @@ export default function PerfilPage() {
   const [missing, setMissing] = useState<string[] | null>(null);
   const [delOpen, setDelOpen] = useState(false);
   const canEdit = true; // OWNER and STAFF can edit the profile; deletion is owner-only
+  const publishedItems = useCatalog(partnerId, { status: "PUBLISHED" });
 
   const publish = useMutation({
     mutationFn: () => api<{ published: boolean; missing: string[] }>(`/partners/${partnerId}/publish`, { method: "POST" }),
@@ -80,7 +82,7 @@ export default function PerfilPage() {
       <QueryState isLoading={partnerQuery.isLoading} error={partnerQuery.error} retry={() => partnerQuery.refetch()}>
         {partner && (
           <>
-            {tab === "dados" && <PartnerDataForm partner={partner} onSaved={refresh} canEdit={canEdit} />}
+            {tab === "dados" && <PartnerDataForm partner={partner} onSaved={refresh} canEdit={canEdit} isOwner={isOwner} />}
             {tab === "midia" && (
               <div className="space-y-6">
                 <LogoCard partner={partner} onSaved={refresh} canEdit={canEdit} />
@@ -96,8 +98,8 @@ export default function PerfilPage() {
                   emails={partner.emails ?? []}
                   addresses={partner.addresses ?? []}
                   invalidateKey={["partner", partner.id]}
-                  extraPhone={(p) => (p.isPrimary || (partner.phones ?? []).length === 1 ? <VerifyButton partnerId={partner.id} channel="PHONE" target={p.number} verified={!!partner.phoneVerifiedAt || !!p.verifiedAt} onVerified={refresh} /> : null)}
-                  extraEmail={(e) => (e.isPrimary || (partner.emails ?? []).length === 1 ? <VerifyButton partnerId={partner.id} channel="EMAIL" target={e.address} verified={!!partner.emailVerifiedAt || !!e.verifiedAt} onVerified={refresh} /> : null)}
+                  extraPhone={(p) => (p.isPrimary || (partner.phones ?? []).length === 1 ? <VerifyButton partnerId={partner.id} channel="PHONE" target={p.number} verified={!!p.verifiedAt} onVerified={refresh} /> : null)}
+                  extraEmail={(e) => (e.isPrimary || (partner.emails ?? []).length === 1 ? <VerifyButton partnerId={partner.id} channel="EMAIL" target={e.address} verified={!!e.verifiedAt} onVerified={refresh} /> : null)}
                 />
               </div>
             )}
@@ -109,13 +111,13 @@ export default function PerfilPage() {
             )}
             {tab === "publicacao" && (
               <div className="grid gap-6 lg:grid-cols-2">
-                <PublishCard published={partner.published} slug={partner.slug} missing={missing} onPublish={() => publish.mutate()} loading={publish.isPending} />
+                <PublishCard published={partner.published} slug={partner.slug} missing={missing} onPublish={() => publish.mutate()} loading={publish.isPending} canPublish={isOwner} />
                 <FieldGroup title="Checklist para publicar">
                   <ul className="space-y-2 text-sm">
-                    <CheckItem ok={!!partner.emailVerifiedAt} label="E-mail verificado" />
-                    <CheckItem ok={!!partner.phoneVerifiedAt} label="Celular verificado" />
+                    <CheckItem ok={(partner.emails ?? []).some((e) => e.verifiedAt)} label="E-mail verificado" />
+                    <CheckItem ok={(partner.phones ?? []).some((p) => p.verifiedAt)} label="Celular verificado" />
                     <CheckItem ok={!!partner.logoUrl || (partner.addresses ?? []).length > 0 || !!partner.serviceRadiusKm} label="Logo, endereço ou área de atendimento" />
-                    <CheckItem ok={(partner.usage?.catalog_items ?? 0) > 0} label="Ao menos um item publicado no catálogo" hint="Confira em Catálogo" />
+                    <CheckItem ok={(publishedItems.data ?? []).length > 0} label="Ao menos um item publicado no catálogo" hint="Confira em Catálogo" />
                   </ul>
                 </FieldGroup>
                 {isOwner && (

@@ -32,6 +32,12 @@ export function useSharingMutation<TBody = unknown>(petId: string, method: "POST
     mutationFn: ({ arg = "", body }: { arg?: string; body?: TBody }) =>
       api<unknown>(`/pets/${petId}${typeof path === "function" ? path(arg) : path}`, { method, partnerId: null, ...(body !== undefined ? { json: body } : {}) }),
     onSuccess: () => {
+      if (path === "/leave") {
+        // access is gone: refresh only the pet lists; this pet's queries would 403 (the caller navigates away and drops them)
+        qc.invalidateQueries({ queryKey: ["pets"], predicate: (q) => q.queryKey[1] !== petId });
+        qc.invalidateQueries({ queryKey: ["me", "home"] });
+        return;
+      }
       qc.invalidateQueries({ queryKey: sharingKey(petId) });
       qc.invalidateQueries({ queryKey: ["pets"] });
     },

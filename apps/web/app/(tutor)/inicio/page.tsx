@@ -19,7 +19,7 @@ export default function InicioPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const complete = useMutation({
-    mutationFn: ({ petId, taskId }: { petId: string; taskId: string }) => api(`/pets/${petId}/tasks/${taskId}/complete`, { method: "POST", json: { forDate: toDateKey() } }),
+    mutationFn: ({ petId, taskId }: { petId: string; taskId: string }) => api(`/pets/${petId}/tasks/${taskId}/complete`, { method: "POST", json: { forDate: toDateKey() }, partnerId: null }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me", "home"] });
       toast("Tarefa concluída!", "success");
@@ -88,7 +88,7 @@ export default function InicioPage() {
             ) : (
               <ul className="divide-y">
                 {d.upcomingAppointments.map((a) => {
-                  const addr = a.address;
+                  const addr = a.address ?? (a.locationType === "PARTNER_VENUE" ? a.partner?.address ?? null : null);
                   const links = addr ? mapsLinks(num(addr.latitude), num(addr.longitude), addressLine(addr)) : null;
                   return (
                     <li key={a.id} className="flex items-start gap-3 py-2">

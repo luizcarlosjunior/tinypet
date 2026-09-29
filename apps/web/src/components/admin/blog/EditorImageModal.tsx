@@ -24,7 +24,7 @@ export function EditorImageModal({ open, onClose, onSelect }: { open: boolean; o
     }, 400);
     return () => clearTimeout(t);
   }, [q]);
-  const media = useBlogMedia({ q: debounced, type: "image", page, pageSize: 30 }, open && tab === "gallery");
+  const media = useBlogMedia({ q: debounced, page, pageSize: 30 }, open && tab === "gallery");
   useEffect(() => {
     if (!media.data) return;
     setItems((prev) => (page === 1 ? media.data.items : [...prev, ...media.data.items.filter((m) => !prev.some((p) => p.id === m.id))]));

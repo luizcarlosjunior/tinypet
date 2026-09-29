@@ -82,7 +82,7 @@ export function VenuePhotosCard({ partner, onSaved, canEdit }: { partner: Partne
   const [error, setError] = useState<unknown>(null);
   const base = `/partners/${partner.id}/venue-photos`;
   const add = useMutation({
-    mutationFn: (m: { url: string; thumbUrl?: string | null }) => api(base, { method: "POST", json: { url: m.url, thumbUrl: m.thumbUrl ?? null, sortOrder: photos.length } }),
+    mutationFn: (m: { url: string; thumbUrl?: string | null }) => api(base, { method: "POST", json: { url: m.url, thumbUrl: m.thumbUrl ?? null } }) /* server appends (sortOrder = count); parallel uploads would all send the same stale length */,
     onSuccess: () => onSaved(),
     onError: (e) => {
       setError(e);

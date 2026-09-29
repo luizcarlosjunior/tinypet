@@ -5,11 +5,14 @@ import { Badge, Button, Input, Modal, Select, Spinner } from "@/components/ui";
 import { ErrorBox, Table, td, th } from "@/components/painel/ui";
 import { useApiMutation, usePetSkills } from "@/hooks/use-crm";
 import { fmtDate, todayISO } from "@/lib/format";
+import { useActivePartner } from "@/hooks/use-partner";
 
 const LEVEL: Record<string, { label: string; tone: "gray" | "amber" | "green" }> = { LEARNING: { label: "Aprendendo", tone: "gray" }, SOMETIMES: { label: "Às vezes", tone: "amber" }, MASTERED: { label: "Dominado", tone: "green" } };
 
 export function SkillsTab({ petId }: { petId: string }) {
   const q = usePetSkills(petId);
+  const { partner } = useActivePartner();
+  const isTrainer = !!partner?.types?.some((t) => ("key" in t ? t.key : t.type.key) === "trainer");
   const [open, setOpen] = useState(false);
   const [skillId, setSkillId] = useState("");
   const [custom, setCustom] = useState("");
@@ -71,10 +74,12 @@ export function SkillsTab({ petId }: { petId: string }) {
                     <Badge tone="green">
                       <BadgeCheck className="mr-1 h-3 w-3" aria-hidden /> Validado
                     </Badge>
-                  ) : (
+                  ) : isTrainer && s.level === "MASTERED" ? (
                     <Button type="button" variant="secondary" className="h-8 text-xs" loading={validate.isPending && validate.variables === s.skillId} onClick={() => validate.mutate(s.skillId)}>
                       Validar
                     </Button>
+                  ) : (
+                    <span className="text-xs text-[var(--muted)]">—</span>
                   )}
                 </td>
               </tr>

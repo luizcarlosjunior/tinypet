@@ -16,7 +16,8 @@ const MISSING_LABEL: Record<string, string> = {
   catalogItem: "Ao menos 1 item publicado no catálogo",
 };
 
-export function PublishCard({ published, slug, missing, onPublish, loading }: { published: boolean; slug?: string | null; missing: string[] | null; onPublish: () => void; loading?: boolean }) {
+/** `canPublish=false` (STAFF): publishing is owner-only (API 403) → no button, just a hint. */
+export function PublishCard({ published, slug, missing, onPublish, loading, canPublish = true }: { published: boolean; slug?: string | null; missing: string[] | null; onPublish: () => void; loading?: boolean; canPublish?: boolean }) {
   return (
     <Card title="Página pública">
       {published ? (
@@ -43,9 +44,13 @@ export function PublishCard({ published, slug, missing, onPublish, loading }: { 
             </ul>
           )}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={onPublish} loading={loading}>
-              Publicar página
-            </Button>
+            {canPublish ? (
+              <Button type="button" onClick={onPublish} loading={loading}>
+                Publicar página
+              </Button>
+            ) : (
+              <p className="w-full text-xs text-[var(--muted)]">Apenas o dono do negócio pode publicar a página.</p>
+            )}
             <Link href="/painel/perfil" className="btn-secondary">
               Completar perfil
             </Link>

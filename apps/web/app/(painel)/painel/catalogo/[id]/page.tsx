@@ -20,6 +20,20 @@ import { isoToLocal, localToISO } from "@/lib/format";
 
 type FormValues = CatalogItemInput;
 
+const blank = (v: unknown) => v === "" || v == null || (typeof v === "number" && Number.isNaN(v));
+function cleanItem(v: FormValues): FormValues {
+  return {
+    ...v,
+    subcategoryId: v.subcategoryId || null,
+    brandId: v.brandId || null,
+    productLineId: v.productLineId || null,
+    defaultLocation: v.defaultLocation || null,
+    price: blank(v.price) ? null : v.price,
+    promoPrice: blank(v.promoPrice) ? null : v.promoPrice,
+    durationMinutes: blank(v.durationMinutes) ? null : v.durationMinutes,
+  };
+}
+
 export default function CatalogItemPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -39,7 +53,8 @@ export default function CatalogItemPage() {
   const [promoLocal, setPromoLocal] = useState("");
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(catalogItemSchema),
+    // "—" selects and cleared number inputs give "" → null (otherwise the schema fails silently, or `money` coerces "" to 0)
+    resolver: (values, ctx, opts) => zodResolver(catalogItemSchema)(cleanItem(values), ctx, opts),
     defaultValues: { type: "SERVICE", name: "", description: "", categoryId: "", subcategoryId: null, price: null, promoPrice: null, promoUntil: null, durationMinutes: 60, serviceLocations: ["PARTNER_VENUE"], defaultLocation: "PARTNER_VENUE", bookable: false, speciesKeys: [], brandId: null, productLineId: null, status: "DRAFT", media: [] },
   });
   const { register, handleSubmit, watch, setValue, control, reset, formState: { errors } } = form;

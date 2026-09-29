@@ -10,12 +10,19 @@ import { fmtDate, toDateKey } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Level = "LEARNING" | "SOMETIMES" | "MASTERED";
-type SkillRow = { skillId: string; name: string; level: Level; masteredAt: string | null; validated: boolean; markedBy?: string | null; isCustom?: boolean };
-type SkillsData = { skills: SkillRow[]; available: { id: string; name: string; isCustom?: boolean }[] };
-type Comparison = { scope: string; groupSize: number; widened: boolean; perSkill: { skillId: string; name: string; pct: number }[]; summary: { mastered: number; percentile: number | null } };
+type SkillRow = { skillId: string; name: string; level: Level; masteredAt: string | null; validated: boolean; markedBy?: { kind: "user" | "partner"; id: string; name?: string; tradeName?: string } | null; isCustom?: boolean };
+/** GET /pets/:id/skills → available items are `{ skillId, name, key }` (system skills of the species not yet marked). */
+type SkillsData = { skills: SkillRow[]; available: { skillId: string; name: string; key?: string | null }[] };
+type ComparisonScope = { label: "nearMe" | "city" | "state" | "Brasil"; city: string | null; state: string | null; breed?: { id: string; name: string } | null };
+type Comparison = { scope: ComparisonScope | null; groupSize: number; widened: boolean; perSkill: { skillId: string; name: string; pct: number }[]; summary: { mastered: number; percentile: number | null }; note?: string };
 
 const LEVELS: [Level, string][] = [["LEARNING", "Aprendendo"], ["SOMETIMES", "Às vezes"], ["MASTERED", "Domina"]];
-const SCOPE_LABEL: Record<string, string> = { nearMe: "perto de você", city: "na sua cidade", state: "no seu estado", country: "no Brasil", breed: "da mesma raça" };
+const SCOPE_LABEL: Record<ComparisonScope["label"], string> = { nearMe: "perto de você", city: "na sua cidade", state: "no seu estado", Brasil: "no Brasil" };
+function scopeText(s: ComparisonScope | null): string {
+  if (!s) return "";
+  const where = s.label === "city" || s.label === "nearMe" ? (s.city ? `em ${s.city}` : SCOPE_LABEL[s.label]) : s.label === "state" ? (s.state ? `em ${s.state}` : SCOPE_LABEL.state) : SCOPE_LABEL.Brasil;
+  return `${s.breed?.name ? `da raça ${s.breed.name} ` : ""}${where}`;
+}
 
 export function PetSkills({ petId, deceased: isDeceased, readOnly = false }: { petId: string; deceased: boolean; readOnly?: boolean }) {
   // shared accounts see the skills but can't change them (same locks as a memorial profile)
@@ -38,7 +45,7 @@ export function PetSkills({ petId, deceased: isDeceased, readOnly = false }: { p
   if (q.isLoading) return <Spinner />;
   if (q.isError) return <Empty title="Não foi possível carregar os comandos" description={errorMessage(q.error)} />;
   const skills = q.data?.skills ?? [];
-  const available = (q.data?.available ?? []).filter((a) => !skills.some((s) => s.skillId === a.id));
+  const available = (q.data?.available ?? []).filter((a) => !skills.some((s) => s.skillId === a.skillId));
 
   function setLevel(skillId: string, level: Level) {
     put.mutateAsync({ body: { skillId, level, masteredAt: level === "MASTERED" ? toDateKey() : null } }).catch((e) => toast(errorMessage(e), "error"));
@@ -94,8 +101,8 @@ export function PetSkills({ petId, deceased: isDeceased, readOnly = false }: { p
             {available.length > 0 && (
               <ul className="flex flex-wrap gap-2">
                 {available.map((a) => (
-                  <li key={a.id}>
-                    <button type="button" onClick={() => setLevel(a.id, "LEARNING")} className="btn-secondary h-8 px-3 text-xs">
+                  <li key={a.skillId}>
+                    <button type="button" onClick={() => setLevel(a.skillId, "LEARNING")} className="btn-secondary h-8 px-3 text-xs">
                       <Plus className="h-3 w-3" aria-hidden /> {a.name}
                     </button>
                   </li>
@@ -142,9 +149,10 @@ export function PetSkills({ petId, deceased: isDeceased, readOnly = false }: { p
           <>
             {cmp.data.summary?.percentile != null && (
               <p className="text-sm">
-                <strong>{cmp.data.summary.mastered}</strong> comandos dominados · sabe mais que <strong>{Math.round(cmp.data.summary.percentile)}%</strong> dos pets {SCOPE_LABEL[cmp.data.scope] ?? cmp.data.scope}.
+                <strong>{cmp.data.summary.mastered}</strong> comandos dominados · sabe mais que <strong>{Math.round(cmp.data.summary.percentile)}%</strong> dos pets {scopeText(cmp.data.scope)}.
               </p>
             )}
+            {cmp.data.note && <p className="text-xs text-[var(--muted)]">{cmp.data.note}</p>}
             <p className="text-xs text-[var(--muted)]">
               Grupo de {cmp.data.groupSize} pets{cmp.data.widened ? " · escopo ampliado para ter uma amostra mínima" : ""}.
             </p>

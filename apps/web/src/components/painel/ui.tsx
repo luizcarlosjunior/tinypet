@@ -233,7 +233,7 @@ export function ChipSelect<T extends string>({ options, value, onChange, label }
 /* ───────── Simple table ───────── */
 export function Table({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("overflow-x-auto rounded-2xl border bg-[var(--card)]", className)}>
+    <div className={cn("relative overflow-x-auto rounded-2xl border bg-[var(--card)]", className)} /* relative: contains absolutely-positioned children (sr-only labels) inside the scroll clip */>
       <table className="w-full text-sm">{children}</table>
     </div>
   );

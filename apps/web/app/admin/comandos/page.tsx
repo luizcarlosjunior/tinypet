@@ -10,8 +10,8 @@ export default function ComandosPage() {
   const opts = (species.data ?? []).map((s) => ({ value: s.key, label: s.label }));
   const fields: FieldDef[] = [
     { key: "name", label: "Comando", required: true, placeholder: "Senta" },
-    { key: "key", label: "Chave", placeholder: "sit" },
-    { key: "speciesKey", label: "Espécie (vazio = todas)", type: "select", options: opts },
+    { key: "key", label: "Chave", placeholder: "sit", emptyAs: "omit" },
+    { key: "speciesKey", label: "Espécie (vazio = todas)", type: "select", options: opts, valueOf: (r) => (r as Skill).species?.key ?? (r as Skill).speciesKey ?? null },
   ];
   return (
     <CrudPage<Skill>

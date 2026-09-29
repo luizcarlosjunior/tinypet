@@ -6,12 +6,14 @@ import { useToast } from "@/components/ui/toast";
 import { getActivePartnerId } from "@/lib/api-client";
 import type { ApiResponse } from "@tinypet/shared";
 
+type ImportResult = { created: number; skipped: number; limitReached?: boolean; errors?: { row: number; message: string }[] };
+
 export function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
@@ -26,7 +28,7 @@ export function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () =
       const pid = getActivePartnerId();
       if (pid) headers.set("X-Partner-Id", pid);
       const res = await fetch("/api/v1/clients/import", { method: "POST", body: fd, headers, credentials: "include" });
-      const body = (await res.json().catch(() => null)) as ApiResponse<{ created: number; skipped: number }> | null;
+      const body = (await res.json().catch(() => null)) as ApiResponse<ImportResult> | null;
       if (!body) throw new Error("Resposta inválida do servidor");
       if (!body.ok) throw new Error(body.error.message);
       setResult(body.data);
@@ -40,6 +42,7 @@ export function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () =
   }
 
   const close = () => {
+    if (busy) return; // import in progress
     setFile(null);
     setResult(null);
     setError(null);
@@ -67,6 +70,23 @@ export function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () =
           <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
             Importação concluída: <strong>{result.created}</strong> criados, <strong>{result.skipped}</strong> ignorados.
           </p>
+        )}
+        {result?.limitReached && (
+          <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
+            O limite de clientes do seu plano foi atingido; as linhas restantes não foram importadas. Faça upgrade para importar mais.
+          </p>
+        )}
+        {!!result?.errors?.length && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-red-700 dark:text-red-300">{result.errors.length} linha(s) com erro</summary>
+            <ul className="mt-1 max-h-40 list-disc overflow-auto pl-5 text-xs text-[var(--muted)]">
+              {result.errors.slice(0, 100).map((e, i) => (
+                <li key={i}>
+                  Linha {e.row}: {e.message}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={close}>

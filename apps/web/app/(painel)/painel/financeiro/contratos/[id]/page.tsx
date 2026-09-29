@@ -98,7 +98,7 @@ function Inner() {
               {c.acceptedAt ? <Badge tone="green">Aceito pelo tutor em {fmtDateTime(c.acceptedAt)}</Badge> : <Badge tone="amber">Aguardando aceite do tutor</Badge>}
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-4">
                 <FieldGroup title="Itens">
                   <Table>
@@ -157,9 +157,9 @@ function Inner() {
                   <dl className="space-y-1 text-sm">
                     <Row label="Subtotal" value={formatBRL(subtotal)} />
                     <Row label="Desconto" value={`− ${formatBRL(c.discount)}`} />
-                    <Row label="Total" value={formatBRL(c.totalAmount)} strong />
+                    <Row label="Total" value={formatBRL(c.netAmount ?? num(c.totalAmount) - num(c.discount))} strong />
                     <Row label="Recebido" value={formatBRL(paid)} />
-                    <Row label="Em aberto" value={formatBRL(Math.max(0, num(c.totalAmount) - paid))} />
+                    <Row label="Em aberto" value={formatBRL(Math.max(0, c.balance ?? num(c.totalAmount) - num(c.discount) - paid))} />
                     <Row label="1º vencimento" value={fmtDate(c.firstDueDate)} />
                     {c.sessionsCount != null && <Row label="Sessões" value={String(c.sessionsCount)} />}
                     {c.createdAt && <Row label="Criado em" value={fmtDate(c.createdAt)} />}

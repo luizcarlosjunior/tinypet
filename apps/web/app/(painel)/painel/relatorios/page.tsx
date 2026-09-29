@@ -8,7 +8,7 @@ import { PlanLimitNotice } from "@/components/painel/PlanLimitNotice";
 import { BarList } from "@/components/painel/relatorios/BarList";
 import { useActivePartner } from "@/hooks/use-partner";
 import { useSpecies } from "@/hooks/use-ref";
-import { useBrandsReport, usePetReport, type PetReportItem } from "@/hooks/use-reports";
+import { useBrandsReport, usePetReport, type PetReportItem, type BrandsReport } from "@/hooks/use-reports";
 import { MONTHS, fmtPhone } from "@/lib/format";
 import { isPlanLimit } from "@/lib/errors";
 
@@ -166,7 +166,7 @@ export default function RelatoriosPage() {
         <PlanLimitNotice error={report.error} />
       ) : (
         <QueryState isLoading={report.isLoading} error={report.error} retry={() => report.refetch()}>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card title={`Pets por ${GROUP_BY.find((g) => g.key === applied.groupBy)?.label.toLowerCase() ?? "grupo"}`} className="lg:col-span-1">
               <p className="mb-3 text-2xl font-bold">
                 {report.data?.total ?? 0} <span className="text-sm font-normal text-[var(--muted)]">pets</span>
@@ -227,8 +227,8 @@ function Row({ p }: { p: PetReportItem }) {
   const breed = typeof p.breed === "string" ? p.breed : p.breed?.name ?? p.breedName ?? "";
   const months = p.ageMonths ?? ageInMonths(p.birthDate, p.approxAgeMonths);
   const stage = p.lifeStage ?? lifeStageFor(months, speciesKey, p.size);
-  const client = p.client?.name ?? p.clientName ?? p.ownerName ?? "—";
-  const phone = p.client?.phone ?? p.phone ?? p.contact ?? "";
+  const client = p.tutor?.name ?? "—";
+  const phone = p.tutor?.phone ?? "";
   return (
     <tr>
       <td className={td}>
@@ -258,16 +258,14 @@ function labelGroup(groupBy: string, key: string): string {
   return key || "Não informado";
 }
 
-function BrandsTable({ data }: { data: unknown }) {
-  const rows: Record<string, unknown>[] = Array.isArray(data) ? (data as Record<string, unknown>[]) : data && typeof data === "object" && Array.isArray((data as { items?: unknown }).items) ? ((data as { items: Record<string, unknown>[] }).items) : [];
+function BrandsTable({ data }: { data: BrandsReport | undefined }) {
+  const rows = data?.byBrandCity ?? [];
   if (!rows.length) return <p className="text-sm text-[var(--muted)]">Ainda não há dados de alimentação dos pets.</p>;
-  const str = (v: unknown) => (v == null ? "" : typeof v === "object" ? String((v as { name?: unknown }).name ?? "") : String(v));
   return (
     <Table>
       <thead>
         <tr>
           <th className={th}>Marca</th>
-          <th className={th}>Linha</th>
           <th className={th}>Cidade</th>
           <th className={th}>Pets</th>
         </tr>
@@ -275,10 +273,9 @@ function BrandsTable({ data }: { data: unknown }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i}>
-            <td className={td}>{str(r.brand ?? r.brandName ?? r.name) || "—"}</td>
-            <td className={td}>{str(r.line ?? r.productLine ?? r.lineName) || "—"}</td>
-            <td className={td}>{[str(r.city), str(r.state)].filter(Boolean).join("/") || "—"}</td>
-            <td className={td}>{str(r.count ?? r.pets ?? r.total) || "—"}</td>
+            <td className={td}>{r.brand || "—"}</td>
+            <td className={td}>{[r.city, r.state].filter(Boolean).join("/") || "—"}</td>
+            <td className={td}>{String(r.pets)}</td>
           </tr>
         ))}
       </tbody>

@@ -361,21 +361,29 @@ export async function measurementsFor(petId: string, period: "6m" | "1y" | "all"
   });
 
   const lifeStage = pet.lifeStage;
-  let reference: { minWeightG: number; maxWeightG: number; source: "breed" | "size" | "species" } | null = null;
+  // minG/maxG: aliases read by the tutor web and mobile charts (same values as minWeightG/maxWeightG)
+  let reference: { minWeightG: number; maxWeightG: number; minG: number; maxG: number; source: "breed" | "size" | "species" } | null = null;
   if (lifeStage) {
     const refs = await prisma.measurementReference.findMany({ where: { speciesId: pet.speciesId, lifeStage } });
     const byBreed = pet.breedId ? refs.find((r) => r.breedId === pet.breedId) : undefined;
     const bySize = pet.size ? refs.find((r) => !r.breedId && r.size === pet.size) : undefined;
     const generic = refs.find((r) => !r.breedId && !r.size);
     const r = byBreed ?? bySize ?? generic;
-    if (r) reference = { minWeightG: r.minWeightG, maxWeightG: r.maxWeightG, source: byBreed ? "breed" : bySize ? "size" : "species" };
+    if (r) reference = { minWeightG: r.minWeightG, maxWeightG: r.maxWeightG, minG: r.minWeightG, maxG: r.maxWeightG, source: byBreed ? "breed" : bySize ? "size" : "species" };
   }
 
   const alerts = await weightAlerts(items.map((m) => ({ measuredAt: m.measuredAt, weightG: m.weightG })));
   return { pet, items, lifeStage, reference, alerts };
 }
 
-export type WeightAlert = { type: "weight_change"; pct: number; fromWeightG: number; toWeightG: number; fromDate: string; toDate: string; days: number; direction: "gain" | "loss" };
+export type WeightAlert = { type: "weight_change"; pct: number; fromWeightG: number; toWeightG: number; fromDate: string; toDate: string; days: number; direction: "gain" | "loss"; message: string };
+
+/** pt-BR text shown by every client (tutor web, partner panel, mobile). */
+export function weightAlertMessage(a: Pick<WeightAlert, "pct" | "days" | "direction" | "fromWeightG" | "toWeightG">): string {
+  const kg = (g: number) => `${(g / 1000).toFixed(1).replace(".", ",")} kg`;
+  const pct = String(Math.abs(a.pct)).replace(".", ",");
+  return `${a.direction === "gain" ? "Ganho" : "Perda"} de ${pct}% de peso em até ${a.days} dias (${kg(a.fromWeightG)} → ${kg(a.toWeightG)}). Converse com o veterinário.`;
+}
 
 /** Weight change above `settings.weight_alert.pct` within `.days`, comparing the latest measurement with the oldest inside the window. */
 export async function weightAlerts(items: { measuredAt: Date; weightG: number }[]): Promise<WeightAlert[]> {
@@ -388,18 +396,17 @@ export async function weightAlerts(items: { measuredAt: Date; weightG: number }[
   if (!base || base.weightG === 0) return [];
   const change = ((latest.weightG - base.weightG) / base.weightG) * 100;
   if (Math.abs(change) <= pct) return [];
-  return [
-    {
-      type: "weight_change",
-      pct: Math.round(change * 10) / 10,
-      fromWeightG: base.weightG,
-      toWeightG: latest.weightG,
-      fromDate: ymd(base.measuredAt),
-      toDate: ymd(latest.measuredAt),
-      days,
-      direction: change > 0 ? "gain" : "loss",
-    },
-  ];
+  const alert: Omit<WeightAlert, "message"> = {
+    type: "weight_change",
+    pct: Math.round(change * 10) / 10,
+    fromWeightG: base.weightG,
+    toWeightG: latest.weightG,
+    fromDate: ymd(base.measuredAt),
+    toDate: ymd(latest.measuredAt),
+    days,
+    direction: change > 0 ? "gain" : "loss",
+  };
+  return [{ ...alert, message: weightAlertMessage(alert) }];
 }
 
 export function measurementsHtml(data: Awaited<ReturnType<typeof measurementsFor>>) {
@@ -510,8 +517,16 @@ export async function reportCard(petId: string) {
     daysUntil = Math.round((dateOnly(candidate).getTime() - dateOnly(today).getTime()) / 86_400_000);
     turning = Number(candidate.slice(0, 4)) - Number(b.slice(0, 4));
   }
-  const ownerTerm = pet.ownerId ? await prisma.user.findUnique({ where: { id: pet.ownerId }, select: { ownerTerm: { select: { label: true } } } }) : null;
+  const [ownerTerm, badges, masteredSkills, streak] = await Promise.all([
+    pet.ownerId ? prisma.user.findUnique({ where: { id: pet.ownerId }, select: { ownerTerm: { select: { label: true } } } }) : null,
+    prisma.earnedBadge.count({ where: { petId } }),
+    prisma.petSkill.count({ where: { petId, level: "MASTERED" } }),
+    prisma.pet.findUnique({ where: { id: petId }, select: { streakDays: true } }),
+  ]);
   return {
+    badges,
+    masteredSkills,
+    streakDays: streak?.streakDays ?? 0,
     pet: { id: pet.id, name: pet.name, avatarUrl: pet.avatarUrl, species: pet.species, breed: pet.breed, birthDate: pet.birthDate ? ymd(pet.birthDate) : null },
     ageMonths: pet.ageMonths,
     ageLabel: pet.ageLabel,

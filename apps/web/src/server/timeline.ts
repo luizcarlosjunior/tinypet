@@ -54,7 +54,8 @@ export async function petTimeline(petId: string, limit = 100): Promise<TimelineI
       occurredAt: a.startsAt,
       partner: a.partner,
       user: null,
-      attachments: a.reportPhotos,
+      // reportPhotos is string[]; expose the same [{ url, name, type }] shape as history events
+      attachments: Array.isArray(a.reportPhotos) ? (a.reportPhotos as unknown[]).filter((u): u is string => typeof u === "string").map((url, i) => ({ url, name: `Foto ${i + 1}`, type: "image" })) : null,
       data: { appointmentId: a.id, nextSteps: a.nextSteps },
     });
   }

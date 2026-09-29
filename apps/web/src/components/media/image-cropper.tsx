@@ -19,13 +19,26 @@ export function ImageCropper({ file, onCancel, onConfirm, confirmLabel = "Usar f
   useEffect(() => {
     const url = URL.createObjectURL(file);
     const i = new Image();
+    let active = true;
+    let settled = false;
+    // revoke only once the image finished loading: revoking while it loads (effect re-run / Strict Mode) logs ERR_FILE_NOT_FOUND
+    const done = () => {
+      settled = true;
+      URL.revokeObjectURL(url);
+    };
     i.onload = () => {
+      done();
+      if (!active) return;
       setImg(i);
       setZoom(1);
       setOffset({ x: 0, y: 0 });
     };
+    i.onerror = done;
     i.src = url;
-    return () => URL.revokeObjectURL(url);
+    return () => {
+      active = false;
+      if (settled) URL.revokeObjectURL(url);
+    };
   }, [file]);
 
   const coverScale = img ? Math.max(VIEW / img.naturalWidth, VIEW / img.naturalHeight) : 1;

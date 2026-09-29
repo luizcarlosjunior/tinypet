@@ -31,15 +31,16 @@ export function useClientContracts(id: string | null, enabled = true) {
 }
 export function useClientAppointments(id: string | null, from: string, to: string) {
   return useQuery({
-    queryKey: ["appointments", { clientId: id, from, to }],
+    // under ["schedule"] so appointment mutations (useInvalidateSchedule) refresh the client tab too
+    queryKey: ["schedule", "client-appointments", { clientId: id, from, to }],
     queryFn: async () => {
-      const r = await apiList<Appointment[]>(`/schedule/appointments?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+      const r = await apiList<Appointment[]>(`/schedule/appointments?clientId=${encodeURIComponent(id ?? "")}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
       return (r.data ?? []).filter((a) => a.clientId === id || a.client?.id === id);
     },
     enabled: !!id,
   });
 }
-export type Birthdays = { clients: (Client & { birthDate: string })[]; pets: (Pet & { birthDate: string; client?: { id: string; name: string; primaryPhone?: string | null } | null; clients?: { client: { id: string; name: string; primaryPhone?: string | null } }[] })[] };
+export type Birthdays = { clients: (Client & { birthDate: string })[]; pets: (Pet & { birthDate: string; clients?: { id: string; name: string; primaryPhone?: string | null }[] })[] };
 export function useBirthdays(month: number, partnerId: string | null) {
   return useQuery({ queryKey: ["clients", partnerId, "birthdays", month], queryFn: () => api<Birthdays>(`/clients/birthdays?month=${month}`), enabled: !!partnerId });
 }
@@ -63,7 +64,11 @@ export function usePetSkills(id: string | null) {
 }
 export type TaskRow = { id: string; title: string; description?: string | null; rule?: { freq: "daily" | "weekly"; days?: number[]; times?: string[] } | null; dueAt?: string | null; status: "PROPOSED" | "ACTIVE" | "PAUSED" | "DONE" | "CANCELED" | string; createdAt?: string };
 export function usePetTasks(id: string | null) {
-  return useQuery({ queryKey: ["pet", id, "tasks"], queryFn: () => api<TaskRow[]>(`/pets/${id}/tasks`), enabled: !!id });
+  return useQuery({ queryKey: ["pet", id, "tasks"], queryFn: async () => {
+      // GET /pets/:id/tasks → { date, tasks, today }
+      const d = await api<TaskRow[] | { tasks: TaskRow[] }>(`/pets/${id}/tasks`);
+      return Array.isArray(d) ? d : d?.tasks ?? [];
+    }, enabled: !!id });
 }
 
 /** Generic mutation helper: `api(path, {method, json})` → invalidates keys + toast. */

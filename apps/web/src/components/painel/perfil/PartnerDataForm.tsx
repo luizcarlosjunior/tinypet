@@ -26,7 +26,8 @@ export function partnerTypeKeys(p: Partner | null): string[] {
   return (p?.types ?? []).map((t) => ("type" in t ? t.type.key : t.key));
 }
 
-export function PartnerDataForm({ partner, onSaved, canEdit }: { partner: Partner; onSaved: () => void; canEdit: boolean }) {
+/** `isOwner=false` (STAFF): legal identity fields are read-only and never sent (the API rejects changes with 403). */
+export function PartnerDataForm({ partner, onSaved, canEdit, isOwner = true }: { partner: Partner; onSaved: () => void; canEdit: boolean; isOwner?: boolean }) {
   const { toast } = useToast();
   const types = usePartnerTypes();
   const [cnpjLoading, setCnpjLoading] = useState(false);
@@ -67,19 +68,19 @@ export function PartnerDataForm({ partner, onSaved, canEdit }: { partner: Partne
   const document = watch("document");
 
   const save = useMutation({
-    mutationFn: (v: Form) =>
-      api(`/partners/${partner.id}`, {
-        method: "PATCH",
-        json: {
-          ...v,
-          description: v.description || null,
-          document: v.document ? onlyDigits(v.document) : null,
-          documentType: v.documentType || null,
-          legalName: v.legalName || null,
-          website: v.website || null,
-          serviceRadiusKm: v.serviceRadiusKm === null || (v.serviceRadiusKm as unknown) === "" ? null : v.serviceRadiusKm,
-        },
-      }),
+    mutationFn: (v: Form) => {
+      const json: Record<string, unknown> = {
+        ...v,
+        description: v.description || null,
+        document: v.document ? onlyDigits(v.document) : null,
+        documentType: v.documentType || null,
+        legalName: v.legalName || null,
+        website: v.website || null,
+        serviceRadiusKm: v.serviceRadiusKm === null || (v.serviceRadiusKm as unknown) === "" ? null : v.serviceRadiusKm,
+      };
+      if (!isOwner) for (const k of ["tradeName", "document", "documentType", "legalName"]) delete json[k];
+      return api(`/partners/${partner.id}`, { method: "PATCH", json });
+    },
     onSuccess: () => {
       toast("Dados salvos", "success");
       onSaved();
@@ -101,7 +102,7 @@ export function PartnerDataForm({ partner, onSaved, canEdit }: { partner: Partne
       <FieldGroup title="Dados do negócio" description="Como seu negócio aparece na página pública.">
         <fieldset disabled={!canEdit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input id="p-tradeName" label="Nome fantasia" {...register("tradeName")} error={errors.tradeName?.message} />
+            <Input id="p-tradeName" label="Nome fantasia" readOnly={!isOwner} title={!isOwner ? "Apenas o dono pode alterar" : undefined} {...register("tradeName")} error={errors.tradeName?.message} />
             <Input id="p-website" label="Site" placeholder="https://" {...register("website", { setValueAs: (v: string) => withHttps(v) })} error={errors.website?.message} />
           </div>
           <div>
@@ -124,7 +125,7 @@ export function PartnerDataForm({ partner, onSaved, canEdit }: { partner: Partne
               <label htmlFor="p-docType" className="label">
                 Documento
               </label>
-              <select id="p-docType" className="input" {...register("documentType", { setValueAs: (v) => (v === "" ? null : v) })}>
+              <select id="p-docType" className="input" disabled={!isOwner} {...register("documentType", { setValueAs: (v) => (v === "" ? null : v) })}>
                 <option value="">Nenhum</option>
                 <option value="CNPJ">CNPJ</option>
                 <option value="CPF">CPF</option>
@@ -133,7 +134,7 @@ export function PartnerDataForm({ partner, onSaved, canEdit }: { partner: Partne
             {documentType && (
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <Input id="p-document" label={documentType} inputMode="numeric" {...register("document")} error={errors.document?.message} />
+                  <Input id="p-document" label={documentType} inputMode="numeric" readOnly={!isOwner} {...register("document")} error={errors.document?.message} />
                 </div>
                 {documentType === "CNPJ" && (
                   <Button type="button" variant="secondary" onClick={onCnpjLookup} loading={cnpjLoading} disabled={!document || !isValidCNPJ(document)}>
@@ -142,7 +143,7 @@ export function PartnerDataForm({ partner, onSaved, canEdit }: { partner: Partne
                 )}
               </div>
             )}
-            {documentType === "CNPJ" && <Input id="p-legalName" label="Razão social" {...register("legalName")} />}
+            {documentType === "CNPJ" && <Input id="p-legalName" label="Razão social" readOnly={!isOwner} {...register("legalName")} />}
           </div>
         </fieldset>
       </FieldGroup>

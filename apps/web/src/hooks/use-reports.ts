@@ -19,11 +19,13 @@ export type PetReportItem = {
   status?: string;
   sex?: string | null;
   size?: string | null;
-  client?: { id?: string; name?: string; phone?: string | null } | null;
-  clientName?: string | null;
-  ownerName?: string | null;
-  phone?: string | null;
-  contact?: string | null;
+  /** partner mode only (admin mode: null) */
+  tutor?: { clientId: string | null; name: string | null; linked: boolean; tags: string[]; phone: string | null; email: string | null } | null;
+};
+export type BrandsReport = {
+  byBrandCity: { brandId: string; brand: string; city: string | null; state: string | null; pets: number | string; species: Record<string, number> }[];
+  byBrand: { brandId: string; brand: string; pets: number | string }[];
+  totalPets: number | string;
 };
 export type PetReport = { items: PetReportItem[]; groups: { key: string; count: number | string }[]; total: number };
 
@@ -31,5 +33,5 @@ export function usePetReport(partnerId: string | null, query: string) {
   return useQuery({ queryKey: ["reports", "pets", partnerId, query], queryFn: () => api<PetReport>(`/reports/pets${query ? `?${query}` : ""}`), enabled: !!partnerId });
 }
 export function useBrandsReport(partnerId: string | null) {
-  return useQuery({ queryKey: ["reports", "brands", partnerId], queryFn: () => api<unknown>("/reports/brands"), enabled: !!partnerId, retry: 0 });
+  return useQuery({ queryKey: ["reports", "brands", partnerId], queryFn: () => api<BrandsReport>("/reports/brands"), enabled: !!partnerId, retry: 0 });
 }

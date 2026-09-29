@@ -16,6 +16,12 @@ export type FieldDef = {
   createOnly?: boolean;
   editOnly?: boolean;
   width?: string;
+  /** What an empty input sends. Default: "omit" for numbers (schemas use `.optional()`), "null" otherwise. */
+  emptyAs?: "null" | "omit";
+  /** Current value for the inline edit form when it isn't `row[key]` (e.g. skills: `species.key`). */
+  valueOf?: (row: Row) => unknown;
+  /** Allow decimals in number inputs (default: integers, like the admin schemas). */
+  decimal?: boolean;
 };
 export type Row = { id: string; [k: string]: unknown };
 export type ColumnDef<T extends Row = Row> = { key: string; label: string; render?: (row: T) => ReactNode; className?: string };
@@ -31,8 +37,9 @@ export function payloadFromForm(fd: FormData, fields: FieldDef[]): Record<string
     }
     const v = typeof raw === "string" ? raw.trim() : "";
     if (v === "") {
-      if (f.type === "number" || f.type === "select" || f.type === "url" || f.type === "json") out[f.key] = null;
-      else out[f.key] = f.required ? "" : null;
+      const emptyAs = f.emptyAs ?? (f.type === "number" ? "omit" : "null");
+      if (f.required && f.type !== "number" && f.type !== "select") out[f.key] = "";
+      else if (emptyAs === "null") out[f.key] = null;
       continue;
     }
     if (f.type === "number") out[f.key] = Number(v);
@@ -85,7 +92,7 @@ export function FieldInput({ f, defaultValue, idPrefix }: { f: FieldDef; default
       <label htmlFor={id} className="label">
         {f.label}
       </label>
-      <input id={id} name={f.key} type={f.type === "number" ? "number" : f.type === "url" ? "url" : "text"} step={f.type === "number" ? "any" : undefined} defaultValue={defaultValue == null ? "" : String(defaultValue)} className="input" placeholder={f.placeholder} required={f.required} />
+      <input id={id} name={f.key} type={f.type === "number" ? "number" : f.type === "url" ? "url" : "text"} step={f.type === "number" ? (f.decimal ? "any" : 1) : undefined} defaultValue={defaultValue == null ? "" : String(defaultValue)} className="input" placeholder={f.placeholder} required={f.required} />
     </div>
   );
 }
@@ -151,7 +158,7 @@ export function AdminTable<T extends Row>({ rows, columns, fields, onSave, onDel
                       }}
                     >
                       {editFields.map((f) => (
-                        <FieldInput key={f.key} f={f} defaultValue={r[f.key]} idPrefix={`${idPrefix}-${r.id}`} />
+                        <FieldInput key={f.key} f={f} defaultValue={f.valueOf ? f.valueOf(r) : r[f.key]} idPrefix={`${idPrefix}-${r.id}`} />
                       ))}
                       {err && (
                         <p className="text-xs text-red-600 sm:col-span-2 lg:col-span-3" role="alert">

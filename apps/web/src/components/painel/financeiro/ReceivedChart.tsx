@@ -4,9 +4,9 @@ import { formatBRL } from "@tinypet/shared";
 import { fmtDateKey, num } from "@/lib/format";
 
 /** Inline-SVG bar chart of amounts received per month. */
-export function ReceivedChart({ data, height = 200 }: { data: { month: string; amount: number | string }[]; height?: number }) {
+export function ReceivedChart({ data, height = 200 }: { data: { month: string; total: number | string }[]; height?: number }) {
   const id = useId();
-  const rows = data.map((d) => ({ month: d.month, amount: num(d.amount) }));
+  const rows = data.map((d) => ({ month: d.month, amount: num(d.total) }));
   if (rows.length === 0) return <p className="py-6 text-center text-sm text-[var(--muted)]">Sem recebimentos no período.</p>;
   const max = Math.max(1, ...rows.map((r) => r.amount));
   const padL = 56;

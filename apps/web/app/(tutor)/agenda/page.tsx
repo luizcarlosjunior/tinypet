@@ -142,7 +142,8 @@ function AppointmentDrawer({ a, onClose }: { a: Appointment; onClose: () => void
   const [mode, setMode] = useState<"view" | "cancel" | "resched">("view");
   const [reason, setReason] = useState("");
   const [newStart, setNewStart] = useState("");
-  const addr = a.address;
+  // venue visits usually have no appointment address: the API sends the partner's primary address instead
+  const addr = a.address ?? (a.locationType === "PARTNER_VENUE" ? a.partner?.address ?? null : null);
   const links = addr ? mapsLinks(num(addr.latitude), num(addr.longitude), addressLine(addr)) : null;
   const finished = ["COMPLETED", "CANCELED", "NO_SHOW"].includes(a.status);
   const hours = a.partner?.cancellationHours;

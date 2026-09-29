@@ -45,7 +45,8 @@ export type Contract = {
   createdAt: string;
   items?: { id: string; description: string; quantity: number; unitPrice: string | number }[];
   installments?: Installment[];
-  pets?: { pet?: { id: string; name: string } | null; petId?: string }[];
+  /** API (decorateContract) flattens to `{ id, name }`; `pet` kept for older payloads */
+  pets?: { id?: string; name?: string; pet?: { id: string; name: string } | null; petId?: string }[];
 };
 
 export type PlanInfo = { planKey: string; planName?: string; limits: Record<string, { enabled: boolean; quantity: number | null }>; usage: Record<string, number> };

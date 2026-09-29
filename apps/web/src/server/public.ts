@@ -4,7 +4,7 @@ import type { PartnerSearchQuery } from "@tinypet/shared";
 import { Errors } from "./errors";
 import { catalogInclude } from "./catalog";
 
-const publicReviewInclude = { user: { select: { id: true, name: true, avatarUrl: true } }, reply: true } satisfies Prisma.ReviewInclude;
+const publicReviewInclude = { user: { select: { id: true, name: true, avatarUrl: true } }, reply: true, item: { select: { id: true, name: true } } } satisfies Prisma.ReviewInclude;
 
 // ───────────────────────────── partners ─────────────────────────────
 

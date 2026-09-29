@@ -20,6 +20,7 @@ export function MediaGrid({ items, onChange, purpose, partnerId, max = 10, allow
     return withOrder;
   };
   const [videoOpen, setVideoOpen] = useState(false);
+  const [videoBusy, setVideoBusy] = useState(false);
   const [coverFor, setCoverFor] = useState<number | null>(null);
   const coverItem = coverFor != null ? items[coverFor] : undefined;
   const move = (i: number, dir: -1 | 1) => {
@@ -86,13 +87,14 @@ export function MediaGrid({ items, onChange, purpose, partnerId, max = 10, allow
           {items.length}/{max} · fotos até 10 MB{allowVideo ? "; vídeos convertidos para MP4 16:9 ou 9:16" : ""}
         </span>
       </div>
-      <Modal open={videoOpen} onClose={() => setVideoOpen(false)} title="Adicionar vídeo" className="sm:max-w-xl">
+      <Modal open={videoOpen} onClose={() => (!videoBusy || window.confirm("Cancelar a conversão/envio do vídeo?")) && setVideoOpen(false)} title="Adicionar vídeo" className="sm:max-w-xl">
         {videoOpen && (
           <VideoUploader
             purpose={purpose}
             partnerId={partnerId}
             onError={error}
             onCancel={() => setVideoOpen(false)}
+            onBusyChange={setVideoBusy}
             onUploaded={(m) => {
               onChange(normalize([...items, { kind: "VIDEO" as const, url: m.url, thumbUrl: m.thumbUrl, assetId: m.id, width: m.width, height: m.height }].slice(0, max)));
               setVideoOpen(false);

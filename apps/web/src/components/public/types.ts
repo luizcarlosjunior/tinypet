@@ -54,7 +54,8 @@ export type PublicItem = {
   ratingAvg: number | string | null;
   ratingCount: number;
   media?: PublicItemMedia[];
-  partner?: PublicPartnerSummary & { addresses?: PublicAddress[]; description?: string | null };
+  /** GET /public/items/:id returns the partner's primary address as `address` */
+  partner?: PublicPartnerSummary & { addresses?: PublicAddress[]; address?: PublicAddress | null; description?: string | null };
   reviews?: PublicReview[];
 };
 

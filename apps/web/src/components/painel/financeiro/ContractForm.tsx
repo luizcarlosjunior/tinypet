@@ -4,13 +4,13 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { addMonths, addWeeks, format, parseISO } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
 import { contractSchema, formatBRL, LOCATION_TYPE_LABEL, LocationTypeEnum, type ContractInput } from "@tinypet/shared";
 import { api, apiList } from "@/lib/api-client";
 import { Button, Input, Select, Textarea } from "@/components/ui";
 import { Checkbox, FieldGroup, Table, td, th } from "@/components/painel/ui";
 import { PlanLimitNotice } from "@/components/painel/PlanLimitNotice";
+import { splitInstallmentsPreview as splitInstallments } from "@/lib/installments";
 import { ClientSearch, clientPets } from "@/components/forms/ClientSearch";
 import { useCreateContract } from "@/hooks/use-finance";
 import { errorMessage } from "@/lib/errors";
@@ -20,18 +20,6 @@ import { CONTRACT_TYPE_LABEL, PERIODICITY_LABEL } from "./common";
 
 type Gen = { startsAt: string; durationMinutes: number; recurrence: "WEEKLY" | "BIWEEKLY" | "MONTHLY"; locationType: ContractInput["generateAppointments"] extends infer G ? (G extends { locationType: infer L } ? L : never) : never; addressId: string; membershipId: string; itemId: string };
 
-/** Splits `total` into `count` installments (2 decimals); the last one absorbs rounding. */
-export function splitInstallments(total: number, count: number, firstDueDate: string, periodicity: "WEEKLY" | "BIWEEKLY" | "MONTHLY") {
-  const n = Math.max(1, Math.floor(count || 1));
-  const cents = Math.round(Math.max(0, total) * 100);
-  const base = Math.floor(cents / n);
-  const first = /^\d{4}-\d{2}-\d{2}$/.test(firstDueDate) ? parseISO(`${firstDueDate}T12:00:00`) : null;
-  return Array.from({ length: n }, (_, i) => {
-    const amountCents = i === n - 1 ? cents - base * (n - 1) : base;
-    const due = first ? (periodicity === "MONTHLY" ? addMonths(first, i) : addWeeks(first, periodicity === "BIWEEKLY" ? i * 2 : i)) : null;
-    return { number: i + 1, amount: amountCents / 100, dueDate: due ? format(due, "yyyy-MM-dd") : "" };
-  });
-}
 
 export function ContractForm({ partnerId, initialClientId }: { partnerId: string | null; initialClientId?: string | null }) {
   const router = useRouter();
@@ -83,7 +71,12 @@ export function ContractForm({ partnerId, initialClientId }: { partnerId: string
   function onSubmit(v: ContractInput) {
     setGenError(null);
     let generateAppointments: ContractInput["generateAppointments"] | undefined;
-    if (genEnabled) {
+    // the API only generates lessons for PACKAGE contracts with a number of sessions
+    if (genEnabled && v.type === "PACKAGE") {
+      if (!v.sessionsCount) {
+        setGenError("Informe o número de sessões do pacote para gerar as aulas na agenda.");
+        return;
+      }
       const parsed = contractSchema.shape.generateAppointments.safeParse({
         startsAt: gen.startsAt ? localToISO(gen.startsAt) : "",
         durationMinutes: gen.durationMinutes,
@@ -103,7 +96,7 @@ export function ContractForm({ partnerId, initialClientId }: { partnerId: string
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 lg:grid-cols-[1fr_360px]" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]" noValidate>
       <div className="space-y-4">
         <FieldGroup title="Cliente e pets">
           <ClientSearch value={client} onChange={setClient} error={errors.clientId?.message} />
@@ -141,7 +134,7 @@ export function ContractForm({ partnerId, initialClientId }: { partnerId: string
           </div>
           {values.type === "PACKAGE" && (
             <div className="mt-3 max-w-xs">
-              <Input id="c-sessions" label="Número de sessões" type="number" min={1} max={200} {...register("sessionsCount")} error={errors.sessionsCount?.message} />
+              <Input id="c-sessions" label="Número de sessões" type="number" min={1} max={200} {...register("sessionsCount", { setValueAs: (v) => (v === "" || v == null ? null : Number(v)) })} error={errors.sessionsCount?.message} />
             </div>
           )}
         </FieldGroup>
@@ -149,7 +142,7 @@ export function ContractForm({ partnerId, initialClientId }: { partnerId: string
         <FieldGroup title="Itens" description="Escolha do catálogo ou descreva livremente.">
           <div className="space-y-3">
             {fields.map((f, i) => (
-              <div key={f.id} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_1fr_80px_120px_40px] sm:items-end">
+              <div key={f.id} className="grid grid-cols-1 gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_80px_120px_40px] sm:items-end">
                 <Select id={`c-item-${i}`} label="Do catálogo" value={values.items?.[i]?.itemId ?? ""} onChange={(e) => pickCatalog(i, e.target.value)}>
                   <option value="">Texto livre</option>
                   {catalogItems.map((c) => (
@@ -188,6 +181,7 @@ export function ContractForm({ partnerId, initialClientId }: { partnerId: string
           </div>
         </FieldGroup>
 
+{values.type === "PACKAGE" && (
         <FieldGroup title="Gerar aulas na agenda" description="Cria automaticamente os agendamentos do pacote a partir da primeira data.">
           <Checkbox label="Gerar agendamentos para este contrato" checked={genEnabled} onChange={(e) => setGenEnabled(e.target.checked)} />
           {genEnabled && (
@@ -241,6 +235,7 @@ export function ContractForm({ partnerId, initialClientId }: { partnerId: string
             </div>
           )}
         </FieldGroup>
+        )}
 
         <FieldGroup title="Termos" description="O tutor aceita pelo app; data, hora e IP ficam registrados.">
           <Textarea id="c-terms" label="Termos do contrato" className="min-h-[120px]" placeholder="Condições de cancelamento, remarcação, política de pagamento…" {...register("terms")} />

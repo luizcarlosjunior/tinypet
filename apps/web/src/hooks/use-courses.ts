@@ -10,12 +10,10 @@ export type Student = {
   user?: { id: string; name: string; email?: string } | null;
   pets?: ({ name: string } | { pet: { name: string } })[];
   progressPct?: number | null;
-  progress?: number | null;
-  completedLessons?: number;
-  totalLessons?: number;
+  /** LessonProgress rows (GET /courses/:id/students) — questions live here */
+  progress?: { lessonId: string; completedAt?: string | null; question?: string | null; lesson?: { id: string; title: string } | null }[];
   createdAt?: string;
   enrolledAt?: string;
-  questions?: { lessonId?: string; lessonTitle?: string; question: string; createdAt?: string }[];
 };
 
 export function useCourses(partnerId: string | null) {
@@ -31,15 +29,15 @@ export function useStudents(partnerId: string | null, courseId: string | null) {
   return useQuery({ queryKey: ["courses", partnerId, "students", courseId], queryFn: () => api<Student[]>(`/courses/${courseId}/students`), enabled: !!partnerId && !!courseId && courseId !== "novo" });
 }
 
-function useCourseMutation<TVars>(fn: (v: TVars) => Promise<unknown>, success?: string) {
+function useCourseMutation<TVars, TData = unknown>(fn: (v: TVars) => Promise<TData>, success?: string | ((d: TData) => string)) {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
     mutationFn: fn,
-    onSuccess: () => {
+    onSuccess: (d: TData) => {
       qc.invalidateQueries({ queryKey: ["courses"] });
       qc.invalidateQueries({ queryKey: ["partner"] });
-      if (success) toast(success, "success");
+      if (success) toast(typeof success === "function" ? success(d) : success, "success");
     },
     onError: (e) => toast(errorMessage(e), "error"),
   });
@@ -56,7 +54,7 @@ export function useSaveCourse() {
   });
 }
 export function useDeleteCourse() {
-  return useCourseMutation((id: string) => api(`/courses/${id}`, { method: "DELETE" }), "Curso removido");
+  return useCourseMutation((id: string) => api<{ deleted?: boolean; archived?: boolean }>(`/courses/${id}`, { method: "DELETE" }), (d) => (d?.archived ? "Curso arquivado (há alunos matriculados)" : "Curso removido"));
 }
 export function useSaveModule() {
   return useCourseMutation(({ courseId, id, title, sortOrder }: { courseId: string; id?: string; title: string; sortOrder?: number }) => (id ? api<CourseModule>(`/courses/${courseId}/modules/${id}`, { method: "PATCH", json: { title, sortOrder } }) : api<CourseModule>(`/courses/${courseId}/modules`, { method: "POST", json: { title } })), "Módulo salvo");

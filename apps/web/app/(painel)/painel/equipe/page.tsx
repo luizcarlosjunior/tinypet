@@ -133,8 +133,9 @@ export default function EquipePage() {
                 {
                   id: edit.id,
                   body: {
-                    role: fd.get("role"),
-                    canSeeFinance: fd.get("canSeeFinance") === "on",
+                    // disabled controls are absent from FormData: omit them instead of sending null/false
+                    role: fd.get("role") ?? undefined,
+                    canSeeFinance: edit.role === "OWNER" ? undefined : fd.get("canSeeFinance") === "on",
                     jobTitle: String(fd.get("jobTitle") ?? "") || null,
                     baseAddressId: String(fd.get("baseAddressId") ?? "") || null,
                     costPerKm: cost ? Number(cost) : null,

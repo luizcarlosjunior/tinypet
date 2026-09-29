@@ -30,7 +30,8 @@ export async function petSkills(petId: string) {
       markedBy: r.markedByPartner ? { kind: "partner" as const, ...r.markedByPartner } : r.markedBy ? { kind: "user" as const, ...r.markedBy } : null,
       updatedAt: r.updatedAt,
     })),
-    available: available.filter((s) => !used.has(s.id)).map((s) => ({ skillId: s.id, name: s.name, key: s.key })),
+    // `id` = alias of `skillId` (older clients read `id`)
+    available: available.filter((s) => !used.has(s.id)).map((s) => ({ id: s.id, skillId: s.id, name: s.name, key: s.key })),
   };
 }
 

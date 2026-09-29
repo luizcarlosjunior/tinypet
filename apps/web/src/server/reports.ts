@@ -272,7 +272,8 @@ export async function brandsReport(mode: ReportMode, q: { species?: string; stat
 /** Resolves partner (X-Partner-Id) vs admin report mode from the request. */
 export async function reportMode(req: import("next/server").NextRequest): Promise<ReportMode> {
   const { requirePartner, requireAdmin } = await import("./auth");
-  if (req.headers.get("x-partner-id")) return { kind: "partner", partnerId: (await requirePartner(req)).partnerId };
+  // ?partnerId= too: the panel downloads the CSV with a plain link (no custom headers)
+  if (req.headers.get("x-partner-id") || req.nextUrl.searchParams.get("partnerId")) return { kind: "partner", partnerId: (await requirePartner(req)).partnerId };
   await requireAdmin(req);
   return { kind: "admin" };
 }

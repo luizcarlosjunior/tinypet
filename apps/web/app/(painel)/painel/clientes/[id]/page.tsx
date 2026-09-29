@@ -9,7 +9,7 @@ import { ConfirmDialog, ErrorBox, Tabs, Table, td, th } from "@/components/paine
 import { ContactsEditor } from "@/components/forms/ContactsEditor";
 import { useActivePartner } from "@/hooks/use-partner";
 import { useApiMutation, useClient, useClientAppointments, useClientContracts } from "@/hooks/use-crm";
-import { addDaysKey, dayEndISO, dayStartISO, fmtDate, fmtDateTime, fmtPhone, todayISO, whatsappLink } from "@/lib/format";
+import { addDaysKey, dayEndISO, dayStartISO, fmtDate, fmtDateTime, fmtPhone, isoToDateKey, todayISO, whatsappLink } from "@/lib/format";
 import { isForbidden } from "@/lib/errors";
 import { ClientForm } from "@/components/painel/clientes/ClientForm";
 import { FamilyEditor } from "@/components/painel/clientes/FamilyEditor";
@@ -193,7 +193,7 @@ function AgendaTab({ client }: { client: Client }) {
             {items.map((a) => (
               <tr key={a.id}>
                 <td className={td}>
-                  <Link href={`/painel/agenda?view=dia&date=${a.startsAt.slice(0, 10)}&appointment=${a.id}`} className="hover:underline">
+                  <Link href={`/painel/agenda?view=dia&date=${isoToDateKey(a.startsAt)}&appointment=${a.id}`} className="hover:underline">
                     {fmtDateTime(a.startsAt)}
                   </Link>
                 </td>

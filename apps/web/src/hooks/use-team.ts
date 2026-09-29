@@ -4,6 +4,7 @@ import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 import type { TeamMember } from "@/types/api";
+import { sessionContextKey } from "@/hooks/use-session-context";
 
 export function useMembers(partnerId: string | null) {
   return useQuery({ queryKey: ["partner", partnerId, "members"], queryFn: () => api<TeamMember[]>(`/partners/${partnerId}/members`), enabled: !!partnerId });
@@ -12,7 +13,12 @@ export function useMembers(partnerId: string | null) {
 export function useTeamMutations(partnerId: string | null) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["partner", partnerId, "members"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["partner", partnerId, "members"] });
+    // usage bar / invite gate (team_members) and the caller's own membership (role, canSeeFinance)
+    qc.invalidateQueries({ queryKey: ["partner", partnerId, "plan"] });
+    qc.invalidateQueries({ queryKey: sessionContextKey });
+  };
   const invite = useMutation({
     mutationFn: (body: unknown) => api<TeamMember>(`/partners/${partnerId}/members`, { method: "POST", json: body }),
     onSuccess: () => {

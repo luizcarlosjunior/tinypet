@@ -16,7 +16,10 @@ import { fmtDate, fmtKm } from "@/lib/format";
 
 type FoodInput = z.infer<typeof petFoodSchema>;
 type Food = { id: string; type: FoodInput["type"]; brandId: string | null; productLineId: string | null; brandOther: string | null; packageSizeG: number | null; dailyGrams: number | null; lastPurchaseAt: string | null; offersEnabled: boolean; brand?: { name: string } | null; productLine?: { name: string } | null };
-type Suggestion = { partner: { id: string; slug: string; tradeName: string; logoUrl: string | null; distanceKm?: number | null }; item?: { id: string; name: string; price: string | number | null; promoPrice: string | number | null } | null; brand?: { name: string } | null; promo?: boolean };
+type SuggestionItem = { id: string; name: string; price: string | number | null; promoPrice: string | number | null; promoUntil: string | null; brand?: { id: string; name: string } | null; productLine?: { id: string; name: string } | null };
+/** GET /pets/:id/foods/suggestions → { origin, partners[] } (partners sorted by distance from the owner's primary address). */
+type Suggestion = { partner: { id: string; slug: string; tradeName: string; logoUrl: string | null; city: string | null; state: string | null }; distanceKm: number | null; items: SuggestionItem[]; offers: SuggestionItem[] };
+type Suggestions = { origin: { lat: number; lng: number } | null; partners: Suggestion[] };
 
 const TYPE_LABEL: Record<FoodInput["type"], string> = { DRY: "Ração seca", WET: "Ração úmida", NATURAL: "Alimentação natural", TREAT: "Petisco", SUPPLEMENT: "Suplemento" };
 
@@ -31,9 +34,8 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
   // shared accounts see the foods but can't change them
   const deceased = isDeceased || readOnly;
   const q = usePetResource<Food[]>(petId, "foods");
-  const sug = usePetResource<Suggestion[] | { partners?: unknown[] }>(petId, "foods/suggestions");
-  // the API currently answers { origin, partners[] } with a different item shape; only render the legacy array form
-  const suggestions: Suggestion[] = Array.isArray(sug.data) ? sug.data : [];
+  const sug = usePetResource<Suggestions>(petId, "foods/suggestions");
+  const suggestions: Suggestion[] = sug.data?.partners ?? [];
   const brands = useBrands();
   const create = usePetMutation<FoodInput>(petId, "foods", "POST", ["foods"]);
   const update = usePetMutation<FoodInput>(petId, "foods", "PATCH", ["foods"]);
@@ -132,20 +134,27 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
           <p className="text-sm text-[var(--muted)]">Nenhuma indicação por enquanto. Cadastre as marcas que seu pet usa e um endereço em Conta.</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
-            {suggestions.map((s, i) => (
-              <li key={`${s.partner.id}-${s.item?.id ?? i}`} className="card text-sm">
+            {suggestions.map((s) => (
+              <li key={s.partner.id} className="card text-sm">
                 <p className="font-medium">
                   <Link href={`/p/${s.partner.slug}`} className="hover:underline">
                     {s.partner.tradeName}
                   </Link>
-                  {s.partner.distanceKm != null && <span className="text-xs text-[var(--muted)]"> · {fmtKm(s.partner.distanceKm)}</span>}
+                  {s.distanceKm != null && <span className="text-xs text-[var(--muted)]"> · {fmtKm(s.distanceKm)}</span>}
+                  {s.distanceKm == null && s.partner.city && <span className="text-xs text-[var(--muted)]"> · {s.partner.city}{s.partner.state ? `/${s.partner.state}` : ""}</span>}
                 </p>
-                {s.item && (
-                  <p className="text-xs text-[var(--muted)]">
-                    {s.item.name} · {s.item.promoPrice != null ? <span className="font-semibold text-emerald-700 dark:text-emerald-300">{formatBRL(s.item.promoPrice)} (oferta)</span> : formatBRL(s.item.price)}
-                  </p>
-                )}
-                {s.brand?.name && <p className="text-xs text-[var(--muted)]">Marca: {s.brand.name}</p>}
+                <ul className="mt-1 space-y-0.5">
+                  {s.items.slice(0, 4).map((it) => (
+                    <li key={it.id} className="text-xs text-[var(--muted)]">
+                      <Link href={`/p/${s.partner.slug}/item/${it.id}`} className="hover:underline">
+                        {it.name}
+                      </Link>
+                      {" · "}
+                      {it.promoPrice != null ? <span className="font-semibold text-emerald-700 dark:text-emerald-300">{formatBRL(it.promoPrice)} (oferta)</span> : it.price != null ? formatBRL(it.price) : "consulte"}
+                    </li>
+                  ))}
+                </ul>
+                {s.offers.length > 0 && <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">{s.offers.length} {s.offers.length === 1 ? "oferta ativa" : "ofertas ativas"}</p>}
               </li>
             ))}
           </ul>

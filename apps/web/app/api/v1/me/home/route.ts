@@ -15,7 +15,7 @@ export const GET = handler(async (req) => {
     petIds.length
       ? prisma.appointment.findMany({
           where: { startsAt: { gte: now, lte: new Date(now.getTime() + 7 * 86_400_000) }, status: { in: ["REQUESTED", "CONFIRMED"] }, pets: { some: { petId: { in: petIds } } } },
-          include: { partner: { select: { id: true, slug: true, tradeName: true, logoUrl: true } }, item: { select: { id: true, name: true } }, pets: { select: { pet: { select: { id: true, name: true, avatarUrl: true } } } }, address: true },
+          include: { partner: { select: { id: true, slug: true, tradeName: true, logoUrl: true, addresses: { where: { isPrimary: true }, take: 1, select: { street: true, number: true, district: true, city: true, state: true, latitude: true, longitude: true } } } }, item: { select: { id: true, name: true } }, pets: { select: { pet: { select: { id: true, name: true, avatarUrl: true } } } }, address: true },
           orderBy: { startsAt: "asc" },
           take: 20,
         })
@@ -34,7 +34,7 @@ export const GET = handler(async (req) => {
     serialize({
       today,
       tasksToday,
-      upcomingAppointments: upcomingAppointments.map((a) => ({ ...a, pets: a.pets.map((p) => p.pet) })),
+      upcomingAppointments: upcomingAppointments.map(({ partner: { addresses, ...partner }, ...a }) => ({ ...a, partner: { ...partner, address: addresses[0] ?? null }, pets: a.pets.map((p) => p.pet) })),
       recentBadges,
       pets: pets.map((p) => ({ ...p, role: p.ownerId === user.id ? "owner" : "shared" })),
       overdueInstallments,

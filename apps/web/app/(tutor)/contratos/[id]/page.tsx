@@ -102,7 +102,7 @@ export default function ContratoPage({ params }: { params: { id: string } }) {
         <p className="mt-2 text-xs text-[var(--muted)]">
           {c.installmentsCount}x {PERIOD[c.periodicity]} · primeira em {fmtDate(c.firstDueDate)}
           {c.sessionsCount ? ` · ${c.sessionsCount} sessões` : ""}
-          {c.pets?.length ? ` · Pets: ${c.pets.map((p) => p.pet?.name).filter(Boolean).join(", ")}` : ""}
+          {c.pets?.length ? ` · Pets: ${c.pets.map((p) => p.name ?? p.pet?.name).filter(Boolean).join(", ")}` : ""}
         </p>
       </section>
 

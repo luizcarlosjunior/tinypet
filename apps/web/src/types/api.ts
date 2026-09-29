@@ -194,12 +194,16 @@ export type Appointment = {
   travelLeg?: TravelLeg | null;
 };
 
+export type DayRouteAlert = { delayMinutes: number; message: string };
+export type DayRouteSuggestion =
+  | { type: "SHIFT"; appointmentId: Id; suggestedStartsAt: string; message: string }
+  | { type: "REORDER"; order: Id[]; savesKm: number; savesMinutes: number; message: string };
 export type DayRoute = {
-  stops: { appointmentId: Id; order: number; address?: string | null; lat?: number | null; lng?: number | null; startsAt: string; legDistanceKm?: number | null; legMinutes?: number | null; estimated?: boolean; alert?: string | null }[];
+  stops: { appointmentId: Id; order: number; clientName?: string | null; title?: string | null; address?: AddressRow | null; addressText?: string | null; lat?: number | null; lng?: number | null; startsAt: string; endsAt?: string; legDistanceKm?: number | null; legMinutes?: number | null; estimated?: boolean; alert?: DayRouteAlert | null }[];
   totalKm: number;
   totalMinutes: number;
   googleMapsUrl?: string | null;
-  suggestions?: { id?: string; title?: string; description?: string; savesKm?: number; savesMinutes?: number; changes?: { appointmentId: Id; startsAt: string }[] }[];
+  suggestions?: DayRouteSuggestion[];
 };
 
 export type Availability = { slots: { weekday: number; startsAt: string; endsAt: string }[] };
@@ -239,16 +243,21 @@ export type Contract = {
   pets?: (PetSummary | { pet: PetSummary })[];
   installments?: Installment[];
   appointments?: Appointment[];
+  netAmount?: number;
+  paidAmount?: number;
+  balance?: number;
   createdAt?: string;
 };
 export type Transaction = { id: Id; kind: "INCOME" | "EXPENSE"; category: string; description?: string | null; amount: number | string; occurredAt: string; method?: string | null };
 export type FinanceSummary = {
-  receivable: number | string;
-  overdue: Installment[];
-  receivedByMonth: { month: string; amount: number | string }[];
-  receivedByMethod: { method: string; amount: number | string }[];
-  receivedByService: { service: string; amount: number | string }[];
-  cashflow: { month: string; income: number | string; expense: number | string; balance?: number | string }[];
+  period?: { from: string; to: string };
+  receivable: { total: number; count: number; from: string; to: string };
+  overdue: (Installment & { contractTitle?: string; clientName?: string; remaining?: number; daysLate?: number })[];
+  overdueTotal?: number;
+  receivedByMonth: { month: string; total: number | string }[];
+  receivedByMethod: { method: string; label?: string; total: number | string }[];
+  receivedByService: { service: string; total: number | string }[];
+  cashflow: { month: string; income: number | string; expense: number | string; net?: number | string }[];
   receivedThisMonth?: number | string;
 };
 
@@ -288,7 +297,7 @@ export type NotificationRow = { id: Id; type: string; title: string; body?: stri
 export type Dashboard = {
   today: Appointment[];
   receivable30d: number | string;
-  overdue: Installment[];
+  overdue: (Installment & { contractTitle?: string; clientId?: string; clientName?: string; daysLate?: number })[];
   counts: { clients: number; pets: number; appointmentsWeek: number };
 };
 
@@ -303,5 +312,5 @@ export type PetHistoryEvent = {
   source?: string;
 };
 export type Measurement = { id: Id; measuredAt: string; weightG: number; heightCm?: number | string | null; lengthCm?: number | string | null; neckCm?: number | string | null; chestCm?: number | string | null; abdomenCm?: number | string | null; bodyScore?: number | null; notes?: string | null; vetVerified?: boolean; partnerId?: Id | null };
-export type Vaccination = { id: Id; kind: "VACCINE" | "DEWORMING"; name: string; appliedAt: string; nextDueAt?: string | null; notes?: string | null };
+export type Vaccination = { id: Id; kind: "VACCINE" | "DEWORMING"; name: string; appliedAt: string; nextDueAt?: string | null; notes?: string | null; partnerId?: Id | null };
 export type PetSkillRow = { id?: Id; skillId: Id; name: string; level: "LEARNING" | "SOMETIMES" | "MASTERED"; masteredAt?: string | null; validated: boolean; markedBy?: string | null };

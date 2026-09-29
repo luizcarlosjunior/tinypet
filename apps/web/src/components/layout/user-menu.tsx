@@ -82,8 +82,8 @@ export function UserMenu() {
             <MenuLink href="/painel/novo" icon={<Building2 className="h-4 w-4" aria-hidden />} onClick={() => setOpen(false)}>
               {memberships.length ? "Criar outro negócio" : "Sou parceiro"}
             </MenuLink>
-            {user?.role === "ADMIN" && (
-              <MenuLink href="/admin" icon={<Shield className="h-4 w-4" aria-hidden />} onClick={() => setOpen(false)}>
+            {(user?.role === "ADMIN" || user?.role === "EDITOR") && (
+              <MenuLink href={user.role === "EDITOR" ? "/admin/blog" : "/admin"} icon={<Shield className="h-4 w-4" aria-hidden />} onClick={() => setOpen(false)}>
                 Admin
               </MenuLink>
             )}

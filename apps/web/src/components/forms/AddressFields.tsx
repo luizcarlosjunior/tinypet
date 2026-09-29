@@ -11,7 +11,8 @@ import type { AddressRow } from "@/types/api";
 const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
 
 /** Standalone address form with CEP lookup. Used for client, partner and inline appointment addresses. */
-export function AddressForm({ initial, onSubmit, onCancel, submitting, showAccessNotes = true, compact }: { initial?: Partial<AddressRow> | null; onSubmit: (v: AddressInput) => void | Promise<void>; onCancel?: () => void; submitting?: boolean; showAccessNotes?: boolean; compact?: boolean }) {
+/** `nested`: rendered inside another <form> (e.g. the appointment modal) → uses a <div> and a button handler, so it neither nests forms nor submits the outer form. */
+export function AddressForm({ initial, onSubmit, onCancel, submitting, showAccessNotes = true, compact, nested }: { initial?: Partial<AddressRow> | null; onSubmit: (v: AddressInput) => void | Promise<void>; onCancel?: () => void; submitting?: boolean; showAccessNotes?: boolean; compact?: boolean; nested?: boolean }) {
   const form = useForm<AddressInput>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
@@ -47,8 +48,10 @@ export function AddressForm({ initial, onSubmit, onCancel, submitting, showAcces
     document.getElementById("addr-number")?.focus();
   }
 
+  const submit = handleSubmit((v) => onSubmit(v));
+  const Root = nested ? "div" : "form";
   return (
-    <form onSubmit={handleSubmit((v) => onSubmit(v))} className="space-y-3" noValidate>
+    <Root {...(nested ? {} : { onSubmit: submit, noValidate: true })} className="space-y-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Input id="addr-label" label="Rótulo" placeholder="Casa, Trabalho…" {...register("label")} error={errors.label?.message} />
         <div>
@@ -86,10 +89,10 @@ export function AddressForm({ initial, onSubmit, onCancel, submitting, showAcces
             Cancelar
           </Button>
         )}
-        <Button type="submit" loading={submitting}>
+        <Button type={nested ? "button" : "submit"} loading={submitting} onClick={nested ? (e) => { e.stopPropagation(); void submit(e); } : undefined}>
           Salvar endereço
         </Button>
       </div>
-    </form>
+    </Root>
   );
 }

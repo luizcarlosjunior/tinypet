@@ -71,7 +71,7 @@ export default function CatalogoPage() {
               <h2 id={`grp-${g.key}`} className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
                 {g.label} <span className="font-normal">({g.items.length})</span>
               </h2>
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {g.items.map((item) => (
                   <li key={item.id} className="card flex gap-3 p-3">
                     <Link href={`/painel/catalogo/${item.id}`} className="block h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-ink-100 dark:bg-ink-900" aria-label={`Editar ${item.name}`}>

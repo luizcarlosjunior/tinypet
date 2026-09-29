@@ -53,7 +53,7 @@ export function ContactsEditor({ base, phones, emails, addresses, invalidateKey,
   });
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <section className="card">
         <header className="mb-2 flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-sm font-semibold">

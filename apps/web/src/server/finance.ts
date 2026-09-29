@@ -89,6 +89,17 @@ export function toCsv(headers: string[], rows: (string | number | Date | null | 
   return "﻿" + [headers, ...rows].map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";
 }
 
+/**
+ * Opt-in pagination for finance lists: without `?page` the full list is returned (mobile/exports rely on it);
+ * with `?page[&pageSize]` → one page + `meta { page, pageSize, total }`.
+ */
+export function optionalPage<T>(rows: T[], sp: URLSearchParams): { data: T[]; meta?: { page: number; pageSize: number; total: number } } {
+  if (!sp.has("page")) return { data: rows };
+  const page = Math.max(1, Math.floor(Number(sp.get("page")) || 1));
+  const pageSize = Math.min(100, Math.max(1, Math.floor(Number(sp.get("pageSize")) || 20)));
+  return { data: rows.slice((page - 1) * pageSize, page * pageSize), meta: { page, pageSize, total: rows.length } };
+}
+
 // ───────────────────────────── contracts ─────────────────────────────
 
 export const contractInclude = {
@@ -96,6 +107,8 @@ export const contractInclude = {
   items: { include: { item: { select: { id: true, name: true } } } },
   pets: { include: { pet: { select: { id: true, name: true } } } },
   installments: { include: { payments: true }, orderBy: { number: "asc" as const } },
+  // generated lessons (PACKAGE) shown on the contract page
+  appointments: { select: { id: true, startsAt: true, status: true, locationType: true, sessionNumber: true }, orderBy: { startsAt: "asc" as const } },
 } satisfies Prisma.ContractInclude;
 
 export type ContractRow = Prisma.ContractGetPayload<{ include: typeof contractInclude }>;
@@ -251,7 +264,7 @@ export async function setContractStatus(ctx: FinanceCtx, id: string, status: Con
 
 export const installmentInclude = {
   payments: { orderBy: { paidAt: "asc" as const } },
-  contract: { select: { id: true, title: true, type: true, status: true, clientId: true, client: { select: { id: true, name: true, userId: true } }, partner: { select: { id: true, tradeName: true } } } },
+  contract: { select: { id: true, title: true, type: true, status: true, installmentsCount: true, clientId: true, client: { select: { id: true, name: true, userId: true } }, partner: { select: { id: true, tradeName: true } } } },
 } satisfies Prisma.InstallmentInclude;
 
 export async function listInstallments(partnerId: string, q: { status?: InstallmentStatus; from?: string; to?: string; clientId?: string }) {
@@ -345,7 +358,7 @@ export async function financeSummary(partnerId: string, q: { from?: string; to?:
     prisma.installment.findMany({ where: { contract: { partnerId }, status: { in: ["PENDING", "OVERDUE"] }, dueDate: { gte: from, lte: to } }, select: { amount: true, paidAmount: true } }),
     prisma.installment.findMany({
       where: { contract: { partnerId }, OR: [{ status: "OVERDUE" }, { status: "PENDING", dueDate: { lt: today } }] },
-      include: { contract: { select: { id: true, title: true, client: { select: { id: true, name: true, userId: true } } } } },
+      include: { payments: { orderBy: { paidAt: "asc" } }, contract: { select: { id: true, title: true, installmentsCount: true, client: { select: { id: true, name: true, userId: true } } } } },
       orderBy: { dueDate: "asc" },
     }),
     prisma.payment.findMany({
@@ -358,6 +371,10 @@ export async function financeSummary(partnerId: string, q: { from?: string; to?:
   const receivableCents = receivableRows.reduce((s, r) => s + toCents(r.amount) - toCents(r.paidAmount), 0);
   const overdue = overdueRows.map((r) => ({
     id: r.id,
+    // same fields as /finance/installments rows so the panel can reuse its installments table (pay / remind)
+    status: r.status,
+    contract: r.contract,
+    payments: r.payments.map((p) => ({ ...p, amount: Number(p.amount) })),
     contractId: r.contract.id,
     contractTitle: r.contract.title,
     clientId: r.contract.client.id,

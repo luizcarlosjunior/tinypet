@@ -6,7 +6,7 @@ import { formatBRL } from "@tinypet/shared";
 import { Select } from "@/components/ui";
 import { QueryState, Table, td, th, Pagination } from "@/components/painel/ui";
 import { useContracts } from "@/hooks/use-finance";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, num } from "@/lib/format";
 import { CONTRACT_STATUS_LABEL, CONTRACT_TYPE_LABEL, ContractStatusBadge } from "./common";
 
 export function ContratosTab({ partnerId }: { partnerId: string | null }) {
@@ -59,7 +59,7 @@ export function ContratosTab({ partnerId }: { partnerId: string | null }) {
                 </td>
                 <td className={td}>{c.client ? <Link href={`/painel/clientes/${c.client.id}`} className="hover:underline">{c.client.name}</Link> : "—"}</td>
                 <td className={td}>{CONTRACT_TYPE_LABEL[c.type] ?? c.type}</td>
-                <td className={`${td} text-right tabular-nums`}>{formatBRL(c.totalAmount)}</td>
+                <td className={`${td} text-right tabular-nums`}>{formatBRL(c.netAmount ?? num(c.totalAmount) - num(c.discount))}</td>
                 <td className={td}>{c.installmentsCount}x</td>
                 <td className={td}>{fmtDate(c.firstDueDate)}</td>
                 <td className={td}>

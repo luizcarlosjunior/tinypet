@@ -24,15 +24,23 @@ export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, as
       setImg(null);
       return;
     }
+    // Revoke only once the image has loaded/failed: revoking in the cleanup while it is still loading (e.g. the
+    // dev StrictMode double effect) aborts the load with ERR_FILE_NOT_FOUND. A decoded image stays drawable.
+    let cancelled = false;
     const url = URL.createObjectURL(file);
     const i = new Image();
     i.onload = () => {
+      URL.revokeObjectURL(url);
+      if (cancelled) return;
       setImg(i);
       setZoom(1);
       setOffset({ x: 0, y: 0 });
     };
+    i.onerror = () => URL.revokeObjectURL(url);
     i.src = url;
-    return () => URL.revokeObjectURL(url);
+    return () => {
+      cancelled = true;
+    };
   }, [file]);
 
   // base scale: cover the viewport with the image

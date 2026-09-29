@@ -32,7 +32,7 @@ export function ResumoTab({ partnerId }: { partnerId: string | null }) {
   const receivedThisMonth = useMemo(() => {
     if (!s) return 0;
     if (s.receivedThisMonth != null) return num(s.receivedThisMonth);
-    return num((s.receivedByMonth ?? []).find((m) => m.month?.startsWith(thisMonth))?.amount);
+    return num((s.receivedByMonth ?? []).find((m) => m.month?.startsWith(thisMonth))?.total);
   }, [s, thisMonth]);
 
   return (
@@ -56,7 +56,7 @@ export function ResumoTab({ partnerId }: { partnerId: string | null }) {
         {s && (
           <>
             <div className="grid gap-3 sm:grid-cols-3">
-              <StatCard label="A receber" value={formatBRL(s.receivable)} hint="Parcelas a vencer no período" tone="brand" icon={<Wallet className="h-4 w-4" aria-hidden />} />
+              <StatCard label="A receber" value={formatBRL(num(s.receivable?.total))} hint="Parcelas a vencer no período" tone="brand" icon={<Wallet className="h-4 w-4" aria-hidden />} />
               <StatCard label="Vencidas" value={formatBRL(overdueTotal)} hint={`${overdue.length} ${overdue.length === 1 ? "parcela vencida" : "parcelas vencidas"}`} tone={overdue.length ? "red" : undefined} icon={<AlertTriangle className="h-4 w-4" aria-hidden />} />
               <StatCard label="Recebido no mês" value={formatBRL(receivedThisMonth)} hint={fmtDateKey(`${thisMonth}-01`, "MMMM 'de' yyyy")} tone="green" icon={<TrendingUp className="h-4 w-4" aria-hidden />} />
             </div>
@@ -67,10 +67,10 @@ export function ResumoTab({ partnerId }: { partnerId: string | null }) {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card title="Recebido por forma de pagamento">
-                <SimpleList rows={(s.receivedByMethod ?? []).map((r) => ({ label: PAYMENT_METHOD_LABEL[r.method as keyof typeof PAYMENT_METHOD_LABEL] ?? r.method, value: num(r.amount) }))} />
+                <SimpleList rows={(s.receivedByMethod ?? []).map((r) => ({ label: PAYMENT_METHOD_LABEL[r.method as keyof typeof PAYMENT_METHOD_LABEL] ?? r.method, value: num(r.total) }))} />
               </Card>
               <Card title="Recebido por serviço">
-                <SimpleList rows={(s.receivedByService ?? []).map((r) => ({ label: r.service || "Sem serviço", value: num(r.amount) }))} />
+                <SimpleList rows={(s.receivedByService ?? []).map((r) => ({ label: r.service || "Sem serviço", value: num(r.total) }))} />
               </Card>
             </div>
 
@@ -93,7 +93,7 @@ export function ResumoTab({ partnerId }: { partnerId: string | null }) {
                     </tr>
                   )}
                   {(s.cashflow ?? []).map((c) => {
-                    const bal = c.balance != null ? num(c.balance) : num(c.income) - num(c.expense);
+                    const bal = c.net != null ? num(c.net) : num(c.income) - num(c.expense);
                     return (
                       <tr key={c.month}>
                         <td className={td}>{/^\d{4}-\d{2}$/.test(c.month) ? fmtDateKey(`${c.month}-01`, "MMM/yyyy") : c.month}</td>

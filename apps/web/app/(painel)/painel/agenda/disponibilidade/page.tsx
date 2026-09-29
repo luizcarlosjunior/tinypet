@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Copy, Plus, Trash2 } from "lucide-react";
 import { Button, Input, PageHeader, Select, Spinner } from "@/components/ui";
 import { FieldGroup, Table, th, td, ErrorBox } from "@/components/painel/ui";
@@ -122,7 +122,7 @@ function TimeOffs({ membershipId }: { membershipId: string | null }) {
   return (
     <FieldGroup title="Bloqueios (folgas, feriados)" description="Períodos indisponíveis para novos agendamentos.">
       <form
-        className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end"
+        className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           if (!form.startsAt || !form.endsAt) return;
@@ -209,20 +209,24 @@ function PartnerSettings({ partnerId, isOwner, initial, onSaved }: { partnerId: 
 
 function IcalCard({ membershipId }: { membershipId: string | null }) {
   const { toast } = useToast();
-  const [url, setUrl] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const key = ["schedule", "ical", membershipId ?? ""];
+  const current = useQuery({ queryKey: key, queryFn: () => api<{ url: string | null }>(`/schedule/ical?membershipId=${encodeURIComponent(membershipId ?? "")}`), enabled: !!membershipId, retry: 0 });
+  const url = current.data?.url ?? null;
   const gen = useMutation({
-    mutationFn: () => api<{ url?: string; calendarToken?: string; token?: string }>("/schedule/ical", { method: "POST", json: { membershipId } }),
+    // Generating a new link rotates the token (old subscriptions stop working).
+    mutationFn: () => api<{ url: string; calendarToken: string }>(`/schedule/ical?membershipId=${encodeURIComponent(membershipId ?? "")}`, { method: "POST" }),
     onSuccess: (d) => {
-      const token = d.calendarToken ?? d.token;
-      setUrl(d.url ?? (token ? `${window.location.origin}/api/v1/schedule/ical/${token}` : null));
+      qc.setQueryData(key, { url: d.url });
+      toast("Link iCal gerado", "success");
     },
     onError: (e) => toast(errorMessage(e), "error"),
   });
   return (
     <FieldGroup title="Google Calendar / iCal" description="Link de assinatura da agenda deste profissional.">
       {url ? (
-        <div className="flex items-center gap-2">
-          <input readOnly aria-label="Link iCal" value={url} className="input flex-1 text-xs" onFocus={(e) => e.target.select()} />
+        <div className="flex flex-wrap items-center gap-2">
+          <input readOnly aria-label="Link iCal" value={url} className="input min-w-0 flex-1 text-xs" onFocus={(e) => e.target.select()} />
           <Button
             type="button"
             variant="secondary"
@@ -232,9 +236,19 @@ function IcalCard({ membershipId }: { membershipId: string | null }) {
           >
             <Copy className="h-4 w-4" aria-hidden /> Copiar
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            loading={gen.isPending}
+            onClick={() => {
+              if (window.confirm("Gerar um novo link? O link atual deixará de funcionar nos calendários já inscritos.")) gen.mutate();
+            }}
+          >
+            Gerar novo link
+          </Button>
         </div>
       ) : (
-        <Button type="button" variant="secondary" loading={gen.isPending} disabled={!membershipId} onClick={() => gen.mutate()}>
+        <Button type="button" variant="secondary" loading={gen.isPending || current.isLoading} disabled={!membershipId} onClick={() => gen.mutate()}>
           Gerar link iCal
         </Button>
       )}

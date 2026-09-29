@@ -7,13 +7,14 @@ import { useSpecies } from "@/hooks/use-ref";
 import { Button, Input, Select, Textarea } from "@/components/ui";
 import { AvatarUpload } from "@/components/media/avatar-upload";
 import type { Pet } from "@/hooks/use-pets";
-import { MicrochipField } from "./microchip";
+import { MicrochipField, MicrochipLookupLinks } from "./microchip";
 
 const SEX = [["MALE", "Macho"], ["FEMALE", "Fêmea"]] as const;
 const SIZE = [["", "Não informado"], ["SMALL", "Pequeno"], ["MEDIUM", "Médio"], ["LARGE", "Grande"], ["GIANT", "Gigante"]] as const;
 
 function toInput(pet?: Pet | null): Partial<PetInput> {
-  if (!pet) return { speciesKey: "dog", neutered: null };
+  // sex starts empty: the user must pick it (required on create)
+  if (!pet) return { speciesKey: "dog", neutered: null, sex: "" as PetInput["sex"] };
   return {
     name: pet.name,
     speciesKey: pet.species?.key ?? pet.speciesKey ?? "dog",
@@ -76,9 +77,8 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel, readOnl
         {(otherBreed || (!breeds.length && speciesKey)) && <Input id="pet-breed-other" label="Qual raça?" {...register("breedOther", { setValueAs: empty })} />}
         <Input id="pet-color" label="Cor / pelagem" {...register("color", { setValueAs: empty })} />
         <Select id="pet-sex" label="Sexo *" required aria-required="true" error={errors.sex?.message} {...register("sex", { setValueAs: empty })}>
-          <option value="" disabled>
-            Selecione
-          </option>
+          {/* not `disabled`: with a disabled placeholder the browser pre-selects "Macho" and the required check is bypassed */}
+          <option value="">Selecione</option>
           {SEX.map(([v, l]) => (
             <option key={v} value={v}>
               {l}
@@ -113,12 +113,14 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel, readOnl
           <option value="true">Sim</option>
           <option value="false">Não</option>
         </Select>
-        <MicrochipField value={watch("microchip")} onChange={(v) => setValue("microchip", v, { shouldValidate: true, shouldDirty: true })} error={errors.microchip?.message} />
+        <MicrochipField showLookups={!readOnly} value={watch("microchip")} onChange={(v) => setValue("microchip", v, { shouldValidate: true, shouldDirty: true })} error={errors.microchip?.message} />
       </div>
       <Textarea id="pet-temperament" label="Temperamento" placeholder="Ex.: dócil, tímido com estranhos" {...register("temperament", { setValueAs: empty })} />
       <Textarea id="pet-care" label="Cuidados especiais" placeholder="Alergias, medicamentos, restrições" {...register("specialCare", { setValueAs: empty })} />
       <Textarea id="pet-feeding" label="Observações de alimentação" {...register("feedingNotes", { setValueAs: empty })} />
       </fieldset>
+      {/* Outside the disabled fieldset so shared accounts can still copy the number and open the lookups. */}
+      {readOnly && pet?.microchip ? <MicrochipLookupLinks chip={pet.microchip} /> : null}
       {!readOnly && <div className="flex justify-end gap-2">
         {onCancel && (
           <Button type="button" variant="secondary" onClick={onCancel}>

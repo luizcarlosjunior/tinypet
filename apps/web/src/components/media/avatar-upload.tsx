@@ -29,7 +29,8 @@ export function AvatarUpload({ value, name, purpose, onChange, size = 96, square
     if (!file) return;
     setBusy(true);
     try {
-      const res = await uploadFile(file, purpose, { crop });
+      // tutor/account uploads: owned by the user, never by the active partner
+      const res = await uploadFile(file, purpose, { crop, partnerId: null });
       onChange(res.url);
       setFile(null);
       toast("Foto atualizada!", "success");

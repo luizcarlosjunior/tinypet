@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@tinypet/db";
 import { transactionSchema, TransactionKindEnum, dateString } from "@tinypet/shared";
 import { handler, ok, parseBody, parseQuery, requirePartner, serialize, audit, clientIp } from "@/server";
-import { dateOnly, listTransactions } from "@/server/finance";
+import { dateOnly, listTransactions, optionalPage } from "@/server/finance";
 
 const query = z.object({ from: dateString.optional(), to: dateString.optional(), kind: TransactionKindEnum.optional() });
 
@@ -10,7 +10,8 @@ const query = z.object({ from: dateString.optional(), to: dateString.optional(),
 export const GET = handler(async (req) => {
   const ctx = await requirePartner(req, undefined, { finance: true });
   const q = parseQuery(req, query);
-  return ok(serialize(await listTransactions(ctx.partnerId, q)));
+  const { data, meta } = optionalPage(await listTransactions(ctx.partnerId, q), req.nextUrl.searchParams);
+  return ok(serialize(data), meta ? { meta } : undefined);
 });
 
 /** POST /finance/transactions (transactionSchema) */

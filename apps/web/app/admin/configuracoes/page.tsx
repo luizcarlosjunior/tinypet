@@ -1,12 +1,11 @@
 "use client";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { errorMessage } from "@/lib/errors";
 import { Button, Input, PageHeader } from "@/components/ui";
 import { ConfirmDialog, QueryState, Table, td, th } from "@/components/painel/ui";
 import { useToast } from "@/components/ui/toast";
-import { useAdminList } from "@/hooks/use-admin";
 import { cn } from "@/lib/utils";
 
 type Setting = { id?: string; key: string; value: unknown; updatedAt?: string };
@@ -20,7 +19,8 @@ function pretty(v: unknown) {
 }
 
 export default function ConfiguracoesPage() {
-  const list = useAdminList<Setting & { id: string }>("settings");
+  // GET /admin/settings → { key: value } map (not a list)
+  const list = useQuery({ queryKey: ["admin", "settings"], queryFn: () => api<Record<string, unknown>>("/admin/settings", { partnerId: null }) });
   const qc = useQueryClient();
   const { toast } = useToast();
   const [editing, setEditing] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function ConfiguracoesPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "settings"] });
 
   const save = useMutation({
-    mutationFn: ({ key, value }: { key: string; value: unknown }) => api(`/admin/settings/${encodeURIComponent(key)}`, { method: "PATCH", json: { value }, partnerId: null }),
+    mutationFn: ({ key, value }: { key: string; value: unknown }) => api(`/admin/settings/${encodeURIComponent(key)}`, { method: "PUT", json: { value }, partnerId: null }),
     onSuccess: () => {
       invalidate();
       setEditing(null);
@@ -41,7 +41,7 @@ export default function ConfiguracoesPage() {
     onError: (e) => toast(errorMessage(e), "error"),
   });
   const create = useMutation({
-    mutationFn: ({ key, value }: { key: string; value: unknown }) => api(`/admin/settings`, { method: "POST", json: { key, value }, partnerId: null }),
+    mutationFn: ({ key, value }: { key: string; value: unknown }) => api(`/admin/settings/${encodeURIComponent(key)}`, { method: "PUT", json: { value }, partnerId: null }) /* PUT upserts */,
     onSuccess: () => {
       invalidate();
       setNewKey("");
@@ -66,7 +66,7 @@ export default function ConfiguracoesPage() {
     return JSON.parse(t);
   };
 
-  const rows = (list.data?.items ?? []).map((r) => ({ ...r, key: r.key ?? r.id }));
+  const rows: Setting[] = Object.entries(list.data ?? {}).map(([key, value]) => ({ key, value }));
 
   return (
     <div className="space-y-4">

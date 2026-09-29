@@ -37,6 +37,7 @@ export function VideoUploader({
   initialFile,
   submitLabel = "Enviar vídeo",
   className,
+  onBusyChange,
 }: {
   purpose: MediaPurpose;
   partnerId?: string | null;
@@ -46,8 +47,13 @@ export function VideoUploader({
   initialFile?: File | null;
   submitLabel?: string;
   className?: string;
+  /** true while probing/transcoding/uploading: hosts (modals) should not close without confirmation. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [phase, setPhase] = useState<Phase>("loading");
+  useEffect(() => {
+    onBusyChange?.(phase === "probing" || phase === "transcoding" || phase === "uploading");
+  }, [phase, onBusyChange]);
   const [limits, setLimits] = useState<MediaLimits | null>(null);
   const [planError, setPlanError] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);

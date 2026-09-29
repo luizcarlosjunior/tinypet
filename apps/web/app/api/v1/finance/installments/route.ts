@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { InstallmentStatusEnum, dateString, id } from "@tinypet/shared";
 import { handler, ok, parseQuery, requirePartner, serialize } from "@/server";
-import { listInstallments } from "@/server/finance";
+import { listInstallments, optionalPage } from "@/server/finance";
 
 const query = z.object({ status: InstallmentStatusEnum.optional(), from: dateString.optional(), to: dateString.optional(), clientId: id.optional() });
 
@@ -9,5 +9,6 @@ const query = z.object({ status: InstallmentStatusEnum.optional(), from: dateStr
 export const GET = handler(async (req) => {
   const ctx = await requirePartner(req, undefined, { finance: true });
   const q = parseQuery(req, query);
-  return ok(serialize(await listInstallments(ctx.partnerId, q)));
+  const { data, meta } = optionalPage(await listInstallments(ctx.partnerId, q), req.nextUrl.searchParams);
+  return ok(serialize(data), meta ? { meta } : undefined);
 });

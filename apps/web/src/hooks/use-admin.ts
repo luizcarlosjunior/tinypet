@@ -97,7 +97,8 @@ export function useAdminReports(status: string) {
   return useAdminList<AdminReport>("reports", { status });
 }
 export function useAdminFlaggedMedia() {
-  return useAdminList<AdminMedia>("media", { status: "FLAGGED" });
+  // moderation queue: take the max page (API default is 20); the grid shows "N de total" when more remain
+  return useAdminList<AdminMedia>("media", { status: "FLAGGED", pageSize: 100 });
 }
 export function useModerate() {
   const qc = useQueryClient();
@@ -106,7 +107,9 @@ export function useModerate() {
   const report = useMutation({
     mutationFn: ({ id, action }: { id: string; action: "HIDE" | "RESTORE" | "DISMISS" }) => api(`/admin/reports/${id}`, { method: "POST", json: { action }, partnerId: null }),
     onSuccess: () => {
+      // report HIDE on media rejects the asset; media APPROVE/REJECT resolves its reports → refresh both lists
       qc.invalidateQueries({ queryKey: ["admin", "reports"] });
+      qc.invalidateQueries({ queryKey: ["admin", "media"] });
       toast("Denúncia atualizada", "success");
     },
     onError,
@@ -114,6 +117,8 @@ export function useModerate() {
   const media = useMutation({
     mutationFn: ({ id, action }: { id: string; action: "APPROVE" | "REJECT" }) => api(`/admin/media/${id}`, { method: "POST", json: { action }, partnerId: null }),
     onSuccess: () => {
+      // report HIDE on media rejects the asset; media APPROVE/REJECT resolves its reports → refresh both lists
+      qc.invalidateQueries({ queryKey: ["admin", "reports"] });
       qc.invalidateQueries({ queryKey: ["admin", "media"] });
       toast("Mídia moderada", "success");
     },

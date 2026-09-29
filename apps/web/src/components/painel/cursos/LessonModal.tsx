@@ -18,21 +18,37 @@ import type { CourseModule, Lesson } from "@/types/api";
 
 type LessonInput = z.input<typeof lessonSchema>;
 
+function cleanLesson(v: LessonInput): LessonInput {
+  const dur = v.durationMinutes as unknown;
+  return {
+    ...v,
+    moduleId: v.moduleId || null,
+    videoUrl: v.videoUrl || null,
+    durationMinutes: dur === "" || dur == null || Number.isNaN(dur) ? null : (v.durationMinutes as number),
+    exerciseRule: v.exerciseRule?.freq ? v.exerciseRule : null,
+  };
+}
+
 export function LessonModal({ open, onClose, courseId, partnerId, modules, lesson, defaultModuleId, nextSortOrder }: { open: boolean; onClose: () => void; courseId: string; partnerId: string | null; modules: CourseModule[]; lesson?: Lesson | null; defaultModuleId?: string | null; nextSortOrder: number }) {
   const { toast } = useToast();
   const save = useSaveLesson();
   const [videoMode, setVideoMode] = useState<"upload" | "url">("url");
   const [hasExercise, setHasExercise] = useState(false);
+  const [videoBusy, setVideoBusy] = useState(false);
   const [times, setTimes] = useState<string[]>([]);
   const [newTime, setNewTime] = useState("08:00");
   const form = useForm<LessonInput>({
-    resolver: zodResolver(lessonSchema),
+    // "" from empty inputs/selects ("Sem módulo", no video, "—" frequency) would fail the schema silently → normalize first
+    resolver: (values, ctx, opts) => zodResolver(lessonSchema)(cleanLesson(values), ctx, opts),
     defaultValues: { moduleId: null, title: "", description: "", videoUrl: "", body: "", durationMinutes: null, exerciseTitle: "", exerciseRule: null, attachments: [] },
   });
   const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = form;
 
+  // Reset only when the modal opens or switches lesson — not when `nextSortOrder`/`defaultModuleId` change because the
+  // lessons query (re)loads while the modal is open, which used to wipe what the user was typing.
+  const openKey = open ? lesson?.id ?? "new" : null;
   useEffect(() => {
-    if (!open) return;
+    if (!openKey) return;
     reset({
       moduleId: lesson?.moduleId ?? defaultModuleId ?? null,
       title: lesson?.title ?? "",
@@ -48,7 +64,8 @@ export function LessonModal({ open, onClose, courseId, partnerId, modules, lesso
     setHasExercise(!!lesson?.exerciseTitle);
     setTimes(lesson?.exerciseRule?.times ?? []);
     setVideoMode("url");
-  }, [open, lesson, defaultModuleId, nextSortOrder, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openKey]);
 
   const videoUrl = watch("videoUrl");
   const attachments = watch("attachments") ?? [];
@@ -73,7 +90,7 @@ export function LessonModal({ open, onClose, courseId, partnerId, modules, lesso
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={lesson ? "Editar aula" : "Nova aula"} className="sm:max-w-2xl">
+    <Modal open={open} onClose={() => (!videoBusy || window.confirm("Cancelar a conversão/envio do vídeo?")) && onClose()} title={lesson ? "Editar aula" : "Nova aula"} className="sm:max-w-2xl">
       <PlanLimitNotice error={save.error} className="mb-3" />
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -109,6 +126,7 @@ export function LessonModal({ open, onClose, courseId, partnerId, modules, lesso
                 purpose="COURSE"
                 partnerId={partnerId}
                 submitLabel="Enviar vídeo da aula"
+                onBusyChange={setVideoBusy}
                 onUploaded={(m) => {
                   setValue("videoUrl", m.url, { shouldDirty: true });
                   toast("Vídeo enviado", "success");

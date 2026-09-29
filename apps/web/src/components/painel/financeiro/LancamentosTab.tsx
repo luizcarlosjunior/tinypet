@@ -135,7 +135,7 @@ function TransactionModal({ open, onClose }: { open: boolean; onClose: () => voi
         <Input id="tx-f-desc" label="Descrição" {...register("description")} />
         <div className="grid grid-cols-2 gap-3">
           <Input id="tx-f-amount" label="Valor (R$)" type="number" step="0.01" min="0.01" inputMode="decimal" {...register("amount")} error={errors.amount?.message} />
-          <Select id="tx-f-method" label="Forma" {...register("method")}>
+          <Select id="tx-f-method" label="Forma" {...register("method", { setValueAs: (v) => v || null })} error={errors.method?.message}>
             <option value="">—</option>
             {Object.entries(PAYMENT_METHOD_LABEL).map(([k, l]) => (
               <option key={k} value={k}>

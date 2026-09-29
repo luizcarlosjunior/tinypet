@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarCheck, Check, ChevronLeft, Home, MapPin, PawPrint, Video } from "lucide-react";
 import { useSessionContext } from "@/hooks/use-session-context";
-import { usePets } from "@/hooks/use-pets";
+import { canEditPet, usePets } from "@/hooks/use-pets";
 import { useCreateBooking, useSlots } from "@/hooks/use-appointments";
 import { useContacts, useContactMutation, type Address } from "@/hooks/use-me";
 import { AddressForm } from "@/components/forms/address-form";
@@ -99,8 +99,11 @@ export function BookingWizard({ item, slug, partnerId, partnerName }: { item: Pu
     }
   }
 
+  // one button per time: the API returns a slot per free professional, but POST /bookings picks the professional itself
+  const uniqueSlots = (slots.data ?? []).filter((s, i, all) => all.findIndex((o) => o.startsAt === s.startsAt) === i);
   const canNext = step === 0 ? petIds.length > 0 : step === 1 ? !!slot : needsLocation && step === 2 ? loc !== "CLIENT_HOME" || !!addressId : true;
-  const activePets = (pets.data ?? []).filter((p) => p.status !== "DECEASED");
+  // only the owner books: pets shared with me (read-only) are rejected by POST /bookings (403)
+  const activePets = (pets.data ?? []).filter((p) => p.status !== "DECEASED" && canEditPet(p));
 
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_300px]">
@@ -158,14 +161,14 @@ export function BookingWizard({ item, slug, partnerId, partnerName }: { item: Pu
               <Spinner />
             ) : slots.isError ? (
               <p className="text-sm text-red-600">Não foi possível carregar os horários. Tente outra data.</p>
-            ) : (slots.data ?? []).length === 0 ? (
+            ) : uniqueSlots.length === 0 ? (
               <p className="text-sm text-[var(--muted)]">Sem horários livres nesta data. Escolha outro dia.</p>
             ) : (
               <ul className="flex flex-wrap gap-2" aria-label="Horários disponíveis">
-                {(slots.data ?? []).map((s) => {
-                  const on = slot?.startsAt === s.startsAt && slot.membershipId === s.membershipId;
+                {uniqueSlots.map((s) => {
+                  const on = slot?.startsAt === s.startsAt;
                   return (
-                    <li key={`${s.startsAt}-${s.membershipId}`}>
+                    <li key={s.startsAt}>
                       <button type="button" onClick={() => setSlot(s)} aria-pressed={on} className={cn("rounded-xl border px-3 py-2 text-sm", on ? "border-brand-500 bg-brand-500 text-white" : "hover:bg-ink-100 dark:hover:bg-ink-800")}>
                         {fmtTime(s.startsAt)}
                         {s.membershipName ? <span className="block text-[10px] opacity-80">{s.membershipName}</span> : null}

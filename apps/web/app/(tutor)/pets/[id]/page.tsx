@@ -63,13 +63,14 @@ function PetDetail({ id }: { id: string }) {
       </Link>
       <header className="flex flex-wrap items-center gap-4">
         <Avatar src={p.avatarUrl} name={p.name} size={80} className={deceased ? "grayscale" : ""} />
-        <div className="min-w-0 flex-1">
+        {/* min width so the birthday button wraps below on phones instead of squeezing the name column */}
+        <div className="min-w-[11rem] flex-1">
           <h1 className="text-2xl font-bold">{p.name}</h1>
           <p className="text-sm text-[var(--muted)]">{[p.species?.label, p.breed?.name ?? p.breedOther, formatAge(months)].filter(Boolean).join(" · ")}</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {stage && <Badge tone="brand">{LIFE_STAGE_LABEL[stage]}</Badge>}
             {p.level > 1 && <Badge tone="amber">Nível {p.level}</Badge>}
-            {p.streakDays > 0 && !deceased && <Badge tone="green">{p.streakDays} dias de rotina</Badge>}
+            {p.streakDays > 0 && !deceased && <Badge tone="green">{p.streakDays} {p.streakDays === 1 ? "dia" : "dias"} de rotina</Badge>}
             {deceased && <Badge tone="gray">Em memória</Badge>}
             {readOnly && <Badge tone="blue">Compartilhado por {p.owner?.username ? `@${p.owner.username}` : p.owner?.name ?? "outro tutor"} · somente leitura</Badge>}
           </div>

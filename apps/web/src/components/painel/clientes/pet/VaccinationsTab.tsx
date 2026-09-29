@@ -9,12 +9,14 @@ import { Badge, Button, Input, Modal, Select, Spinner, Textarea } from "@/compon
 import { ConfirmDialog, ErrorBox, Table, td, th } from "@/components/painel/ui";
 import { useApiMutation, usePetVaccinations } from "@/hooks/use-crm";
 import { fmtDate, todayISO } from "@/lib/format";
+import { useActivePartner } from "@/hooks/use-partner";
 import type { Vaccination } from "@/types/api";
 
 type VaccinationInput = z.infer<typeof vaccinationSchema>;
 
 export function VaccinationsTab({ petId }: { petId: string }) {
   const q = usePetVaccinations(petId);
+  const { partnerId } = useActivePartner();
   const [modal, setModal] = useState<{ open: boolean; row?: Vaccination }>({ open: false });
   const [del, setDel] = useState<Vaccination | null>(null);
   const keys = [["pet", petId, "vaccinations"], ["pet", petId, "history"]];
@@ -73,12 +75,15 @@ export function VaccinationsTab({ petId }: { petId: string }) {
                   </td>
                   <td className={`${td} hidden max-w-[200px] truncate sm:table-cell`}>{v.notes ?? ""}</td>
                   <td className={`${td} whitespace-nowrap text-right`}>
+                    {/* only rows registered by this partner can be changed (tutor/other partners' rows → 403) */}
+                    {v.partnerId === partnerId && (<>
                     <button type="button" className="btn-ghost h-8 w-8 p-0" aria-label={`Editar ${v.name}`} onClick={() => setModal({ open: true, row: v })}>
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button type="button" className="btn-ghost h-8 w-8 p-0 text-red-600" aria-label={`Remover ${v.name}`} onClick={() => setDel(v)}>
                       <Trash2 className="h-4 w-4" />
                     </button>
+                    </>)}
                   </td>
                 </tr>
               );

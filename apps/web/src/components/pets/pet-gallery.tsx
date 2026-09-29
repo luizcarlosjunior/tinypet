@@ -26,6 +26,8 @@ export function PetGallery({ petId, deceased, readOnly = false }: { petId: strin
   const [limit, setLimit] = useState<PlanLimitError | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  /** True while the video is probing/transcoding/uploading: the dialog must not close mid-job. */
+  const [videoBusy, setVideoBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({ title: "", description: "", notes: "", takenAt: toDateKey(), isStory: false, visibility: "PRIVATE" });
@@ -71,7 +73,7 @@ export function PetGallery({ petId, deceased, readOnly = false }: { petId: strin
     if (!file) return;
     setBusy(true);
     try {
-      const up = await uploadFile(file, "PET_GALLERY", { onProgress: setProgress });
+      const up = await uploadFile(file, "PET_GALLERY", { onProgress: setProgress, partnerId: null });
       await createItem(up);
     } catch (e) {
       handleCreateError(e);
@@ -141,7 +143,7 @@ export function PetGallery({ petId, deceased, readOnly = false }: { petId: strin
         )}
       </section>
 
-      <Modal open={open} onClose={() => !busy && setOpen(false)} title="Adicionar à galeria">
+      <Modal open={open} onClose={() => !busy && !videoBusy && setOpen(false)} title="Adicionar à galeria">
         <div className="space-y-3">
           <input
             ref={inputRef}
@@ -199,6 +201,7 @@ export function PetGallery({ petId, deceased, readOnly = false }: { petId: strin
               purpose="PET_GALLERY"
               partnerId={null}
               initialFile={file}
+              onBusyChange={setVideoBusy}
               submitLabel={form.isStory ? "Publicar story" : "Enviar"}
               onCancel={() => setFile(null)}
               onUploaded={async (m) => {

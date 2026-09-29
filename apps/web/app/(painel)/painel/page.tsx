@@ -28,7 +28,7 @@ function petsOf(a: Appointment) {
 }
 
 export default function DashboardPage() {
-  const { partnerId, partner, membership, refresh } = useActivePartner();
+  const { partnerId, partner, membership, refresh, isOwner, canSeeFinance } = useActivePartner();
   const qc = useQueryClient();
   const { toast } = useToast();
   const dash = useQuery({ queryKey: ["dashboard", partnerId], queryFn: () => api<Dashboard>(`/partners/${partnerId}/dashboard`), enabled: !!partnerId, refetchInterval: 120_000 });
@@ -62,8 +62,12 @@ export default function DashboardPage() {
       <QueryState isLoading={dash.isLoading} error={dash.error} retry={() => dash.refetch()}>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Agenda de hoje" value={d?.today.length ?? 0} hint="atendimentos" icon={<CalendarDays className="h-4 w-4" />} href={`/painel/agenda?view=dia&date=${todayISO()}`} />
-          <StatCard label="A receber (30 dias)" value={formatBRL(num(d?.receivable30d))} tone="brand" icon={<Wallet className="h-4 w-4" />} href="/painel/financeiro?tab=parcelas" />
-          <StatCard label="Vencidas" value={formatBRL(overdueTotal)} hint={`${d?.overdue.length ?? 0} parcelas`} tone={overdueTotal > 0 ? "red" : undefined} icon={<AlertCircle className="h-4 w-4" />} href="/painel/financeiro?tab=parcelas&status=OVERDUE" />
+          {canSeeFinance && (
+            <>
+              <StatCard label="A receber (30 dias)" value={formatBRL(num(d?.receivable30d))} tone="brand" icon={<Wallet className="h-4 w-4" />} href="/painel/financeiro?tab=parcelas" />
+              <StatCard label="Vencidas" value={formatBRL(overdueTotal)} hint={`${d?.overdue.length ?? 0} parcelas`} tone={overdueTotal > 0 ? "red" : undefined} icon={<AlertCircle className="h-4 w-4" />} href="/painel/financeiro?tab=parcelas&status=OVERDUE" />
+            </>
+          )}
           <StatCard label="Clientes · Pets" value={`${d?.counts.clients ?? 0} · ${d?.counts.pets ?? 0}`} hint={`${d?.counts.appointmentsWeek ?? 0} atendimentos na semana`} icon={<Users className="h-4 w-4" />} href="/painel/clientes" />
         </div>
 
@@ -117,7 +121,8 @@ export default function DashboardPage() {
           </Card>
 
           <div className="space-y-6">
-            <PublishCard published={!!partner?.published} slug={partner?.slug ?? membership?.slug} missing={missing} onPublish={() => publish.mutate()} loading={publish.isPending} />
+            <PublishCard published={!!partner?.published} slug={partner?.slug ?? membership?.slug} missing={missing} onPublish={() => publish.mutate()} loading={publish.isPending} canPublish={isOwner} />
+            {canSeeFinance && (
             <Card title="Parcelas vencidas" actions={<Link href="/painel/financeiro?tab=parcelas&status=OVERDUE" className="text-sm text-brand-600 hover:underline dark:text-brand-300">Ver todas</Link>}>
               {(d?.overdue ?? []).length === 0 ? (
                 <p className="flex items-center gap-2 text-sm text-[var(--muted)]">
@@ -128,7 +133,7 @@ export default function DashboardPage() {
                   {(d?.overdue ?? []).slice(0, 8).map((i) => (
                     <li key={i.id} className="flex items-center gap-2 py-2">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{i.contract?.client?.name ?? i.contract?.title ?? "Parcela"}</p>
+                        <p className="truncate font-medium">{i.clientName ?? i.contractTitle ?? "Parcela"}</p>
                         <p className="text-xs text-[var(--muted)]">
                           {formatBRL(num(i.amount) - num(i.paidAmount))} · venc. {fmtDate(i.dueDate)} · <span className="text-red-600 dark:text-red-300">{i.daysLate ?? daysLate(i.dueDate)} dias de atraso</span>
                         </p>
@@ -141,6 +146,7 @@ export default function DashboardPage() {
                 </ul>
               )}
             </Card>
+            )}
           </div>
         </div>
       </QueryState>

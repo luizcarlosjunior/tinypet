@@ -175,7 +175,8 @@ export function routeTotal(matrix: number[][], order: number[]): number {
 
 export const appointmentInclude = {
   pets: { include: { pet: { select: { id: true, name: true, avatarUrl: true, species: { select: { key: true, label: true } } } } } },
-  client: { select: { id: true, name: true, userId: true } },
+  // phones: partner agenda drawer (WhatsApp/call); blanked in decorateOwnerAppointment
+  client: { select: { id: true, name: true, userId: true, phones: { select: { number: true, type: true, isPrimary: true }, orderBy: { isPrimary: "desc" as const } } } },
   item: { select: { id: true, name: true, durationMinutes: true, defaultLocation: true } },
   membership: { select: { id: true, jobTitle: true, user: { select: { id: true, name: true, avatarUrl: true } } } },
   address: true,
@@ -544,10 +545,10 @@ export function rangeFromQuery(from: string, to: string): { from: Date; to: Date
   return { from: f, to: t };
 }
 
-export async function listAgenda(partnerId: string, q: { from: string; to: string; membershipId?: string; status?: AppointmentStatus; locationType?: LocationType }) {
+export async function listAgenda(partnerId: string, q: { from: string; to: string; membershipId?: string; clientId?: string; status?: AppointmentStatus; locationType?: LocationType }) {
   const { from, to } = rangeFromQuery(q.from, q.to);
   const rows = await prisma.appointment.findMany({
-    where: { partnerId, startsAt: { lt: to }, endsAt: { gt: from }, ...(q.membershipId ? { membershipId: q.membershipId } : {}), ...(q.status ? { status: q.status } : {}), ...(q.locationType ? { locationType: q.locationType } : {}) },
+    where: { partnerId, startsAt: { lt: to }, endsAt: { gt: from }, ...(q.membershipId ? { membershipId: q.membershipId } : {}), ...(q.clientId ? { clientId: q.clientId } : {}), ...(q.status ? { status: q.status } : {}), ...(q.locationType ? { locationType: q.locationType } : {}) },
     include: appointmentInclude,
     orderBy: { startsAt: "asc" },
   });
@@ -815,7 +816,8 @@ export const ownerAppointmentInclude = {
 export type OwnerAppointmentRow = Prisma.AppointmentGetPayload<{ include: typeof ownerAppointmentInclude }>;
 
 export function decorateOwnerAppointment(a: OwnerAppointmentRow) {
-  const base = decorateAppointment(a);
+  // the partner's CRM phones are not exposed on the owner side
+  const base = decorateAppointment({ ...a, client: a.client ? { ...a.client, phones: [] } : null });
   const venue = a.locationType === "PARTNER_VENUE" ? a.address ?? a.partner.addresses[0] ?? null : null;
   const c = coordsOf(venue);
   const { addresses: _addresses, ...partner } = a.partner;

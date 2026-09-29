@@ -434,6 +434,7 @@ export const agendaQuery = z.object({
   from: isoDateTime.or(dateString),
   to: isoDateTime.or(dateString),
   membershipId: id.optional(),
+  clientId: id.optional(),
   status: AppointmentStatusEnum.optional(),
   locationType: LocationTypeEnum.optional(),
 });
@@ -493,7 +494,7 @@ export const courseSchema = z.object({
 });
 export const lessonSchema = z.object({
   moduleId: id.optional().nullable(),
-  title: z.string().min(1).max(200),
+  title: z.string().min(1, "Informe o título da aula").max(200),
   description: z.string().max(5000).optional().nullable(),
   videoUrl: httpUrl.optional().nullable(),
   body: z.string().max(20000).optional().nullable(),
@@ -540,6 +541,7 @@ export const planSchema = z.object({
   trialDays: z.number().int().min(0).optional(),
   visible: z.boolean().optional(),
   isDefault: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
   limits: z.array(z.object({ featureKey: z.string().max(60), enabled: z.boolean().default(true), quantity: z.number().int().nullable().optional() })).max(100).optional(),
 });
 export const assignPlanSchema = z.object({ planKey: z.string().min(1).max(60) });
@@ -563,7 +565,8 @@ export const petReportQuery = paginationQuery.extend({
   district: z.string().max(120).optional(),
   sex: SexEnum.optional(),
   size: PetSizeEnum.optional(),
-  neutered: z.coerce.boolean().optional(),
+  // query strings: "false" must be false (z.coerce.boolean would turn any non-empty string into true)
+  neutered: z.preprocess((v) => (v === "true" || v === true ? true : v === "false" || v === false ? false : v === "" ? undefined : v), z.boolean().optional()),
   status: PetStatusEnum.optional(),
   tag: z.string().max(40).optional(),
   groupBy: z.enum(["state", "city", "species", "breed", "lifeStage", "birthMonth", "createdMonth"]).optional(),

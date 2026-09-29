@@ -105,7 +105,7 @@ export default async function ItemPage({ params }: { params: { slug: string; ite
               <Avatar src={it.partner.logoUrl} name={it.partner.tradeName} size={40} square />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold">{it.partner.tradeName}</span>
-                <span className="block text-xs text-[var(--muted)]">{[it.partner.city, it.partner.state].filter(Boolean).join(" - ")}</span>
+                <span className="block text-xs text-[var(--muted)]">{[it.partner.address?.city ?? it.partner.city, it.partner.address?.state ?? it.partner.state].filter(Boolean).join(" - ")}</span>
               </span>
             </Link>
           )}

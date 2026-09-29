@@ -27,10 +27,10 @@ export function PetForm({ initial, partnerId, onSubmit, submitting, submitLabel 
     defaultValues: {
       name: initial?.name ?? "",
       speciesKey: initial?.species?.key ?? initial?.speciesKey ?? "dog",
-      breedId: initial?.breedId ?? initial?.breed?.id ?? "",
+      breedId: initial?.breedId ?? initial?.breed?.id ?? (initial?.breedOther ? "__other" : ""),
       breedOther: initial?.breedOther ?? "",
       color: initial?.color ?? "",
-      sex: initial?.sex ?? undefined,
+      sex: initial?.sex ?? ("" as unknown as PetInput["sex"]),
       size: initial?.size ?? undefined,
       birthDate: initial?.birthDate?.slice(0, 10) ?? "",
       approxAgeMonths: initial?.approxAgeMonths ?? undefined,
@@ -118,7 +118,8 @@ export function PetForm({ initial, partnerId, onSubmit, submitting, submitLabel 
         {breedId === "__other" && <Input id="pet-breed-other" label="Qual raça?" {...register("breedOther")} />}
         <Input id="pet-color" label="Cor" {...register("color")} />
         <Select id="pet-sex" label="Sexo *" required aria-required="true" error={errors.sex?.message} {...register("sex")}>
-          <option value="" disabled>
+          {/* not `disabled`: a select with no enabled match auto-selects the first enabled option (silently "Macho") */}
+          <option value="">
             Selecione
           </option>
           {Object.entries(SEX_LABEL).map(([k, l]) => (

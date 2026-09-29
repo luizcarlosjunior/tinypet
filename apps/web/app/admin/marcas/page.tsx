@@ -15,7 +15,7 @@ const STATUS_OPTS = [
 ];
 const fields: FieldDef[] = [
   { key: "name", label: "Marca", required: true },
-  { key: "status", label: "Status", type: "select", options: STATUS_OPTS },
+  { key: "status", label: "Status", type: "select", options: STATUS_OPTS, emptyAs: "omit" },
 ];
 const lineFields: FieldDef[] = [{ key: "name", label: "Linha", required: true }];
 
@@ -28,7 +28,8 @@ function StatusBadge({ s }: { s?: string }) {
 export default function MarcasPage() {
   const [tab, setTab] = useState<"all" | "pending">("all");
   const m = useAdminMutations("brands");
-  const approve = (id: string, status: "APPROVED" | "REJECTED") => m.update.mutate({ id, body: { status } });
+  // approving goes through POST /admin/brands/:id/approve (also approves the brand's pending product lines)
+  const approve = (id: string, status: "APPROVED" | "REJECTED") => (status === "APPROVED" ? m.post.mutate({ path: `${id}/approve` }) : m.update.mutate({ id, body: { status } }));
   return (
     <CrudPage<Brand>
       resource="brands"

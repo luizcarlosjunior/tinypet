@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { useSessionContext } from "@/hooks/use-session-context";
-import { usePets } from "@/hooks/use-pets";
+import { canEditPet, usePets } from "@/hooks/use-pets";
 import { api } from "@/lib/api-client";
 import { errorMessage } from "@/lib/errors";
 import { Button, Modal, Spinner } from "@/components/ui";
@@ -60,7 +60,7 @@ export function EnrollButton({ courseId, paid }: { courseId: string; paid: boole
         ) : (
           <ul className="space-y-2">
             {(pets.data ?? [])
-              .filter((p) => p.status !== "DECEASED")
+              .filter((p) => p.status !== "DECEASED" && canEditPet(p)) /* enrollment is owner-only */
               .map((p) => {
                 const on = petIds.includes(p.id);
                 return (

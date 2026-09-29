@@ -2,12 +2,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PawPrint } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { errorMessage } from "@/lib/errors";
 import { useSessionContext } from "@/hooks/use-session-context";
-import { usePets } from "@/hooks/use-pets";
+import { canEditPet, usePets } from "@/hooks/use-pets";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, Empty, Spinner } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
@@ -27,9 +27,12 @@ export function InviteAccept({ token }: { token: string }) {
   const invite = useQuery({ queryKey: ["invite", token], queryFn: () => api<Invite>(`/invites/${token}`), retry: false });
   const pets = usePets({ enabled: isLoggedIn });
   const [merges, setMerges] = useState<Record<string, string | null>>({});
+  const qc = useQueryClient();
   const accept = useMutation({
     mutationFn: () => api("/invites/accept", { method: "POST", json: { token, petMerges: (invite.data?.pets ?? []).map((p) => ({ partnerPetId: p.id, ownerPetId: merges[p.id] ?? null })) } }),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pets"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
       toast("Convite aceito! Seus pets já aparecem na sua conta.", "success");
       router.push("/pets");
     },
@@ -37,7 +40,9 @@ export function InviteAccept({ token }: { token: string }) {
   });
 
   if (invite.isLoading || sessionStatus === "loading") return <Spinner />;
-  if (invite.isError || !invite.data) return <Empty title="Convite inválido ou expirado" description="Peça ao parceiro para enviar um novo convite." action={<Link href="/" className="btn-secondary">Ir para o início</Link>} />;
+  // the API answers 200 with the invite status: only PENDING (and not past expiresAt) can be accepted
+  const unusable = !!invite.data && ((invite.data.status && invite.data.status !== "PENDING") || (invite.data.expiresAt && new Date(invite.data.expiresAt).getTime() < Date.now()));
+  if (invite.isError || !invite.data || unusable) return <Empty title="Convite inválido ou expirado" description="Peça ao parceiro para enviar um novo convite." action={<Link href="/" className="btn-secondary">Ir para o início</Link>} />;
   const inv = invite.data;
   const next = `/convite/${token}`;
 
@@ -78,7 +83,7 @@ export function InviteAccept({ token }: { token: string }) {
                     </label>
                     <select id={`merge-${p.id}`} value={merges[p.id] ?? ""} onChange={(e) => setMerges((m) => ({ ...m, [p.id]: e.target.value || null }))} className="input h-9 text-sm">
                       <option value="">É um pet novo (adicionar à minha conta)</option>
-                      {(pets.data ?? []).map((mine) => (
+                      {(pets.data ?? []).filter((mine) => canEditPet(mine)).map((mine) => (
                         <option key={mine.id} value={mine.id}>
                           É o meu {mine.name}
                         </option>

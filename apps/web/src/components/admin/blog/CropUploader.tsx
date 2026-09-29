@@ -6,6 +6,7 @@ import ReactCrop, { centerCrop, makeAspectCrop, type PercentCrop } from "react-i
 import { ChevronDown, ImagePlus, Loader2, Maximize2, RotateCcw, Scissors, SlidersHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { Switch } from "@/components/painel/ui";
 import { errorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ export function CropUploader({
 }) {
   const id = useId();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const forcePng = preset.format === "png";
   const fileRef = useRef<HTMLInputElement>(null);
   const areaRef = useRef<HTMLDivElement>(null);
@@ -183,6 +185,7 @@ export function CropUploader({
       const file = await renderToFile(img, rect, out, wantWebp ? "webp" : "png", quality, source?.name ?? "imagem");
       const media = await uploadBlogMedia(file, wantWebp || file.type === "image/webp" ? { format: "webp", quality: clampQuality(quality), alt } : { optimize: true, format: "png", quality: clampQuality(quality), alt }, setProgress);
       onChange(media.url, media);
+      qc.invalidateQueries({ queryKey: ["blog-admin", "media"] });
       toast("Imagem enviada", "success");
       setUploading(false);
       if (src) URL.revokeObjectURL(src);

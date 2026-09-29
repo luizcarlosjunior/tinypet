@@ -143,8 +143,9 @@ export async function publishChecks(partnerId: string) {
   if (!partner) throw Errors.notFound("Parceiro não encontrado");
 
   const missing: string[] = [];
-  const emailVerified = !!partner.emailVerifiedAt || partner.emails.some((e) => e.isPrimary && e.verifiedAt);
-  const phoneVerified = !!partner.phoneVerifiedAt || partner.phones.some((p) => p.isPrimary && p.verifiedAt);
+  // a verified contact row must still exist (the partner-level flags are kept in sync by syncVerifiedFlags)
+  const emailVerified = partner.emails.some((e) => e.verifiedAt);
+  const phoneVerified = partner.phones.some((p) => p.verifiedAt);
   if (!emailVerified) missing.push("Verifique o e-mail do parceiro");
   if (!phoneVerified) missing.push("Verifique o celular do parceiro");
   const hasLocation = !!partner.logoUrl || partner.addresses.length > 0 || (partner.serviceRadiusKm ?? 0) > 0;
@@ -260,20 +261,35 @@ export async function updateContact(partnerId: string, kind: ContactKind, cid: s
     const b = body as Partial<PhoneInput>;
     if (b.isPrimary) await unsetPrimary(partnerId, kind, cid);
     const number = b.number !== undefined ? toE164BR(b.number) : undefined;
-    return prisma.phone.update({ where: { id: cid }, data: { type: b.type, number, isPrimary: b.isPrimary, ...(number && number !== ex.number ? { verifiedAt: null } : {}) } });
+    const row = await prisma.phone.update({ where: { id: cid }, data: { type: b.type, number, isPrimary: b.isPrimary, ...(number && number !== ex.number ? { verifiedAt: null } : {}) } });
+    await syncVerifiedFlags(partnerId, kind);
+    return row;
   }
   if (kind === "emails") {
     const ex = await prisma.email.findFirst({ where: { id: cid, partnerId } });
     if (!ex) throw Errors.notFound("E-mail não encontrado");
     const b = body as Partial<EmailInput>;
     if (b.isPrimary) await unsetPrimary(partnerId, kind, cid);
-    return prisma.email.update({ where: { id: cid }, data: { address: b.address, isPrimary: b.isPrimary, ...(b.address && b.address !== ex.address ? { verifiedAt: null } : {}) } });
+    const row = await prisma.email.update({ where: { id: cid }, data: { address: b.address, isPrimary: b.isPrimary, ...(b.address && b.address !== ex.address ? { verifiedAt: null } : {}) } });
+    await syncVerifiedFlags(partnerId, kind);
+    return row;
   }
   const ex = await prisma.address.findFirst({ where: { id: cid, partnerId } });
   if (!ex) throw Errors.notFound("Endereço não encontrado");
   const b = await withGeo(body as Partial<AddressInput>, ex);
   if (b.isPrimary) await unsetPrimary(partnerId, kind, cid);
   return prisma.address.update({ where: { id: cid }, data: { ...b } });
+}
+
+/** Partner.emailVerifiedAt / phoneVerifiedAt only while some e-mail / phone row is still verified (edits and deletes reset rows). */
+async function syncVerifiedFlags(partnerId: string, kind: ContactKind) {
+  if (kind === "emails") {
+    const n = await prisma.email.count({ where: { partnerId, verifiedAt: { not: null } } });
+    if (!n) await prisma.partner.update({ where: { id: partnerId }, data: { emailVerifiedAt: null } });
+  } else if (kind === "phones") {
+    const n = await prisma.phone.count({ where: { partnerId, verifiedAt: { not: null } } });
+    if (!n) await prisma.partner.update({ where: { id: partnerId }, data: { phoneVerifiedAt: null } });
+  }
 }
 
 export async function deleteContact(partnerId: string, kind: ContactKind, cid: string) {
@@ -291,6 +307,7 @@ export async function deleteContact(partnerId: string, kind: ContactKind, cid: s
     if (!ex) throw Errors.notFound("Endereço não encontrado");
     await prisma.address.delete({ where: { id: cid } });
   }
+  await syncVerifiedFlags(partnerId, kind);
 }
 
 // ───────────────────────────── venue photos ─────────────────────────────

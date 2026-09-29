@@ -238,8 +238,8 @@ export async function requirePartner(req: NextRequest, partnerIdFromRoute?: stri
   const user = await requireUser(req);
   const partnerId = partnerIdFromRoute ?? req.headers.get("x-partner-id") ?? req.nextUrl.searchParams.get("partnerId") ?? "";
   if (!partnerId) throw Errors.badRequest("Informe o parceiro (X-Partner-Id)");
-  const m = await prisma.membership.findUnique({ where: { userId_partnerId: { userId: user.id, partnerId } } });
-  if (!m) throw Errors.forbidden("Você não faz parte deste parceiro");
+  const m = await prisma.membership.findUnique({ where: { userId_partnerId: { userId: user.id, partnerId } }, include: { partner: { select: { deletedAt: true } } } });
+  if (!m || m.partner.deletedAt) throw Errors.forbidden("Você não faz parte deste parceiro");
   if (opts?.ownerOnly && m.role !== "OWNER") throw Errors.forbidden("Apenas o dono do parceiro pode fazer isso");
   if (opts?.finance && m.role !== "OWNER" && !m.canSeeFinance) throw Errors.forbidden("Sem acesso ao financeiro");
   return { user, partnerId, membershipId: m.id, role: m.role, canSeeFinance: m.role === "OWNER" || m.canSeeFinance };
@@ -280,7 +280,7 @@ export async function assertPetAccess(userId: string, petId: string, level: PetA
 export async function sessionContext(user: AuthUser) {
   const [dbUser, memberships] = await Promise.all([
     prisma.user.findUnique({ where: { id: user.id }, include: { ownerTerm: true, subscription: { include: { plan: true } } } }),
-    prisma.membership.findMany({ where: { userId: user.id }, include: { partner: { select: { id: true, tradeName: true, slug: true, logoUrl: true, plan: true, published: true } } } }),
+    prisma.membership.findMany({ where: { userId: user.id, partner: { deletedAt: null } }, include: { partner: { select: { id: true, tradeName: true, slug: true, logoUrl: true, plan: true, published: true } } } }),
   ]);
   return {
     user: {

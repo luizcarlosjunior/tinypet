@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowRightLeft, Clock, Crown, LogOut, Mail, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePetMutation, usePetResource } from "@/hooks/use-pets";
 import { usePetSharing, useSharingMutation, type PetShare } from "@/hooks/use-sharing";
 import { useSessionContext } from "@/hooks/use-session-context";
@@ -265,6 +266,7 @@ function TransferDialog({ petId, petName, to, onClose }: { petId: string; petNam
 function SharedView({ petId, petName }: { petId: string; petName: string }) {
   const { data } = usePetSharing(petId);
   const leave = useSharingMutation(petId, "POST", "/leave");
+  const qc = useQueryClient();
   const { toast } = useToast();
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
@@ -313,6 +315,7 @@ function SharedView({ petId, petName }: { petId: string; petName: string }) {
             .then(() => {
               toast(`Você saiu do compartilhamento de ${petName}.`, "info");
               router.push("/pets");
+              setTimeout(() => qc.removeQueries({ queryKey: ["pets", petId] }), 1000);
             })
             .catch((e) => toast(errorMessage(e), "error"))
         }

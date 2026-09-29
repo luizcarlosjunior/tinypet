@@ -113,6 +113,7 @@ function ProfileCard() {
           </div>
           <Input id="birth" type="date" label="Data de nascimento (opcional)" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           <Select id="term" label="Como prefere ser chamado" value={termId} onChange={(e) => setTermId(e.target.value)}>
+            <option value="">Padrão{user.ownerTerm && !termId ? ` (${user.ownerTerm})` : ""}</option>
             {(terms.data ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
           </Select>
           <div className="sm:col-span-2 flex items-center justify-between">

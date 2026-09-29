@@ -15,7 +15,7 @@ export default function AddOnsPage() {
     { key: "name", label: "Nome", required: true, placeholder: "+1 curso" },
     { key: "featureKey", label: "Recurso", type: "select", options: keys, required: true },
     { key: "quantity", label: "Quantidade", type: "number", required: true },
-    { key: "priceMonthly", label: "Preço mensal (R$)", type: "number" },
+    { key: "priceMonthly", label: "Preço mensal (R$)", type: "number", decimal: true, emptyAs: "null" },
   ];
   return (
     <CrudPage<AddOn>

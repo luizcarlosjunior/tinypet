@@ -188,7 +188,7 @@ function AgendaInner() {
         </div>
       )}
       {!q.isLoading && (
-        <div className={cn(view === "dia" && "grid gap-4 xl:grid-cols-[1fr_320px]")}>
+        <div className={cn(view === "dia" && "grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]")}>
           <div className="min-w-0">
             {view === "dia" && <DayView date={date} items={items} members={members.data ?? []} membershipId={membershipId || null} onOpen={setSelected} />}
             {view === "semana" && <WeekView start={range.from} items={items} members={members.data ?? []} onOpen={setSelected} onDay={(d) => setParams({ view: "dia", date: d })} />}

@@ -6,13 +6,13 @@ import { fmtDate } from "@/lib/format";
 import { SYSTEM_BADGES, safeHref } from "@tinypet/shared";
 import { cn } from "@/lib/utils";
 
-type Earned = { id?: string; badgeId?: string; earnedAt?: string | null; badge?: { key: string; name: string; description: string | null; iconUrl: string | null; partner?: { tradeName: string } | null } | null; key?: string; name?: string; description?: string | null; iconUrl?: string | null; earned?: boolean };
+type Earned = { id?: string; badgeId?: string; earnedAt?: string | null; badge?: { key: string; name: string; description: string | null; iconUrl: string | null; partner?: { tradeName: string } | null } | null; key?: string; name?: string; description?: string | null; iconUrl?: string | null; earned?: boolean; partner?: { id: string; tradeName: string } | null };
 
 export function PetBadges({ petId }: { petId: string }) {
   const q = usePetResource<Earned[]>(petId, "badges");
   if (q.isLoading) return <Spinner />;
   const rows = q.data ?? [];
-  const norm = rows.map((r) => ({ key: r.badge?.key ?? r.key ?? r.badgeId ?? "", name: r.badge?.name ?? r.name ?? "", description: r.badge?.description ?? r.description ?? null, iconUrl: r.badge?.iconUrl ?? r.iconUrl ?? null, earnedAt: r.earnedAt ?? null, earned: r.earned ?? !!r.earnedAt, partner: r.badge?.partner?.tradeName }));
+  const norm = rows.map((r) => ({ key: r.badge?.key ?? r.key ?? r.badgeId ?? r.id ?? "", name: r.badge?.name ?? r.name ?? "", description: r.badge?.description ?? r.description ?? null, iconUrl: r.badge?.iconUrl ?? r.iconUrl ?? null, earnedAt: r.earnedAt ?? null, earned: r.earned ?? !!r.earnedAt, partner: r.badge?.partner?.tradeName ?? r.partner?.tradeName }));
   const earnedKeys = new Set(norm.filter((b) => b.earned).map((b) => b.key));
   const all = [...norm.filter((b) => b.earned), ...SYSTEM_BADGES.filter((s) => !earnedKeys.has(s.key) && !norm.some((n) => n.key === s.key)).map((s) => ({ key: s.key, name: s.name, description: s.description, iconUrl: null, earnedAt: null, earned: false, partner: undefined })), ...norm.filter((b) => !b.earned)];
   return (

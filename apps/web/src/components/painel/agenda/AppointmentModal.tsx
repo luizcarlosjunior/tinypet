@@ -87,6 +87,7 @@ export function AppointmentModal({ open, onClose, editing, initialDate, initialM
     mutationFn: (v: AddressInput) => api<{ id: string }>(`/clients/${clientId}/addresses`, { method: "POST", json: v }),
     onSuccess: (a) => {
       qc.invalidateQueries({ queryKey: ["clients", clientId] });
+      qc.invalidateQueries({ queryKey: ["client", clientId] });
       setValue("addressId", a.id);
       setNewAddr(false);
     },
@@ -183,7 +184,7 @@ export function AppointmentModal({ open, onClose, editing, initialDate, initialM
             ))}
           </Select>
           <Input id="ap-title" label="Título" placeholder="Ex.: Aula de obediência" {...register("title")} error={errors.title?.message} />
-          <Select id="ap-member" label="Profissional" {...register("membershipId")} error={errors.membershipId?.message}>
+          <Select id="ap-member" label="Profissional" {...register("membershipId", { setValueAs: (v) => v || null })} error={errors.membershipId?.message}>
             <option value="">— sem profissional —</option>
             {(members.data ?? []).map((m) => (
               <option key={m.id} value={m.id}>
@@ -233,7 +234,7 @@ export function AppointmentModal({ open, onClose, editing, initialDate, initialM
                   </Button>
                 ) : (
                   <div className="mt-3 border-t pt-3">
-                    <AddressForm compact submitting={addAddress.isPending} onCancel={() => setNewAddr(false)} onSubmit={(v) => addAddress.mutate(v)} />
+                    <AddressForm compact nested submitting={addAddress.isPending} onCancel={() => setNewAddr(false)} onSubmit={(v) => addAddress.mutate(v)} />
                   </div>
                 )}
               </>
@@ -253,7 +254,7 @@ export function AppointmentModal({ open, onClose, editing, initialDate, initialM
                 </option>
               ))}
             </Select>
-            {recurrence && recurrence !== "NONE" && <Input id="ap-occ" type="number" min={1} max={52} label={recurrence === "PACKAGE" ? "Número de sessões" : "Quantidade de ocorrências"} {...register("occurrences")} error={errors.occurrences?.message} />}
+            {recurrence && recurrence !== "NONE" && <Input id="ap-occ" type="number" min={1} max={52} label={recurrence === "PACKAGE" ? "Número de sessões" : "Quantidade de ocorrências"} {...register("occurrences", { setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)) })} error={errors.occurrences?.message} />}
           </div>
         )}
 

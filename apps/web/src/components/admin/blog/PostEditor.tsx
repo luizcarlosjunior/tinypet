@@ -319,7 +319,7 @@ export function PostEditor({ post }: { post?: (BlogPostFull & { tags: string[]; 
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
           <Card>
             <div className="space-y-4">

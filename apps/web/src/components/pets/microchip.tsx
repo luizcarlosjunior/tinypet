@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * Microchip input: a switch ("Possui microchip") that is OFF while nothing is typed; when ON, a 15-digit field.
  * Turning it off clears the value (null). A valid number shows the lookup links right below.
  */
-export function MicrochipField({ id = "pet-microchip", value, onChange, error }: { id?: string; value: string | null | undefined; onChange: (v: string | null) => void; error?: string }) {
+export function MicrochipField({ id = "pet-microchip", value, onChange, error, showLookups = true }: { id?: string; value: string | null | undefined; onChange: (v: string | null) => void; error?: string; showLookups?: boolean }) {
   const digits = normalizeMicrochip(value);
   const [enabled, setEnabled] = useState(digits.length > 0);
   useEffect(() => {
@@ -46,7 +46,7 @@ export function MicrochipField({ id = "pet-microchip", value, onChange, error }:
             id={id}
             inputMode="numeric"
             autoComplete="off"
-            maxLength={MICROCHIP_DIGITS}
+            // no maxLength: a pasted "985 112 003 456 789" would be cut to 15 chars (12 digits); onChange keeps 15 digits
             placeholder="Ex.: 963000012345678"
             className={cn("input font-mono tracking-wider", error && "border-red-500")}
             aria-invalid={!!error}
@@ -57,7 +57,7 @@ export function MicrochipField({ id = "pet-microchip", value, onChange, error }:
           <p id={`${id}-hint`} className={cn("mt-1 text-xs", error ? "text-red-600" : "text-[var(--muted)]")}>
             {error ?? `${digits.length}/${MICROCHIP_DIGITS} dígitos`}
           </p>
-          {isValidMicrochip(digits) && <MicrochipLookupLinks chip={digits} className="mt-3" />}
+          {showLookups && isValidMicrochip(digits) && <MicrochipLookupLinks chip={digits} className="mt-3" />}
         </div>
       )}
     </div>

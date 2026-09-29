@@ -123,6 +123,7 @@ function FlaggedMedia() {
   const rows = list.data?.items ?? [];
   return (
     <QueryState isLoading={list.isLoading} error={list.error} retry={() => list.refetch()} isEmpty={rows.length === 0} empty={<Empty title="Nenhuma mídia sinalizada" description="A moderação automática não sinalizou nada pendente." />}>
+      {(list.data?.meta?.total ?? 0) > rows.length && <p className="mb-2 text-xs text-[var(--muted)]">Mostrando {rows.length} de {list.data?.meta?.total} — modere estas para ver as próximas.</p>}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-label="Mídias sinalizadas">
         {rows.map((m) => (
           <li key={m.id} className="overflow-hidden rounded-xl border bg-[var(--card)]">

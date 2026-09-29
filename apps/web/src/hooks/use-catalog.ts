@@ -1,6 +1,6 @@
 "use client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api-client";
+import { api, apiList } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 import type { CatalogItem, CatalogMedia } from "@/types/api";
@@ -16,7 +16,20 @@ function qs(p: Record<string, string | undefined>) {
 }
 
 export function useCatalog(partnerId: string | null, params: CatalogParams = {}) {
-  return useQuery({ queryKey: ["catalog", partnerId, params], queryFn: () => api<CatalogItem[]>(`/catalog${qs(params)}`), enabled: !!partnerId });
+  return useQuery({
+    queryKey: ["catalog", partnerId, params],
+    // GET /catalog is paginated (default 20) → load every page so the list (grouped by type) is complete
+    queryFn: async () => {
+      const all: CatalogItem[] = [];
+      for (let page = 1; page <= 50; page++) {
+        const r = await apiList<CatalogItem[]>(`/catalog${qs({ ...params, page: String(page), pageSize: "100" })}`);
+        all.push(...(r.data ?? []));
+        if (!r.meta || all.length >= r.meta.total || (r.data ?? []).length === 0) break;
+      }
+      return all;
+    },
+    enabled: !!partnerId,
+  });
 }
 export function useCatalogItem(partnerId: string | null, id: string | null) {
   return useQuery({ queryKey: ["catalog", partnerId, "item", id], queryFn: () => api<CatalogItem>(`/catalog/${id}`), enabled: !!partnerId && !!id && id !== "novo" });

@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BadgeCheck, Flag, MessageSquareReply } from "lucide-react";
@@ -100,13 +100,20 @@ export function ReviewForm({ itemId, existing }: { itemId: string; existing?: Pu
   const { toast } = useToast();
   const router = useRouter();
   const qc = useQueryClient();
-  const form = useForm<ReviewInput>({ resolver: zodResolver(reviewSchema), defaultValues: { rating: existing?.rating ?? 0, comment: existing?.comment ?? "" } });
+  // the item page is server-rendered without the viewer: load my own review (the API upserts one per user/item)
+  const mine = useQuery({ queryKey: ["reviews", "mine"], queryFn: () => api<(PublicReview & { itemId?: string | null })[]>("/reviews/mine", { partnerId: null }), enabled: isLoggedIn && !existing });
+  const current = existing ?? mine.data?.find((r) => r.itemId === itemId) ?? null;
+  const form = useForm<ReviewInput>({ resolver: zodResolver(reviewSchema), defaultValues: { rating: current?.rating ?? 0, comment: current?.comment ?? "" } });
+  useEffect(() => {
+    if (current && !form.formState.isDirty) form.reset({ rating: current.rating, comment: current.comment ?? "" });
+  }, [current, form]);
   const rating = form.watch("rating");
   const m = useMutation({
     mutationFn: (v: ReviewInput) => api(`/reviews/items/${itemId}`, { method: "POST", json: v }),
     onSuccess: () => {
       toast("Avaliação publicada. Obrigado!", "success");
       qc.invalidateQueries({ queryKey: ["public"] });
+      qc.invalidateQueries({ queryKey: ["reviews", "mine"] });
       router.refresh();
     },
     onError: (e) => toast(errorMessage(e), "error"),
@@ -129,7 +136,7 @@ export function ReviewForm({ itemId, existing }: { itemId: string; existing?: Pu
   return (
     <form onSubmit={form.handleSubmit((v) => m.mutate(v))} className="card space-y-3" aria-labelledby="avaliar-titulo">
       <h3 id="avaliar-titulo" className="font-semibold">
-        {existing ? "Editar minha avaliação" : "Avaliar"}
+        {current ? "Editar minha avaliação" : "Avaliar"}
       </h3>
       <div>
         <span className="label">Sua nota</span>
@@ -139,7 +146,7 @@ export function ReviewForm({ itemId, existing }: { itemId: string; existing?: Pu
       <Textarea id="review-comment" label="Depoimento (opcional)" placeholder="Como foi sua experiência?" {...form.register("comment")} error={form.formState.errors.comment?.message} />
       <div className="flex justify-end">
         <Button type="submit" loading={m.isPending}>
-          {existing ? "Salvar" : "Publicar avaliação"}
+          {current ? "Salvar" : "Publicar avaliação"}
         </Button>
       </div>
     </form>

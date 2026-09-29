@@ -8,7 +8,9 @@ import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 import { safeHref } from "@tinypet/shared";
 
-type Ev = { id: string; type: string; title: string; description: string | null; occurredAt: string; partner?: { tradeName: string } | null; user?: { name: string } | null; attachments?: { url: string; name: string; type?: string }[] | null; photos?: string[] | null };
+type Ev = { id: string; type: string; title: string; description: string | null; occurredAt: string; partner?: { tradeName: string } | null; user?: { name: string } | null; attachments?: { url: string; name: string; type?: string }[] | null };
+
+const isImage = (a: { url: string; type?: string }) => (a.type ?? "").startsWith("image") || /\.(jpe?g|png|webp|gif)(\?|$)/i.test(a.url);
 
 const ICON: Record<string, { icon: typeof Award; color: string; label: string }> = {
   VISIT: { icon: Stethoscope, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200", label: "Visita" },
@@ -46,6 +48,9 @@ export function PetHistory({ petId, deceased, readOnly = false }: { petId: strin
         <ol className="relative ml-4 border-l">
           {items.map((e) => {
             const meta = ICON[e.type] ?? { icon: Flag, color: ICON.NOTE!.color, label: e.type };
+            const atts = Array.isArray(e.attachments) ? e.attachments.filter((a) => a && typeof a.url === "string") : [];
+            const photos = atts.filter(isImage);
+            const files = atts.filter((a) => !isImage(a));
             const Icon = meta.icon;
             return (
               <li key={e.id} className="mb-6 ml-6">
@@ -59,19 +64,21 @@ export function PetHistory({ petId, deceased, readOnly = false }: { petId: strin
                   </p>
                   <p className="mt-0.5 font-medium">{e.title}</p>
                   {e.description && <p className="mt-1 whitespace-pre-line text-sm text-[var(--muted)]">{e.description}</p>}
-                  {e.photos && e.photos.length > 0 && (
+                  {photos.length > 0 && (
                     <ul className="mt-2 flex gap-2 overflow-x-auto">
-                      {e.photos.map((p) => (
-                        <li key={p}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={safeHref(p)} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                      {photos.map((p) => (
+                        <li key={p.url}>
+                          <a href={safeHref(p.url)} target="_blank" rel="noopener noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={safeHref(p.url)} alt={p.name} className="h-16 w-16 rounded-lg object-cover" />
+                          </a>
                         </li>
                       ))}
                     </ul>
                   )}
-                  {e.attachments && e.attachments.length > 0 && (
+                  {files.length > 0 && (
                     <ul className="mt-2 flex flex-wrap gap-2">
-                      {e.attachments.map((a) => (
+                      {files.map((a) => (
                         <li key={a.url}>
                           <a href={safeHref(a.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
                             <Paperclip className="h-3 w-3" aria-hidden /> {a.name}

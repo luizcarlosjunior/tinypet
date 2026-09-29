@@ -8,15 +8,15 @@ import { FEATURES, formatBRL } from "@tinypet/shared";
 import { CreateForm, type FieldDef } from "@/components/admin/AdminTable";
 import { cn } from "@/lib/utils";
 
-const OWNER_KEYS = ["owner_pets", "owner_gallery", "owner_stories", "owner_storage_mb"];
+const OWNER_KEYS = ["owner_pets", "owner_gallery", "owner_stories", "owner_storage_mb", "owner_videos_per_day", "owner_video_max_seconds"];
 const BOOLEAN_KEYS = ["paid_courses", "online_booking", "whatsapp_reminders", "custom_badges", "search_highlight", "advanced_reports", "owner_gallery", "owner_stories"];
 
 const planFields: FieldDef[] = [
   { key: "key", label: "Chave", required: true, placeholder: "pro" },
   { key: "name", label: "Nome", required: true, placeholder: "Pro" },
   { key: "audience", label: "Público", type: "select", required: true, options: [{ value: "PARTNER", label: "Parceiro" }, { value: "OWNER", label: "Tutor" }] },
-  { key: "priceMonthly", label: "Preço mensal (R$)", type: "number" },
-  { key: "priceYearly", label: "Preço anual (R$)", type: "number" },
+  { key: "priceMonthly", label: "Preço mensal (R$)", type: "number", decimal: true, emptyAs: "null" },
+  { key: "priceYearly", label: "Preço anual (R$)", type: "number", decimal: true, emptyAs: "null" },
   { key: "trialDays", label: "Dias de teste", type: "number" },
   { key: "visible", label: "Visível", type: "checkbox" },
   { key: "isDefault", label: "Padrão", type: "checkbox" },

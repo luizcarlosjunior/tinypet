@@ -120,7 +120,7 @@ function CourseForm({ id }: { id: string | null }) {
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Select id="c-cat" label="Categoria" {...register("categoryId")}>
+            <Select id="c-cat" label="Categoria" {...register("categoryId", { setValueAs: (v) => v || null })}>
               <option value="">—</option>
               {(categories.data ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
@@ -328,7 +328,8 @@ function StudentsTab({ courseId }: { courseId: string }) {
         </thead>
         <tbody>
           {rows.map((s) => {
-            const pct = s.progressPct ?? s.progress ?? (s.totalLessons ? Math.round(((s.completedLessons ?? 0) / s.totalLessons) * 100) : 0);
+            const pct = s.progressPct ?? 0;
+            const questions = (s.progress ?? []).filter((p) => p.question);
             return (
               <tr key={s.id}>
                 <td className={td}>
@@ -347,11 +348,11 @@ function StudentsTab({ courseId }: { courseId: string }) {
                 </td>
                 <td className={td}>{fmtDate(s.enrolledAt ?? s.createdAt)}</td>
                 <td className={td}>
-                  {s.questions?.length ? (
+                  {questions.length ? (
                     <ul className="space-y-1 text-xs">
-                      {s.questions.map((qq, i) => (
+                      {questions.map((qq, i) => (
                         <li key={i}>
-                          {qq.lessonTitle && <span className="font-medium">{qq.lessonTitle}: </span>}
+                          {qq.lesson?.title && <span className="font-medium">{qq.lesson.title}: </span>}
                           {qq.question}
                         </li>
                       ))}

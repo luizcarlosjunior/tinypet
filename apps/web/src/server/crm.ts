@@ -101,8 +101,11 @@ export const addresses = {
       zipCode: input.zipCode ?? row.zipCode,
     };
     const addressChanged = ["street", "number", "district", "city", "state", "zipCode"].some((k) => (merged as Record<string, unknown>)[k] !== (row as Record<string, unknown>)[k]);
+    // Clients re-send the stored coordinates on edit: when the address text changed, those are stale → re-geocode.
+    const given = input.latitude != null && input.longitude != null;
+    const staleGiven = given && addressChanged && Number(row.latitude) === Number(input.latitude) && Number(row.longitude) === Number(input.longitude);
     const coords =
-      input.latitude != null && input.longitude != null
+      given && !staleGiven
         ? { latitude: input.latitude, longitude: input.longitude }
         : addressChanged || row.latitude == null || row.longitude == null
           ? await withCoords({ ...merged, latitude: null, longitude: null })
@@ -133,7 +136,7 @@ export const clientInclude = {
     where: { pet: { deletedAt: null } },
     select: {
       pet: {
-        select: { id: true, name: true, avatarUrl: true, status: true, birthDate: true, ownerId: true, createdByPartnerId: true, species: { select: { key: true, label: true } }, breed: { select: { id: true, name: true } } },
+        select: { id: true, name: true, avatarUrl: true, status: true, birthDate: true, approxAgeMonths: true, sex: true, breedOther: true, ownerId: true, createdByPartnerId: true, species: { select: { key: true, label: true } }, breed: { select: { id: true, name: true } } },
       },
     },
   },
@@ -387,13 +390,13 @@ export async function birthdays(partnerId: string, month: number) {
     prisma.client.findMany({ where: { id: { in: clientIds } }, include: clientInclude }),
     prisma.pet.findMany({
       where: { id: { in: petRows.map((r) => r.id) } },
-      select: { id: true, name: true, avatarUrl: true, birthDate: true, species: { select: { key: true, label: true } }, clients: { where: { client: { partnerId } }, select: { client: { select: { id: true, name: true } } } } },
+      select: { id: true, name: true, avatarUrl: true, birthDate: true, species: { select: { key: true, label: true } }, clients: { where: { client: { partnerId, deletedAt: null } }, select: { client: { select: { id: true, name: true, phones: { select: { number: true, isPrimary: true } } } } } } },
     }),
   ]);
   const day = (d: Date | null) => (d ? Number(ymd(d).slice(8, 10)) : 0);
   return {
     clients: clients.map(clientSummary).sort((a, b) => day(a.birthDate) - day(b.birthDate)),
-    pets: pets.map((p) => ({ ...p, clients: p.clients.map((c) => c.client) })).sort((a, b) => day(a.birthDate) - day(b.birthDate)),
+    pets: pets.map((p) => ({ ...p, clients: p.clients.map(({ client: { phones, ...c } }) => ({ ...c, primaryPhone: phones.find((ph) => ph.isPrimary)?.number ?? phones[0]?.number ?? null })) })).sort((a, b) => day(a.birthDate) - day(b.birthDate)),
   };
 }
 

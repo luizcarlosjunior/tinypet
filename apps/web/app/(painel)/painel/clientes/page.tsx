@@ -52,7 +52,7 @@ export default function ClientesPage() {
           </>
         }
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
           <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
             <SearchInput value={q} onChange={setQ} placeholder="Nome, telefone ou pet…" />
