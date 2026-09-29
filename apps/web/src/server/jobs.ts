@@ -16,7 +16,7 @@ function safeEqual(a: string, b: string) {
 }
 
 /**
- * Jobs are protected by CRON_SECRET, sent as `Authorization: Bearer <CRON_SECRET>` (Vercel Cron does this automatically)
+ * Jobs are protected by CRON_SECRET, sent as `Authorization: Bearer <CRON_SECRET>` (server crontab, see docs/deploy.md)
  * or `x-cron-secret: <CRON_SECRET>`. Rejects when the secret is unset and, in production, when it is shorter than
  * 16 chars or a placeholder (`change-me-cron`, `dev-cron-secret`).
  */
@@ -32,7 +32,7 @@ export function requireCron(req: NextRequest) {
   if (!provided || !safeEqual(provided, secret)) throw Errors.unauthorized("Cron secret inválido");
 }
 
-/** Builds `{ GET, POST }` route exports for a cron job (Vercel Cron issues GET requests). */
+/** Builds `{ GET, POST }` route exports for a cron job (callable with either method). */
 export function cronRoute(job: () => Promise<unknown>) {
   const h = handler(async (req) => {
     requireCron(req);

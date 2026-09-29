@@ -31,7 +31,7 @@ function assertStorageConfigured() {
   }
 }
 const LOCAL_DIR = path.join(process.cwd(), "public", "uploads");
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3033";
 
 const s3 = useS3
   ? new S3Client({

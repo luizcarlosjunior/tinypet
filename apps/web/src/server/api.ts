@@ -58,8 +58,8 @@ export function paginate(page: number, pageSize: number) {
 
 /**
  * Client IP for rate limiting / audit.
- * - `TRUST_PROXY=1`: trust the first hop of `x-forwarded-for` (only behind a proxy you control that overwrites it).
- * - On Vercel, `x-vercel-forwarded-for` / `x-real-ip` are set by the platform and cannot be spoofed by clients.
+ * - `TRUST_PROXY=1`: trust the first hop of `x-forwarded-for` (only behind a proxy you control that overwrites it,
+ *   e.g. nginx `proxy_set_header X-Forwarded-For $remote_addr` — see docs/deploy.md).
  * - Otherwise returns a constant, so IP-keyed limits degrade to a global per-key limit instead of being bypassable
  *   by sending a fake `X-Forwarded-For`.
  */
@@ -75,10 +75,6 @@ export function clientIpFromHeaders(headers: Headers | Record<string, string | s
     return Array.isArray(v) ? v[0] : v;
   };
   const first = (v?: string) => v?.split(",")[0]?.trim() || undefined;
-  if (process.env.VERCEL) {
-    const v = first(get("x-vercel-forwarded-for")) ?? first(get("x-real-ip"));
-    if (v) return v;
-  }
   if (process.env.TRUST_PROXY === "1") {
     const v = first(get("x-forwarded-for")) ?? first(get("x-real-ip"));
     if (v) return v;
