@@ -145,6 +145,17 @@ export function assertOwnerControlled(actor: PetActor, msg = "Apenas o tutor pod
   if (!canEditOwnerControlled(actor)) throw Errors.forbidden(msg);
 }
 
+/**
+ * Who may register the pet's death (irreversible): the owner; never a shared account; a partner only for an ownerless
+ * pet it created itself (same rule as other owner-controlled data).
+ */
+export function assertCanRegisterDeath(actor: PetActor) {
+  if (actor.via === "family") throw Errors.forbidden("Apenas o tutor principal ou o parceiro podem registrar o falecimento");
+  if (actor.via === "partner" && actor.pet.ownerId !== null) throw Errors.forbidden("Este pet tem tutor: apenas o tutor pode registrar o falecimento");
+  assertOwnerControlled(actor, "Apenas o parceiro que cadastrou o pet pode registrar o falecimento");
+  if (actor.pet.status === "DECEASED") throw Errors.conflict("O falecimento deste pet já foi registrado");
+}
+
 /** Partners may only edit/delete rows they created themselves (rows with partnerId null belong to owner/family). */
 export function assertPartnerOwnsRow(actor: PetActor, rowPartnerId: string | null | undefined, msg = "Registro do tutor ou de outro parceiro não pode ser alterado") {
   if (actor.via === "partner" && (!rowPartnerId || rowPartnerId !== actor.partnerId)) throw Errors.forbidden(msg);
