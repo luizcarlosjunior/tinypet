@@ -1,4 +1,4 @@
-# Run from tinyPet/: docker compose up -d  (or `pnpm db:up` from the repo root)
+# Run from tinyPet/: docker compose up -d  (or `yarn db:up` from the repo root)
 name: tinypet
 services:
   mysql:

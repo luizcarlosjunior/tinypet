@@ -1,4 +1,4 @@
-// Metro config for the pnpm workspace (repo root = ..; tinyPetApp consumes ../shared).
+// Metro config for the Yarn workspace (repo root = ..; tinyPetApp consumes ../shared).
 // Expo SDK 52 auto-detects workspaces; we only make sure the repo root is watched and resolvable.
 // @tinypet/shared is TypeScript source; Metro transpiles it (sourceExts already includes ts/tsx).
 const { getDefaultConfig } = require("expo/metro-config");
