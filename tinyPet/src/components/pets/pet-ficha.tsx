@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { BreedInfoCard } from "./breed-info";
 import { Flower2 } from "lucide-react";
 import { canEditPet, useUpdatePet, type Pet } from "@/hooks/use-pets";
 import { PetForm } from "./pet-form";
@@ -48,6 +49,7 @@ export function PetFicha({ pet }: { pet: Pet }) {
           }
         />
       </section>
+      <BreedInfoCard breedId={pet.breedId} breedName={pet.breed?.name} sex={pet.sex} />
       {isPrimaryOwner && pet.status === "ACTIVE" && (
         <section className="card border-dashed">
           <h3 className="text-sm font-semibold">Registrar falecimento</h3>

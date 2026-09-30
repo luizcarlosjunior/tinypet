@@ -487,14 +487,20 @@ model Species {
 }
 
 model Breed {
-  id         String                 @id @default(cuid())
-  speciesId  String                 @map("species_id")
-  name       String
-  isMixed    Boolean                @default(false) @map("is_mixed") // SRD
-  isOther    Boolean                @default(false) @map("is_other")
-  species    Species                @relation(fields: [speciesId], references: [id])
-  pets       Pet[]
-  references MeasurementReference[]
+  id               String                 @id @default(cuid())
+  speciesId        String                 @map("species_id")
+  name             String
+  isMixed          Boolean                @default(false) @map("is_mixed") // SRD
+  isOther          Boolean                @default(false) @map("is_other")
+  /// Breed name used to look it up in API Ninjas (dogs/cats, English), e.g. "German Shepherd". Admin editable.
+  externalName     String?                @map("external_name") @db.VarChar(120)
+  /// Breed facts replicated from API Ninjas (see BreedProfile); null + profileCheckedAt = looked up, not found.
+  profileId        String?                @map("profile_id")
+  profileCheckedAt DateTime?              @map("profile_checked_at")
+  profile          BreedProfile?          @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  species          Species                @relation(fields: [speciesId], references: [id])
+  pets             Pet[]
+  references       MeasurementReference[]
 
   @@unique([speciesId, name])
   @@map("breeds")
@@ -2155,4 +2161,78 @@ model BlogCommentReport {
   @@unique([commentId, userId])
   @@index([status, createdAt])
   @@map("blog_comment_reports")
+}
+
+/// Cache of external animal-data API responses (API Ninjas dogs/cats) to save credits: a query is sent to the
+/// provider only on a cache miss. Entries don't expire; "not found" (empty result) is retried after 30 days;
+/// admins can force a refresh.
+model ApiCache {
+  id        String   @id @default(cuid())
+  /// e.g. "api-ninjas:dogs:german shepherd" (lowercased query)
+  key       String   @unique @db.VarChar(191)
+  provider  String   @db.VarChar(40)
+  /// Raw JSON returned by the provider (array of results).
+  payload   Json
+  /// 0 when the provider found nothing.
+  results   Int      @default(0)
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+  hits      Int      @default(0)
+
+  @@map("api_cache")
+}
+
+/// Breed facts replicated from API Ninjas (dogs/cats), one row per provider breed, in metric units.
+/// Filled on demand: when a breed isn't here yet the provider is queried and every returned breed is stored.
+/// Traits are 1–5 (labels in src/server/breed-info.ts; cats' `grooming` is 5 = low effort).
+model BreedProfile {
+  id           String  @id @default(cuid())
+  /// "dog" | "cat" (Species.key)
+  speciesKey   String  @map("species_key") @db.VarChar(20)
+  /// Provider breed name (English), e.g. "German Shepherd"
+  externalName String  @map("external_name") @db.VarChar(120)
+  source       String  @default("api-ninjas") @db.VarChar(40)
+  imageUrl     String? @map("image_url") @db.VarChar(500)
+  origin       String? @db.VarChar(120)
+  /// Cats: size text from the provider (e.g. "12 to 16 inches")
+  lengthText   String? @map("length_text") @db.VarChar(120)
+
+  lifeMinYears Float? @map("life_min_years")
+  lifeMaxYears Float? @map("life_max_years")
+
+  weightMinKgMale   Float? @map("weight_min_kg_male")
+  weightMaxKgMale   Float? @map("weight_max_kg_male")
+  weightMinKgFemale Float? @map("weight_min_kg_female")
+  weightMaxKgFemale Float? @map("weight_max_kg_female")
+  /// Cats: overall range
+  weightMinKg       Float? @map("weight_min_kg")
+  weightMaxKg       Float? @map("weight_max_kg")
+
+  heightMinCmMale   Float? @map("height_min_cm_male")
+  heightMaxCmMale   Float? @map("height_max_cm_male")
+  heightMinCmFemale Float? @map("height_min_cm_female")
+  heightMaxCmFemale Float? @map("height_max_cm_female")
+
+  energy            Int?
+  playfulness       Int?
+  trainability      Int?
+  intelligence      Int?
+  goodWithChildren  Int? @map("good_with_children")
+  goodWithOtherDogs Int? @map("good_with_other_dogs")
+  goodWithStrangers Int? @map("good_with_strangers")
+  familyFriendly    Int? @map("family_friendly")
+  otherPetsFriendly Int? @map("other_pets_friendly")
+  protectiveness    Int?
+  barking           Int?
+  shedding          Int?
+  grooming          Int?
+  drooling          Int?
+  coatLength        Int? @map("coat_length")
+  generalHealth     Int? @map("general_health")
+
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  breeds    Breed[]
+
+  @@unique([speciesKey, externalName])
+  @@map("breed_profiles")
 }

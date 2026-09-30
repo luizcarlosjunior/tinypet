@@ -104,6 +104,10 @@ O pet é o centro do app: uma ficha única que o tutor controla e que os parceir
 - Pet falecido não pode ser compartilhado nem transferido.
 - O dono vê os parceiros que têm acesso ao pet e pode revogar o acesso de cada um (o histórico registrado pelo parceiro é mantido).
 
+**Sobre a raça**
+
+- Para cães e gatos, a ficha mostra dados típicos da raça: foto ilustrativa, expectativa de vida, peso e altura típicos (por sexo nos cães), origem (gatos) e características de 1 a 5 (energia, facilidade de treino, convívio com crianças e outros animais, queda de pelo…). Fonte: API Ninjas, replicado no nosso banco para economizar créditos.
+
 **Alimentação e marcas**
 
 O tutor informa o que cada pet come, e o tinyPet usa isso para indicar lojas e ofertas daquelas marcas perto dele.
@@ -527,7 +531,7 @@ Tabelas, modelos, campos, enums e código ficam em inglês; a interface continua
 | Identity | User (com `username`, `tokenVersion`), Session, OwnerTerm, Membership (user ↔ partner, com papel), VerificationCode (código com hash), RateLimit |
 | Partner | Partner, PartnerType, SocialLink, BusinessHours, VenuePhoto |
 | Contacts | Phone, Email, Address (dono: user, client ou partner) |
-| Pets & CRM | Client, FamilyMember, Pet, Species, Breed, PetAccess, PetShareInvite, PetOwnershipTransfer, PetSocialProfile, PetMedia, PetHistoryEvent, LifeStageRule, Skill, PetSkill, SkillStat (agregado diário), PetFood (pet, tipo, marca, linha, embalagem, consumo diário, última compra) |
+| Pets & CRM | Client, FamilyMember, Pet, Species, Breed, BreedProfile, ApiCache, PetAccess, PetShareInvite, PetOwnershipTransfer, PetSocialProfile, PetMedia, PetHistoryEvent, LifeStageRule, Skill, PetSkill, SkillStat (agregado diário), PetFood (pet, tipo, marca, linha, embalagem, consumo diário, última compra) |
 | Catalog | Category, Subcategory, Brand, ProductLine, ProductFlavor, CatalogItem, CatalogItemMedia, Review, ReviewReply, Report |
 | Courses | Course, CourseModule, Lesson, LessonAttachment, Enrollment, LessonProgress, Certificate |
 | Scheduling | Appointment, AppointmentPet, Availability, TimeOff, TravelLeg (distância e tempo entre visitas, bloco reservado) |

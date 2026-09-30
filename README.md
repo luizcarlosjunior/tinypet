@@ -98,6 +98,10 @@ Limites de vídeo por plano (402 `PLAN_LIMIT`): gratuito 1 vídeo/dia e até 30 
 
 Fixtures de teste de vídeo: `tinyPet/src/server/__fixtures__/generate.sh` (ffmpeg).
 
+## Dados de raças (API Ninjas)
+
+A ficha mostra "Sobre a raça" (cães e gatos): expectativa de vida, peso/altura típicos e características de 1 a 5. Os dados são replicados na tabela `breed_profiles`; o API Ninjas (`API_NINJAS_KEY`) só é chamado quando a raça ainda não está no banco, e todas as raças retornadas são gravadas. Cada raça tem o nome em inglês usado na busca (`externalName`, editável em Admin → Espécies e raças). **Uso comercial exige plano pago do API Ninjas.**
+
 ## Pagamentos
 
 Fase 3. Interface `PaymentProvider` em `tinyPet/src/server/payments`, adapter Pagar.me v5 e webhook idempotente em `/api/v1/webhooks/pagarme`.

@@ -70,6 +70,38 @@ const FEATURES: { key: string; module: string; label: string; kind: "BOOLEAN" | 
 ];
 
 type Limit = [string, boolean, number | null];
+/** English names used to look breeds up in API Ninjas (dogs/cats). */
+const BREED_EXTERNAL_NAMES: Record<string, string> = {
+  "Labrador Retriever": "Labrador Retriever",
+  "Golden Retriever": "Golden Retriever",
+  "Shih Tzu": "Shih Tzu",
+  Poodle: "Poodle (Standard)",
+  "Bulldog Francês": "French Bulldog",
+  "Yorkshire Terrier": "Yorkshire Terrier",
+  Pug: "Pug",
+  "Border Collie": "Border Collie",
+  "Pastor Alemão": "German Shepherd",
+  Rottweiler: "Rottweiler",
+  Dachshund: "Dachshund",
+  "Lhasa Apso": "Lhasa Apso",
+  "Spitz Alemão": "Pomeranian",
+  Beagle: "Beagle",
+  Pinscher: "Miniature Pinscher",
+  Chihuahua: "Chihuahua",
+  "Maltês": "Maltese",
+  Boxer: "Boxer",
+  "Pit Bull": "American Staffordshire Terrier",
+  "Husky Siberiano": "Siberian Husky",
+  "Angorá": "Turkish Angora",
+  Bengal: "Bengal",
+  "British Shorthair": "British Shorthair",
+  "Maine Coon": "Maine Coon",
+  Persa: "Persian",
+  Ragdoll: "Ragdoll",
+  "Siamês": "Siamese",
+  Sphynx: "Sphynx",
+};
+
 const PLANS: { key: string; name: string; audience: "OWNER" | "PARTNER"; priceMonthly: number | null; priceYearly: number | null; isDefault: boolean; sortOrder: number; limits: Limit[] }[] = [
   {
     key: "free", name: "Free", audience: "PARTNER", priceMonthly: 0, priceYearly: 0, isDefault: true, sortOrder: 0,
@@ -179,7 +211,9 @@ async function seedReference() {
     const row = await prisma.species.upsert({ where: { key: s.key }, update: { label: s.label, sortOrder: i }, create: { ...s, sortOrder: i } });
     speciesByKey[s.key] = row.id;
     for (const b of BREEDS[s.key] ?? []) {
-      await prisma.breed.upsert({ where: { speciesId_name: { speciesId: row.id, name: b } }, update: {}, create: { speciesId: row.id, name: b } });
+      await prisma.breed.upsert({ where: { speciesId_name: { speciesId: row.id, name: b } }, update: {}, create: { speciesId: row.id, name: b, externalName: BREED_EXTERNAL_NAMES[b] ?? null } });
+      // fill the English lookup name once (admins may change it later)
+      if (BREED_EXTERNAL_NAMES[b]) await prisma.breed.updateMany({ where: { speciesId: row.id, name: b, externalName: null }, data: { externalName: BREED_EXTERNAL_NAMES[b] } });
     }
     await prisma.breed.upsert({ where: { speciesId_name: { speciesId: row.id, name: "SRD" } }, update: { isMixed: true }, create: { speciesId: row.id, name: "SRD", isMixed: true } });
     await prisma.breed.upsert({ where: { speciesId_name: { speciesId: row.id, name: "Outra" } }, update: { isOther: true }, create: { speciesId: row.id, name: "Outra", isOther: true } });

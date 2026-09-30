@@ -15,6 +15,7 @@ const breedFields: FieldDef[] = [
   { key: "name", label: "Raça", required: true },
   { key: "isMixed", label: "SRD (sem raça definida)", type: "checkbox" },
   { key: "isOther", label: "Opção \"Outra\"", type: "checkbox" },
+  { key: "externalName", label: "Nome em inglês (API Ninjas)", placeholder: "Ex.: German Shepherd" },
 ];
 
 export default function EspeciesPage() {

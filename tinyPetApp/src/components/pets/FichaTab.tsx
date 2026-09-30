@@ -10,6 +10,7 @@ import { Button, Card, Checkbox, Input, KeyValue, Sheet, Text } from "@/componen
 import { useAuth } from "@/lib/auth-store";
 import { PetForm } from "./PetForm";
 import { MicrochipLookupLinks } from "./Microchip";
+import { BreedInfoCard } from "./BreedInfoCard";
 import { speciesKeyOf } from "@/lib/species";
 
 const SEX_LABEL: Record<string, string> = { MALE: "Macho", FEMALE: "Fêmea" };
@@ -75,6 +76,7 @@ export function FichaTab({ pet, canEdit, isOwner: _isOwner, canRegisterDeath = f
         <KeyValue k="Cuidados especiais" v={pet.specialCare} />
         <KeyValue k="Alimentação" v={pet.feedingNotes} />
       </Card>
+      <BreedInfoCard breedId={pet.breedId} breedName={pet.breed?.name} />
       {canEdit ? <Button title="Editar ficha" variant="secondary" icon="create-outline" onPress={() => setEditing(true)} /> : null}
       {canRegisterDeath && pet.status === "ACTIVE" ? <Button title="Registrar falecimento" variant="ghost" icon="heart-outline" style={{ marginTop: spacing.sm }} onPress={() => setDeceasedOpen(true)} /> : null}
 
