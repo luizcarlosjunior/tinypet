@@ -13,6 +13,39 @@ A web/API roda como processo Node (`next start`, porta 3033) numa VM própria �
 | Jobs | `crontab` (ou timers systemd) chamando `/api/v1/jobs/*` |
 | tinyPetApp | Não vai para o servidor: EAS Build/lojas, com `EXPO_PUBLIC_API_URL=https://<domínio>` em `tinyPetApp/.env` ou no perfil do EAS |
 
+## Coolify
+
+O repositório tem um `Dockerfile` na raiz (web + API; o app mobile não entra na imagem) e `GET /api/health` (verifica o banco).
+
+1. **Banco:** em *Resources → New → Database → MySQL 8*. Anote a URL interna (`mysql://user:senha@<host-interno>:3306/<db>`) e ative backups agendados.
+2. **Aplicação:** *New → Application → GitHub* (repo privado: GitHub App ou deploy key), branch `master`.
+   - Build Pack: **Dockerfile** · Base Directory: `/` · Dockerfile: `/Dockerfile`
+   - Porta exposta: **3033** · Domínio: `https://seu-dominio` (Coolify emite o certificado)
+   - Health check: caminho `/api/health`, porta 3033
+   - Servidor com **≥ 4 GB de RAM** para o `next build` (ou build em outro servidor)
+3. **Variáveis de ambiente** (aba *Environment Variables*). Marque **Build Variable** em `NEXT_PUBLIC_APP_URL`, `S3_BUCKET`, `S3_PUBLIC_URL` e `AWS_REGION` (entram no bundle do navegador e no `next.config`).
+
+   | Variável | Valor |
+   | --- | --- |
+   | `NODE_ENV` | `production` |
+   | `DATABASE_URL` | URL interna do MySQL do Coolify |
+   | `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL` | `https://seu-dominio` |
+   | `NEXTAUTH_SECRET`, `JWT_SECRET` | ≥ 32 caracteres (`openssl rand -base64 48`) — o app não sobe sem eles |
+   | `CRON_SECRET` | `openssl rand -hex 32` |
+   | `TRUST_PROXY` | `1` (o proxy do Coolify — Traefik/Caddy — define o IP real) |
+   | `S3_BUCKET`, `AWS_REGION` (ou `S3_REGION`), `S3_PUBLIC_URL` | bucket de mídia (obrigatório em produção) |
+   | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | usuário IAM com Put/Get/DeleteObject no bucket (fora da AWS não há IAM role) |
+   | `SMTP_URL`, `EMAIL_FROM` | e-mail transacional (sem isso os e-mails são descartados em produção) |
+   | `DB_PUSH_ON_START` | `1` para aplicar o schema ao iniciar (enquanto não houver `prisma/migrations`) |
+   | Opcionais | `API_NINJAS_KEY`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `APPLE_CLIENT_ID/SECRET`, `PAGARME_*`, `CORS_ORIGINS`, `BLOG_VIEW_SALT` |
+
+4. **Primeiro deploy / seed:** com `DB_PUSH_ON_START=1` o container cria as tabelas. Depois, no *Terminal* do container: `cd /app && SEED_ALLOW_PRODUCTION=1 SEED_ADMIN_EMAIL=admin@seu-dominio SEED_ADMIN_PASSWORD='senha-forte' yarn db:seed` (dados de referência + admin; sem usuários demo).
+5. **Jobs:** aba *Scheduled Tasks* da aplicação, uma tarefa por job (roda dentro do container; `CRON_SECRET` já está no ambiente). Comando: `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3033/api/v1/jobs/<job>` com os horários da tabela de Jobs abaixo (UTC).
+6. **S3:** CORS do bucket liberando `PUT` e `GET` para `https://seu-dominio` (ver README → Mídia).
+7. **Webhook Pagar.me** (quando usar): `https://seu-dominio/api/v1/webhooks/pagarme` com HTTP Basic.
+
+`DB_PUSH_ON_START` usa `prisma db push` **sem** `--accept-data-loss`: mudanças destrutivas fazem o container falhar ao iniciar em vez de apagar dados. Recomendado: criar a migração inicial (`prisma migrate`) e trocar por `migrate deploy`.
+
 ## Build e start
 
 ```bash

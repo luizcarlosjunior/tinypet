@@ -12,7 +12,8 @@ export const metadata: Metadata = {
   title: "tinyPet — encontre quem cuida do seu pet",
   description: "Adestradores, clínicas veterinárias, lojas e pet shops perto de você. Agende visitas, acompanhe a saúde e a rotina dos seus pets.",
 };
-export const revalidate = 300;
+// Rendered per request (in Docker the API isn't reachable during `next build`); the data fetch below is cached 5 min.
+export const dynamic = "force-dynamic";
 
 const TYPES = [
   { key: "trainer", label: "Treinadores e adestradores", icon: GraduationCap, text: "Obediência, comportamento e cursos online." },

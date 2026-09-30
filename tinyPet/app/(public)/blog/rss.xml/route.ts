@@ -3,7 +3,8 @@ import { publishedWhere } from "@/server/blog/posts";
 import { excerpt } from "@/server/blog/utils";
 import { blogAppUrl } from "@/server/blog/auth";
 
-export const revalidate = 600;
+// Rendered on request (it reads the database, which isn't available during `next build` in Docker); cached by HTTP.
+export const dynamic = "force-dynamic";
 
 function esc(s: string) {
   // eslint-disable-next-line no-control-regex
@@ -50,5 +51,5 @@ ${posts[0]?.publishDate ? `<lastBuildDate>${posts[0].publishDate.toUTCString()}<
 ${items}
 </channel>
 </rss>`;
-  return new Response(xml, { headers: { "Content-Type": "application/rss+xml; charset=utf-8", "Cache-Control": "public, max-age=600, s-maxage=600" } });
+  return new Response(xml, { headers: { "Content-Type": "application/rss+xml; charset=utf-8", "Cache-Control": "public, max-age=600, s-maxage=600, stale-while-revalidate=3600" } });
 }

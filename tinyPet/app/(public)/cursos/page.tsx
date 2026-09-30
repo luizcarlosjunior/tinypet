@@ -8,7 +8,8 @@ import { COURSE_LEVEL_LABEL, type PublicCourse } from "@/components/public/types
 import { formatBRL, safeHref } from "@tinypet/shared";
 
 export const metadata: Metadata = { title: "Cursos", description: "Cursos online de adestramento e cuidados com pets, feitos por parceiros tinyPet." };
-export const revalidate = 120;
+// Rendered per request (API unreachable during `next build` in Docker); the data fetch is cached 2 min.
+export const dynamic = "force-dynamic";
 
 export default async function CursosPage() {
   const res = await serverApiList<PublicCourse[]>("/public/courses?pageSize=50", { revalidate: 120 });

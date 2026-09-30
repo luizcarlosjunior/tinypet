@@ -1,0 +1,15 @@
+**/node_modules
+**/.next
+**/.next-*
+**/.turbo
+**/.expo
+**/.env
+**/.env.*.local
+**/*.tsbuildinfo
+tinyPet/public/uploads
+tinyPet/public/ffmpeg
+tinyPetApp/ios
+tinyPetApp/android
+.git
+.DS_Store
+AGENTS.md

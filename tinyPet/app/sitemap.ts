@@ -3,7 +3,8 @@ import { prisma } from "@/db";
 import { publishedWhere } from "@/server/blog/posts";
 import { blogAppUrl } from "@/server/blog/auth";
 
-export const revalidate = 3600;
+// Rendered on request (reads the database, unavailable during `next build` in Docker).
+export const dynamic = "force-dynamic";
 
 /** Public sitemap: main public pages, blog posts and active blog categories. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
