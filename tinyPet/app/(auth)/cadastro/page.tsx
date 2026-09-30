@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useState } from "react";
+import { useEffect, Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@tinypet/shared";
 import { api } from "@/lib/api-client";
+import { RECAPTCHA_NOTICE, RECAPTCHA_SITE_KEY, captchaToken, loadRecaptcha } from "@/lib/recaptcha";
 import { errorMessage } from "@/lib/errors";
 import { useOwnerTerms } from "@/hooks/use-ref";
 import { Button, Input } from "@/components/ui";
@@ -30,12 +31,15 @@ function CadastroForm() {
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema), defaultValues: { marketingConsent: false } });
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("empty");
+  useEffect(() => void loadRecaptcha(), []);
 
   async function onSubmit(v: RegisterInput) {
     setError(null);
     try {
-      await api("/auth/register", { method: "POST", json: v });
-      const r = await signIn("credentials", { email: v.email, password: v.password, redirect: false });
+      const regToken = await captchaToken("register");
+      await api("/auth/register", { method: "POST", json: v, headers: regToken ? { "X-Captcha-Token": regToken } : undefined });
+      // a reCAPTCHA token is single-use: get a new one for the login right after
+      const r = await signIn("credentials", { email: v.email, password: v.password, captchaToken: (await captchaToken("login")) ?? "", redirect: false });
       if (r?.error) {
         router.push(`/entrar?next=${encodeURIComponent(next)}`);
         return;
@@ -106,6 +110,7 @@ function CadastroForm() {
         <Button type="submit" className="w-full" loading={isSubmitting} disabled={usernameBlocksSubmit(usernameStatus)}>
           Criar conta
         </Button>
+        {RECAPTCHA_SITE_KEY && <p className="text-center text-[11px] text-[var(--muted)]">{RECAPTCHA_NOTICE}</p>}
       </form>
       <SocialButtons callbackUrl={next} />
       <p className="mt-6 text-center text-sm text-[var(--muted)]">

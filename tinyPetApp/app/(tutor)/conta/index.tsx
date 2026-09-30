@@ -4,10 +4,10 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-store";
 import { useOwnerTerms } from "@/hooks/use-ref";
-import { useDeleteAccount, useHome, useNotifications, useUpdateProfile } from "@/hooks/use-me";
+import { useDeleteAccount, useHome, useNotifications, useSendDeleteCode, useUpdateProfile } from "@/hooks/use-me";
 import { useUsernameAvailability } from "@/hooks/use-sharing";
 import { USERNAME_HINT, usernameProblem, usernameReasonText } from "@/lib/username";
-import { errorMessage } from "@/lib/api";
+import { ApiError, errorMessage } from "@/lib/api";
 import { pickAndUpload } from "@/lib/upload";
 import { unregisterPushToken } from "@/lib/push";
 import { spacing, useTheme } from "@/lib/theme";
@@ -20,7 +20,7 @@ export default function Account() {
   const { user, memberships, setContext, signOut, refresh } = useAuth();
   const terms = useOwnerTerms();
   const update = useUpdateProfile();
-  const del = useDeleteAccount();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
   const [uploading, setUploading] = useState(false);
@@ -99,7 +99,7 @@ export default function Account() {
         onPress: () =>
           Alert.alert("Tem certeza?", "Confirme novamente para excluir sua conta definitivamente.", [
             { text: "Manter conta", style: "cancel" },
-            { text: "Excluir definitivamente", style: "destructive", onPress: () => del.mutateAsync().then(signOut).catch((e) => Alert.alert("Erro", errorMessage(e))) },
+            { text: "Excluir definitivamente", style: "destructive", onPress: () => setDeleteOpen(true) },
           ]),
       },
     ]);
@@ -184,7 +184,7 @@ export default function Account() {
 
       <Section title="Sessão">
         <Button title="Sair" variant="secondary" icon="log-out-outline" onPress={logout} />
-        <Button title="Excluir minha conta" variant="ghost" onPress={deleteAccount} style={{ marginTop: spacing.sm }} loading={del.isPending} />
+        <Button title="Excluir minha conta" variant="ghost" onPress={deleteAccount} style={{ marginTop: spacing.sm }} />
       </Section>
 
       <Sheet visible={editOpen} onClose={() => setEditOpen(false)} title="Editar perfil">
@@ -213,6 +213,94 @@ export default function Account() {
         />
         <Button title="Salvar" onPress={() => void saveUsername()} loading={update.isPending} disabled={!canSaveUsername} />
       </Sheet>
+
+      <DeleteAccountSheet visible={deleteOpen} onClose={() => setDeleteOpen(false)} />
     </Screen>
+  );
+}
+
+/** Maps the reasons of DELETE /auth/me to pt-BR (falls back to the server message). */
+function deleteErrorText(e: unknown): string {
+  if (!(e instanceof ApiError)) return errorMessage(e);
+  const d = (e.details ?? {}) as { reason?: string };
+  const reason = [e.code, d.reason].find((r) => r && ["PASSWORD_REQUIRED", "PASSWORD_INVALID", "CODE_REQUIRED", "CODE_INVALID"].includes(r));
+  switch (reason) {
+    case "PASSWORD_REQUIRED":
+      return "Informe sua senha para confirmar.";
+    case "PASSWORD_INVALID":
+      return "Senha incorreta.";
+    case "CODE_REQUIRED":
+      return "Informe o código enviado ao seu e-mail.";
+    case "CODE_INVALID":
+      return "Código inválido ou expirado.";
+    default:
+      return errorMessage(e);
+  }
+}
+
+/** Last step of account deletion: asks for the password (or an e-mail code for Google/Apple accounts). */
+function DeleteAccountSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const t = useTheme();
+  const { user, signOut } = useAuth();
+  const hasPassword = user?.hasPassword !== false;
+  const del = useDeleteAccount();
+  const sendCode = useSendDeleteCode();
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const close = () => {
+    setPassword("");
+    setCode("");
+    setCodeSent(false);
+    setError(null);
+    onClose();
+  };
+  const proofOk = hasPassword ? password.length > 0 : /^\d{6}$/.test(code);
+  const submit = async () => {
+    setError(null);
+    try {
+      await del.mutateAsync(hasPassword ? { password } : { code });
+      close();
+      await signOut();
+    } catch (e) {
+      setError(deleteErrorText(e));
+    }
+  };
+
+  return (
+    <Sheet visible={visible} onClose={close} title="Excluir conta">
+      <Text variant="small" tone="muted">
+        Para sua segurança, confirme sua identidade. Esta ação não pode ser desfeita.
+      </Text>
+      {hasPassword ? (
+        <Input label="Sua senha" secureTextEntry autoComplete="current-password" textContentType="password" value={password} onChangeText={setPassword} />
+      ) : (
+        <View>
+          <Text variant="small" tone="muted" style={{ marginTop: spacing.sm }}>
+            Sua conta entra com Google ou Apple. Para confirmar, enviaremos um código ao seu e-mail.
+          </Text>
+          {codeSent ? <Input label="Código recebido por e-mail" keyboardType="number-pad" maxLength={6} textContentType="oneTimeCode" value={code} onChangeText={(v: string) => setCode(v.replace(/\D/g, ""))} /> : null}
+          <Button
+            title={codeSent ? "Reenviar código" : "Enviar código por e-mail"}
+            variant="secondary"
+            loading={sendCode.isPending}
+            onPress={() =>
+              sendCode
+                .mutateAsync()
+                .then(() => setCodeSent(true))
+                .catch((e) => setError(errorMessage(e)))
+            }
+          />
+        </View>
+      )}
+      {error ? (
+        <Text variant="small" style={{ color: t.danger, marginTop: 6 }} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+      <Button title="Excluir conta definitivamente" variant="danger" disabled={!proofOk} onPress={() => void submit()} loading={del.isPending} style={{ marginTop: spacing.md }} />
+    </Sheet>
   );
 }

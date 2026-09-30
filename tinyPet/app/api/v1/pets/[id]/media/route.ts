@@ -4,6 +4,7 @@ import { petMediaSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, parseQuery, assertFeature, Errors } from "@/server";
 import { petActor } from "@/server/pets";
 import { awardBadge } from "@/server/badges";
+import { assertOwnMediaUrls } from "@/server/media";
 
 const query = z.object({ story: z.coerce.boolean().optional(), page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(30) });
 
@@ -26,9 +27,14 @@ export const POST = handler<{ id: string }>(async (req, { params }) => {
   const actor = await petActor(req, params.id, "EDIT");
   if (actor.pet.status === "DECEASED" && actor.via !== "owner") throw Errors.forbidden("Perfil em memorial");
   const body = await parseBody(req, petMediaSchema);
+  // only the tutor decides to publish the pet publicly
+  if (actor.via === "partner" && body.visibility === "PUBLIC") throw Errors.forbidden("Somente o tutor pode deixar a mídia pública");
   const planOwnerId = actor.pet.ownerId ?? actor.user.id;
   await assertFeature("OWNER", planOwnerId, "owner_gallery");
   if (body.isStory) await assertFeature("OWNER", planOwnerId, "owner_stories");
+  await assertOwnMediaUrls([body.url, body.thumbUrl], actor.user.id);
+  // size comes from the stored asset (never trust the client value: it feeds storage quotas)
+  const asset = await prisma.mediaAsset.findFirst({ where: { url: body.url, status: "READY" }, select: { sizeBytes: true } });
   const takenAt = new Date(body.takenAt);
   const media = await prisma.petMedia.create({
     data: {
@@ -43,7 +49,7 @@ export const POST = handler<{ id: string }>(async (req, { params }) => {
       isStory: body.isStory,
       expiresAt: body.isStory ? new Date(takenAt.getTime() + 24 * 60 * 60 * 1000) : null,
       visibility: body.visibility,
-      sizeBytes: body.sizeBytes,
+      sizeBytes: asset?.sizeBytes ?? body.sizeBytes,
       uploadedByUserId: actor.via === "partner" ? null : actor.user.id,
       uploadedByPartnerId: actor.via === "partner" ? actor.partnerId : null,
     },

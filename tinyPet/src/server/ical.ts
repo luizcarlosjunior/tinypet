@@ -11,7 +11,7 @@ import { Errors } from "./errors";
 export type IcsEvent = { uid: string; start: Date; end: Date; summary: string; description?: string | null; location?: string | null; url?: string | null; status?: "CONFIRMED" | "TENTATIVE" | "CANCELLED" };
 
 export function icsEscape(s: string) {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n");
 }
 
 export function icsDate(d: Date) {
@@ -73,7 +73,9 @@ export async function rotateCalendarToken(membershipId: string) {
 
 /** VCALENDAR with the membership's appointments from today on (non-canceled). Returns null for an unknown token. */
 export async function icsForToken(token: string): Promise<string | null> {
-  const m = await prisma.membership.findUnique({ where: { calendarToken: token }, include: { partner: { select: { tradeName: true } }, user: { select: { name: true } } } });
+  const m = await prisma.membership.findUnique({ where: { calendarToken: token }, include: { partner: { select: { tradeName: true, deletedAt: true } }, user: { select: { name: true, deletedAt: true } } } });
+  // feed dies with the partner or the professional account
+  if (m && (m.partner.deletedAt || m.user.deletedAt)) return null;
   if (!m) return null;
   const { start } = dayBounds(localDateStr(new Date()));
   const rows = await prisma.appointment.findMany({

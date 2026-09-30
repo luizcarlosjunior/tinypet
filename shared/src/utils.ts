@@ -351,7 +351,12 @@ export function parsePetSocialUsername(key: PetSocialNetworkKey, input: string):
       const other = PET_SOCIAL_NETWORKS.find((n) => n.hosts.includes(host) || n.shortHosts?.includes(host));
       return { ok: false, message: other ? `Este link é do ${other.label}, não do ${net.label}` : `Este link não é do ${net.label}` };
     }
-    const first = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
+    let first: string;
+    try {
+      first = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
+    } catch {
+      return { ok: false, message: "Link inválido" };
+    }
     if (!first) return { ok: false, message: `O link não tem o usuário do ${net.label}` };
     if (net.reserved.includes(first.toLowerCase())) return { ok: false, message: `Cole o link do perfil do ${net.label}, não de uma publicação ou página` };
     if (net.atInPath && !first.startsWith("@")) return { ok: false, message: `Cole o link do perfil do ${net.label} (com @ no endereço)` };

@@ -82,6 +82,10 @@ export function useMarkNotificationsRead() {
   return useMutation({ mutationFn: () => api("/notifications", { method: "PATCH" }), onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }) });
 }
 
+/** `password` for accounts with password; otherwise `code` from useSendDeleteCode(). */
 export function useDeleteAccount() {
-  return useMutation({ mutationFn: () => api("/auth/me", { method: "DELETE" }) });
+  return useMutation({ mutationFn: (proof: { password?: string; code?: string }) => api("/auth/me", { method: "DELETE", json: proof }) });
+}
+export function useSendDeleteCode() {
+  return useMutation({ mutationFn: () => api("/auth/me/delete-code", { method: "POST" }) });
 }

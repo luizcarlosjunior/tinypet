@@ -11,7 +11,8 @@ export const GET = handler(async (req) => {
 export const POST = handler(async (req) => {
   const user = await requireUser(req);
   const body = await parseBody(req, familyMemberSchema);
-  const linked = body.email ? await prisma.user.findFirst({ where: { email: body.email.toLowerCase(), deletedAt: null }, select: { id: true } }) : null;
+  // link only accounts that confirmed the e-mail (an unverified address may belong to someone else)
+  const linked = body.email ? await prisma.user.findFirst({ where: { email: body.email.toLowerCase(), deletedAt: null, emailVerifiedAt: { not: null } }, select: { id: true } }) : null;
   const row = await prisma.familyMember.create({ data: { ...body, userId: user.id, linkedUserId: linked?.id ?? null } });
   return ok((await familyView(user.id, [row]))[0], { status: 201 });
 });

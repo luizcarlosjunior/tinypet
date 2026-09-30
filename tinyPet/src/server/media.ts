@@ -248,6 +248,28 @@ export async function canAccessAsset(asset: Pick<MediaAsset, "userId" | "partner
   return false;
 }
 
+/**
+ * Media URLs saved on records (avatars, gallery, catalog, logo, venue photos, attachments…) must be files uploaded
+ * through our pipeline: under our public media base and matching a READY asset the caller can access. External
+ * URLs would skip validation, moderation, EXIF stripping and deletion, and work as tracking pixels.
+ * Values already stored on the record (`keep`) are accepted unchanged (legacy data, forms re-sending the same value).
+ */
+export async function assertOwnMediaUrls(urls: (string | null | undefined)[], userId: string, keep: (string | null | undefined)[] = []) {
+  const kept = new Set(keep.filter(Boolean) as string[]);
+  const list = [...new Set(urls.filter((u): u is string => !!u && !kept.has(u)))];
+  if (!list.length) return;
+  const base = publicUrl("");
+  const reject = () => {
+    throw Errors.badRequest("Envie a imagem ou o vídeo pelo tinyPet: links externos não são aceitos.", { reason: "MEDIA_URL" });
+  };
+  if (list.some((u) => !u.startsWith(base))) reject();
+  const assets = await prisma.mediaAsset.findMany({ where: { status: "READY", OR: [{ url: { in: list } }, { thumbUrl: { in: list } }] }, select: { url: true, thumbUrl: true, userId: true, partnerId: true } });
+  for (const u of list) {
+    const a = assets.find((x) => x.url === u || x.thumbUrl === u);
+    if (!a || !(await canAccessAsset(a, userId))) reject();
+  }
+}
+
 export { getVideoLimits, assertVideoPlanAllowed, videoOwnerOf, type VideoLimits, type VideoOwner } from "./video-limits";
 
 /** Marks an asset REJECTED and removes its stored object. */
@@ -296,6 +318,21 @@ export type FinalizedAsset = MediaAsset & { durationSeconds?: number | null };
  * measured bitrates within VIDEO_OUTPUT) and stored as-is. On any violation the object is deleted and the asset REJECTED.
  * Marks the asset READY.
  */
+/**
+ * Validated bytes always live under a new server-only key: the presigned PUT for the upload key stays valid for
+ * its full lifetime, so keeping the file there would let the client swap it for unvalidated content after /complete.
+ */
+function finalKey(key: string, ext: string) {
+  return `${key.replace(/\.[^./]+$/, "")}-${randomUUID().slice(0, 8)}${ext}`;
+}
+
+async function moveToFinalKey(asset: Pick<MediaAsset, "key" | "mimeType">, bytes: Buffer) {
+  const key = finalKey(asset.key, /\.[^./]+$/.exec(asset.key)?.[0] ?? "");
+  const url = await storeBytes(key, bytes, asset.mimeType);
+  await deleteBytes(asset.key);
+  return { key, url };
+}
+
 export async function finalizeAsset(assetId: string, crop?: Crop): Promise<FinalizedAsset> {
   const asset = await prisma.mediaAsset.findUnique({ where: { id: assetId } });
   if (!asset) throw Errors.notFound("Mídia não encontrada");
@@ -328,11 +365,13 @@ export async function finalizeAsset(assetId: string, crop?: Crop): Promise<Final
     const owner = videoOwnerOf(asset);
     const overLimit = owner ? await videoDurationViolation(owner, info.durationSeconds) : null;
     if (overLimit) return rejectAsset(asset, overLimit);
-    const done = await prisma.mediaAsset.update({ where: { id: assetId }, data: { status: "READY", sizeBytes: realSize, width: info.width, height: info.height } });
+    const moved = await moveToFinalKey(asset, input);
+    const done = await prisma.mediaAsset.update({ where: { id: assetId }, data: { ...moved, status: "READY", sizeBytes: realSize, width: info.width, height: info.height } });
     return { ...done, durationSeconds: info.durationSeconds };
   }
   if (asset.mimeType === "application/pdf") {
-    return prisma.mediaAsset.update({ where: { id: assetId }, data: { status: "READY", sizeBytes: realSize } });
+    const moved = await moveToFinalKey(asset, input);
+    return prisma.mediaAsset.update({ where: { id: assetId }, data: { ...moved, status: "READY", sizeBytes: realSize } });
   }
 
   const sharpOpts = { failOn: "error" as const, limitInputPixels: MAX_INPUT_PIXELS };
@@ -379,9 +418,9 @@ export async function finalizeAsset(assetId: string, crop?: Crop): Promise<Final
     return rejectAsset(asset, "Não foi possível processar a imagem");
   }
 
-  const newKey = asset.key.replace(/\.[^.]+$/, "") + ".webp";
+  const newKey = finalKey(asset.key, ".webp");
   const url = await storeBytes(newKey, webp.data, "image/webp");
-  if (newKey !== asset.key) await deleteBytes(asset.key);
+  await deleteBytes(asset.key);
   const thumbUrl = thumb ? await storeBytes(newKey.replace(/\.webp$/, ".thumb.webp"), thumb, "image/webp") : null;
 
   return prisma.mediaAsset.update({

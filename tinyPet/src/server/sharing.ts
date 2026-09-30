@@ -171,9 +171,11 @@ export async function createShareInvite(actor: PetActor, handle: string) {
   if (!parsed) throw Errors.notFound(NOT_FOUND_ACCOUNT);
   const target = await prisma.user.findFirst({
     where: { deletedAt: null, ...(parsed.kind === "email" ? { email: parsed.email } : { username: parsed.username }) },
-    select: userCard,
+    select: { ...userCard, emailVerifiedAt: true },
   });
   if (!target) throw Errors.notFound(NOT_FOUND_ACCOUNT);
+  // By e-mail only to accounts that confirmed it (anyone can register an unverified address); @username is fine.
+  if (parsed.kind === "email" && !target.emailVerifiedAt) throw Errors.conflict("Essa conta ainda não confirmou o e-mail. Peça para a pessoa confirmar ou convide pelo @usuário.");
   if (target.id === owner.id) throw Errors.badRequest("Você já é o tutor deste pet.");
   const petId = actor.pet.id;
   await expireStale({ petId });

@@ -4,6 +4,7 @@ import { historyEventSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, parseQuery, serialize } from "@/server";
 import { petActor, jsonInput } from "@/server/pets";
 import { petTimeline } from "@/server/timeline";
+import { assertOwnMediaUrls } from "@/server/media";
 
 const query = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) });
 
@@ -17,6 +18,7 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
 export const POST = handler<{ id: string }>(async (req, { params }) => {
   const actor = await petActor(req, params.id, "EDIT");
   const body = await parseBody(req, historyEventSchema);
+  await assertOwnMediaUrls((body.attachments ?? []).map((a) => a.url), actor.user.id);
   const event = await prisma.petHistoryEvent.create({
     data: {
       petId: params.id,

@@ -87,11 +87,79 @@ const maxAudioBps = VIDEO_OUTPUT.maxAudioBitrate * (1 + VIDEO_OUTPUT.bitrateTole
 const CONTAINER_ALLOWANCE_BYTES = 64 * 1024;
 
 /**
+ * Upper bound of samples per track: ≤ 60 s (longest plan) at ≤ 60 fps video / ~47 fps AAC, with generous margin.
+ * A crafted MP4 can declare billions of samples in a few bytes (stts/ctts counts), which makes the demuxer allocate
+ * one object per sample and crash the process (heap out of memory) — this guard runs before it.
+ */
+export const MAX_SAMPLES_PER_TRACK = 20_000;
+
+const CONTAINERS = new Set(["moov", "trak", "mdia", "minf", "stbl", "edts", "moof", "traf", "mvex", "udta"]);
+
+/**
+ * Walks the ISO-BMFF box tree (no allocation per sample) and rejects files whose sample tables declare more samples
+ * than MAX_SAMPLES_PER_TRACK, or more sample bytes than the file holds. Throws VideoRejectError("VIDEO_INVALID").
+ */
+export function assertSaneMp4Tables(bytes: Uint8Array): void {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const u32 = (o: number) => view.getUint32(o);
+  const type = (o: number) => String.fromCharCode(bytes[o]!, bytes[o + 1]!, bytes[o + 2]!, bytes[o + 3]!);
+  const bad = (why: string) => {
+    throw new VideoRejectError("VIDEO_INVALID", { why });
+  };
+  let boxes = 0;
+  const walk = (start: number, end: number, depth: number) => {
+    if (depth > 12) bad("depth");
+    let o = start;
+    while (o + 8 <= end) {
+      if (++boxes > 10_000) bad("boxes");
+      let size = u32(o);
+      const t = type(o + 4);
+      let header = 8;
+      if (size === 1) {
+        if (o + 16 > end) bad("size64");
+        const hi = u32(o + 8);
+        size = hi * 2 ** 32 + u32(o + 12);
+        header = 16;
+      } else if (size === 0) size = end - o;
+      if (size < header || o + size > end) bad(`box ${t}`);
+      const body = o + header;
+      const boxEnd = o + size;
+      if (CONTAINERS.has(t)) walk(body, boxEnd, depth + 1);
+      else if (t === "stts" || t === "ctts") {
+        // full box: version/flags(4) + entry_count(4) + entries of (sample_count(4), value(4))
+        if (body + 8 > boxEnd) bad(t);
+        const entries = u32(body + 4);
+        if (entries > MAX_SAMPLES_PER_TRACK || body + 8 + entries * 8 > boxEnd) bad(`${t} entries`);
+        let total = 0;
+        for (let i = 0; i < entries; i++) {
+          total += u32(body + 8 + i * 8);
+          if (total > MAX_SAMPLES_PER_TRACK) bad(`${t} samples`);
+        }
+      } else if (t === "stsz") {
+        if (body + 12 > boxEnd) bad("stsz");
+        const sampleSize = u32(body + 4);
+        const count = u32(body + 8);
+        if (count > MAX_SAMPLES_PER_TRACK) bad("stsz count");
+        if (sampleSize > 0 && sampleSize * count > bytes.byteLength) bad("stsz bytes");
+        if (sampleSize === 0 && body + 12 + count * 4 > boxEnd) bad("stsz table");
+      } else if (t === "trun") {
+        if (body + 8 > boxEnd) bad("trun");
+        if (u32(body + 4) > MAX_SAMPLES_PER_TRACK) bad("trun samples");
+      }
+      o = boxEnd;
+    }
+  };
+  walk(0, bytes.byteLength, 0);
+}
+
+/**
  * Parses an MP4 held in memory and validates it against VIDEO_OUTPUT. Throws VideoRejectError on any violation.
  * `declared` is the width/height sent in the upload request; the real display size must match it exactly.
  */
 export async function validateMp4(bytes: Uint8Array, declared?: { width?: number | null; height?: number | null }): Promise<VideoInfo> {
   if (bytes.byteLength > MEDIA_MAX_BYTES) throw new VideoRejectError("VIDEO_TOO_LARGE", { sizeBytes: bytes.byteLength });
+  // Only ISO-BMFF files are walked; anything else is reported as VIDEO_FORMAT by the demuxer check below.
+  if (bytes.byteLength >= 8 && String.fromCharCode(...bytes.subarray(4, 8)) === "ftyp") assertSaneMp4Tables(bytes);
   const input = new Input({ source: new BufferSource(bytes), formats: [MP4, QTFF] });
   try {
     let format;

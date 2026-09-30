@@ -96,7 +96,7 @@ function Vaccinations({ petId, deceased }: { petId: string; deceased: boolean })
                 {v.nextDueAt && <span className={cn("text-xs", overdue ? "font-semibold text-red-600" : "text-[var(--muted)]")}>Próxima: {fmtDay(v.nextDueAt)}{overdue ? " (atrasada)" : ""}</span>}
                 {v.measurement && <span className="text-xs text-[var(--muted)]">Peso: {fmtWeight(v.measurement.weightG)}</span>}
                 {v.partner?.tradeName && <span className="text-xs text-[var(--muted)]">{v.partner.tradeName}</span>}
-                {!deceased && (
+                {!deceased && !v.partner && (
                   <span className="flex gap-1">
                     <button type="button" onClick={() => openEdit(v)} className="btn-ghost h-8 w-8 px-0" aria-label={`Editar ${v.name}`}>
                       <Pencil className="h-4 w-4" aria-hidden />

@@ -2,6 +2,7 @@ import { prisma } from "@/db";
 import { updatePartnerSchema, onlyDigits } from "@tinypet/shared";
 import { handler, ok, parseBody, requirePartner, serialize, audit, clientIp, Errors } from "@/server";
 import { getPartnerFull, updatePartner, softDeletePartner } from "@/server/partners";
+import { assertOwnMediaUrls } from "@/server/media";
 
 export const GET = handler<{ id: string }>(async (req, { params }) => {
   const ctx = await requirePartner(req, params.id);
@@ -11,6 +12,10 @@ export const GET = handler<{ id: string }>(async (req, { params }) => {
 export const PATCH = handler<{ id: string }>(async (req, { params }) => {
   const ctx = await requirePartner(req, params.id);
   const input = await parseBody(req, updatePartnerSchema);
+  if (input.logoUrl) {
+    const cur = await prisma.partner.findUniqueOrThrow({ where: { id: ctx.partnerId }, select: { logoUrl: true } });
+    await assertOwnMediaUrls([input.logoUrl], ctx.user.id, [cur.logoUrl]);
+  }
   // legal identity (document, legal/trade name → slug) is owner-only; other profile fields stay member-writable
   if (ctx.role !== "OWNER") {
     const cur = await prisma.partner.findUniqueOrThrow({ where: { id: ctx.partnerId }, select: { documentType: true, document: true, legalName: true, tradeName: true } });

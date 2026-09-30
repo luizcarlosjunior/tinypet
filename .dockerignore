@@ -4,7 +4,8 @@
 **/.turbo
 **/.expo
 **/.env
-**/.env.*.local
+**/.env.*
+!**/.env.example
 **/*.tsbuildinfo
 tinyPet/public/uploads
 tinyPet/public/ffmpeg

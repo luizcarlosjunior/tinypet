@@ -11,6 +11,10 @@ import { COURSE_LEVEL_LABEL, num, type PublicCourse } from "@/components/public/
 import { formatBRL, SPECIES, safeHref } from "@tinypet/shared";
 
 export const revalidate = 120;
+/** No build-time params: each page renders on its first visit and is then served from the ISR cache. */
+export async function generateStaticParams() {
+  return [];
+}
 
 async function getCourse(id: string) {
   return serverApi<PublicCourse>(`/public/courses/${encodeURIComponent(id)}`, { revalidate: 120 });

@@ -3,6 +3,7 @@ import { updatePetSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, Errors, serialize, audit, clientIp } from "@/server";
 import { petActor, petData, petWithAge, assertOwnerControlled, petRole, ensurePublicSlug } from "@/server/pets";
 import { awardBadge } from "@/server/badges";
+import { assertOwnMediaUrls } from "@/server/media";
 
 export const GET = handler<{ id: string }>(async (req, { params }) => {
   const actor = await petActor(req, params.id, "VIEW");
@@ -36,6 +37,7 @@ export const PATCH = handler<{ id: string }>(async (req, { params }) => {
   const actor = await petActor(req, params.id, "EDIT");
   assertOwnerControlled(actor, "Este pet tem tutor: apenas o tutor pode alterar a ficha");
   const body = await parseBody(req, updatePetSchema);
+  await assertOwnMediaUrls([body.avatarUrl], actor.user.id, [actor.pet.avatarUrl]);
   const data = await petData(body);
   const pet = await prisma.pet.update({ where: { id: params.id }, data });
   await ensurePublicSlug(pet.id);

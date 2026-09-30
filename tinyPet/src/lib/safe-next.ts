@@ -10,7 +10,10 @@ export function safeNext(next: string | null | undefined, fallback = "/inicio"):
     const base = "http://x.invalid";
     const u = new URL(next, base);
     if (u.origin !== base) return fallback;
-    return u.pathname + u.search + u.hash;
+    // Dot segments can normalise into a protocol-relative URL ("/.//evil.com" → "//evil.com"): never return that.
+    const out = u.pathname + u.search + u.hash;
+    if (out.startsWith("//") || out.startsWith("/\\")) return fallback;
+    return out;
   } catch {
     return fallback;
   }

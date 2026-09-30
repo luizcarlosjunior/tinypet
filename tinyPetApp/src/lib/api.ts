@@ -117,6 +117,8 @@ export function qs(params: Record<string, string | number | boolean | null | und
 }
 
 export function errorMessage(e: unknown, fallback = "Algo deu errado. Tente novamente."): string {
+  // The app can't run reCAPTCHA: the server only asks for it after risk signals (e.g. several wrong passwords).
+  if (e instanceof ApiError && (e.code === "CAPTCHA_REQUIRED" || e.code === "CAPTCHA_FAILED")) return "Por segurança, aguarde 15 minutos e tente de novo, ou entre pelo site tinypet.com.br.";
   if (e instanceof ApiError) return e.message || fallback;
   if (e instanceof Error) return e.message || fallback;
   return fallback;

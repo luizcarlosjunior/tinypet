@@ -1,10 +1,16 @@
 import { lessonSchema } from "@tinypet/shared";
+import { prisma } from "@/db";
 import { handler, ok, parseBody, requirePartner } from "@/server";
 import { updateLesson, deleteLesson } from "@/server/courses";
+import { assertOwnMediaUrls } from "@/server/media";
 
 export const PATCH = handler<{ id: string; lid: string }>(async (req, { params }) => {
   const ctx = await requirePartner(req);
   const input = await parseBody(req, lessonSchema.partial());
+  if (input.attachments?.length) {
+    const cur = await prisma.lessonAttachment.findMany({ where: { lessonId: params.lid, lesson: { course: { partnerId: ctx.partnerId } } }, select: { url: true } });
+    await assertOwnMediaUrls(input.attachments.map((a) => a.url), ctx.user.id, cur.map((a) => a.url));
+  }
   return ok(await updateLesson(ctx.partnerId, params.id, params.lid, input));
 });
 

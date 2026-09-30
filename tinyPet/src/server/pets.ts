@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { formatInTimeZone } from "date-fns-tz";
-import { prisma, Prisma, type PetSize } from "@/db";
+import { prisma, Prisma, type PetSize, type MediaVisibility } from "@/db";
 import {
   ageInMonths,
   formatAge,
@@ -106,7 +106,7 @@ export async function petLifeStage(pet: PetAgeInput): Promise<LifeStage | null> 
 
 export type PetActor = {
   user: AuthUser;
-  pet: { id: string; ownerId: string | null; status: "ACTIVE" | "DECEASED"; name: string; createdByPartnerId: string | null };
+  pet: { id: string; ownerId: string | null; status: "ACTIVE" | "DECEASED"; name: string; createdByPartnerId: string | null; avatarUrl: string | null };
   via: "owner" | "family" | "partner";
   partnerId?: string;
 };
@@ -117,7 +117,7 @@ export type PetActor = {
  * Shared accounts (`via: "family"`) only pass `VIEW` and `TASK` (mark tasks done); `EDIT` is 403 for them.
  */
 export async function petActor(req: NextRequest, petId: string, level: PetAccessLevel = "VIEW"): Promise<PetActor> {
-  const select = { id: true, ownerId: true, status: true, name: true, createdByPartnerId: true } as const;
+  const select = { id: true, ownerId: true, status: true, name: true, createdByPartnerId: true, avatarUrl: true } as const;
   if (req.headers.get("x-partner-id")) {
     const ctx = await requirePartner(req);
     const pet = await prisma.pet.findFirst({
@@ -161,6 +161,12 @@ export function assertCanRegisterDeath(actor: PetActor) {
 /** Partners may only edit/delete rows they created themselves (rows with partnerId null belong to owner/family). */
 export function assertPartnerOwnsRow(actor: PetActor, rowPartnerId: string | null | undefined, msg = "Registro do tutor ou de outro parceiro não pode ser alterado") {
   if (actor.via === "partner" && (!rowPartnerId || rowPartnerId !== actor.partnerId)) throw Errors.forbidden(msg);
+}
+
+/** Clinical rows registered by a partner (vaccine applied at a clinic…) can't be changed by the tutor/family either. */
+export function assertRowAuthor(actor: PetActor, rowPartnerId: string | null | undefined) {
+  if (rowPartnerId && actor.via !== "partner") throw Errors.forbidden("Registro do parceiro não pode ser alterado pelo tutor");
+  assertPartnerOwnsRow(actor, rowPartnerId);
 }
 
 /** Throws 403 unless the actor is the pet's owner (shared accounts and partners can't). */
@@ -533,14 +539,15 @@ ${ref}${alerts}
 
 // ───────────────────────────── foods ─────────────────────────────
 
-export async function foodSuggestions(petId: string) {
+/** `withDistance`: only for the owner — distances from the owner's home to several stores would reveal where they live. */
+export async function foodSuggestions(petId: string, withDistance = true) {
   const pet = await prisma.pet.findUniqueOrThrow({
     where: { id: petId },
     select: { ownerId: true, foods: { where: { brandId: { not: null }, offersEnabled: true }, select: { brandId: true } } },
   });
   const brandIds = Array.from(new Set(pet.foods.map((f) => f.brandId!).filter(Boolean)));
   if (!brandIds.length) return { origin: null, partners: [] };
-  const origin = pet.ownerId
+  const origin = pet.ownerId && withDistance
     ? await prisma.address.findFirst({ where: { userId: pet.ownerId, isPrimary: true, latitude: { not: null }, longitude: { not: null } }, select: { latitude: true, longitude: true } })
     : null;
   const items = await prisma.catalogItem.findMany({
@@ -637,10 +644,15 @@ export async function reportCard(petId: string) {
   };
 }
 
-export async function milestones(petId: string) {
+/** Gallery visibility a viewer may see: owner everything; shared accounts FAMILY+; partners PARTNERS/PUBLIC. */
+export function visibleMediaFor(via: PetActor["via"]): MediaVisibility[] | undefined {
+  return via === "owner" ? undefined : via === "family" ? ["FAMILY", "PARTNERS", "PUBLIC"] : ["PARTNERS", "PUBLIC"];
+}
+
+export async function milestones(petId: string, visible?: MediaVisibility[]) {
   const pet = await prisma.pet.findUniqueOrThrow({ where: { id: petId }, select: { name: true, birthDate: true, avatarUrl: true } });
   const [media, badges] = await Promise.all([
-    prisma.petMedia.findMany({ where: { petId, deletedAt: null, isStory: false, title: { not: null } }, orderBy: { takenAt: "desc" } }),
+    prisma.petMedia.findMany({ where: { petId, deletedAt: null, isStory: false, title: { not: null }, ...(visible ? { visibility: { in: visible } } : {}) }, orderBy: { takenAt: "desc" } }),
     prisma.earnedBadge.findMany({ where: { petId }, include: { badge: true } }),
   ]);
   const items: { type: "media" | "badge" | "birthday"; date: Date; title: string; description?: string | null; imageUrl?: string | null; data?: unknown }[] = [];

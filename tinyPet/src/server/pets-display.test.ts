@@ -32,7 +32,7 @@ describe("monthly tasks", () => {
 
 describe("assertCanRegisterDeath", () => {
   const user = { id: "u1" } as PetActor["user"];
-  const pet = (p: Partial<PetActor["pet"]> = {}): PetActor["pet"] => ({ id: "p1", name: "Rex", status: "ACTIVE", ownerId: null, createdByPartnerId: "partnerA", ...p });
+  const pet = (p: Partial<PetActor["pet"]> = {}): PetActor["pet"] => ({ id: "p1", name: "Rex", status: "ACTIVE", ownerId: null, createdByPartnerId: "partnerA", avatarUrl: null, ...p });
   const partner = (partnerId: string, p?: Partial<PetActor["pet"]>): PetActor => ({ user, pet: pet(p), via: "partner", partnerId });
 
   it("allows the owner", () => {

@@ -9,6 +9,7 @@ export const GET = handler<{ token: string }>(async (_req, { params }) => {
     expiresAt: invite.expiresAt,
     partner: invite.partner,
     clientName: invite.client.name,
-    pets: invite.client.pets.map((p) => p.pet),
+    // no internal ids of other accounts (ownerId) in this public preview
+    pets: invite.client.pets.map(({ pet: { ownerId: _o, ...p } }) => p),
   });
 });

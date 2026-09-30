@@ -364,6 +364,8 @@ export async function listMembers(partnerId: string) {
 export async function inviteMember(partnerId: string, input: { email: string; role: "OWNER" | "STAFF"; canSeeFinance: boolean; jobTitle?: string | null }) {
   const user = await prisma.user.findFirst({ where: { email: input.email, deletedAt: null } });
   if (!user) throw Errors.notFound("Nenhum usuário com este e-mail. Peça para a pessoa criar uma conta no tinyPet primeiro.");
+  // Unverified e-mail: anyone could have registered it (pre-account hijacking of team access).
+  if (!user.emailVerifiedAt) throw Errors.conflict("Essa pessoa ainda não confirmou o e-mail no tinyPet. Peça para ela confirmar o e-mail (código enviado no cadastro) e tente de novo.");
   const exists = await prisma.membership.findUnique({ where: { userId_partnerId: { userId: user.id, partnerId } } });
   if (exists) throw Errors.conflict("Esta pessoa já faz parte da equipe");
   await assertLimit("PARTNER", partnerId, "team_members", await prisma.membership.count({ where: { partnerId } }));

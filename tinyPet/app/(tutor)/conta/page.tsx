@@ -279,9 +279,25 @@ function PlanCard() {
 
 function DangerZone() {
   const { toast } = useToast();
+  const session = useSessionContext();
+  const hasPassword = session.data?.user.hasPassword !== false;
   const [step, setStep] = useState(0);
   const [confirmText, setConfirmText] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const proofOk = hasPassword ? password.length > 0 : /^\d{6}$/.test(code.trim());
+
+  async function sendCode() {
+    try {
+      await api("/auth/me/delete-code", { method: "POST" });
+      setCodeSent(true);
+      toast("Enviamos um código para o seu e-mail.", "success");
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    }
+  }
 
   async function exportData() {
     try {
@@ -300,7 +316,7 @@ function DangerZone() {
   async function deleteAccount() {
     setBusy(true);
     try {
-      await api("/auth/me", { method: "DELETE" });
+      await api("/auth/me", { method: "DELETE", json: hasPassword ? { password } : { code: code.trim() } });
       await signOut({ callbackUrl: "/" });
     } catch (e) {
       toast(errorMessage(e), "error");
@@ -326,7 +342,15 @@ function DangerZone() {
           <div className="space-y-3 text-sm">
             <p>Esta ação não pode ser desfeita. Digite <strong>EXCLUIR</strong> para confirmar.</p>
             <Input id="confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} aria-label="Confirmação" />
-            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setStep(0)}>Cancelar</Button><Button variant="danger" loading={busy} disabled={confirmText !== "EXCLUIR"} onClick={deleteAccount}>Excluir definitivamente</Button></div>
+            {hasPassword ? (
+              <Input id="del-password" type="password" label="Sua senha" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            ) : (
+              <div className="space-y-2">
+                {codeSent && <Input id="del-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} label="Código recebido por e-mail" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} required />}
+                <Button variant="secondary" onClick={sendCode}>{codeSent ? "Reenviar código" : "Enviar código por e-mail"}</Button>
+              </div>
+            )}
+            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setStep(0)}>Cancelar</Button><Button variant="danger" loading={busy} disabled={confirmText !== "EXCLUIR" || !proofOk} onClick={deleteAccount}>Excluir definitivamente</Button></div>
           </div>
         )}
       </Modal>

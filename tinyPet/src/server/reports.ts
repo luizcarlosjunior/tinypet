@@ -37,6 +37,7 @@ const reportInclude = (mode: ReportMode) =>
   ({
     species: { select: { key: true, label: true } },
     breed: { select: { id: true, name: true } },
+    // partner mode: the partner only sees what its own client record holds (never the tutor account data)
     owner: { select: { id: true, name: true, email: true, addresses: addressSelect } },
     clients:
       mode.kind === "partner"
@@ -91,7 +92,8 @@ export async function petReportRows(mode: ReportMode, q: PetReportQuery) {
       const ageMonths = petAgeMonths(p, now);
       const lifeStage = petLifeStageSync(p, rules, now);
       const client = p.clients?.[0]?.client ?? null;
-      const addr = (mode.kind === "partner" ? client?.addresses[0] : null) ?? p.owner?.addresses[0] ?? null;
+      const owner = mode.kind === "partner" ? null : p.owner;
+      const addr = (mode.kind === "partner" ? client?.addresses[0] : null) ?? owner?.addresses[0] ?? null;
       const birthMonth = p.birthDate ? Number(ymd(p.birthDate).slice(5, 7)) : null;
       return {
         id: p.id,
@@ -118,11 +120,11 @@ export async function petReportRows(mode: ReportMode, q: PetReportQuery) {
           mode.kind === "partner"
             ? {
                 clientId: client?.id ?? null,
-                name: client?.name ?? p.owner?.name ?? null,
+                name: client?.name ?? owner?.name ?? null,
                 linked: !!client?.userId,
                 tags: (client?.tags as string[] | null) ?? [],
                 phone: client?.phones[0]?.number ?? null,
-                email: client?.emails[0]?.address ?? p.owner?.email ?? null,
+                email: client?.emails[0]?.address ?? owner?.email ?? null,
               }
             : null,
       };
@@ -239,7 +241,7 @@ export async function brandsReport(mode: ReportMode, q: { species?: string; stat
   const brandTotals = new Map<string, { brandId: string; brand: string; pets: Set<string> }>();
   for (const f of foods) {
     const clientAddr = (f.pet as unknown as { clients?: { client: { addresses: { city: string; state: string }[] } }[] }).clients?.[0]?.client.addresses[0];
-    const addr = f.pet.owner?.addresses[0] ?? clientAddr ?? null;
+    const addr = mode.kind === "partner" ? (clientAddr ?? null) : (f.pet.owner?.addresses[0] ?? null);
     if (q.state && addr?.state?.toUpperCase() !== q.state.toUpperCase()) continue;
     if (q.city && addr?.city !== q.city) continue;
     const key = `${f.brand!.id}|${addr?.city ?? ""}|${addr?.state ?? ""}`;

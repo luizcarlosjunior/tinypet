@@ -23,21 +23,23 @@ O repositório tem um `Dockerfile` na raiz (web + API; o app mobile não entra n
    - Porta exposta: **3033** · Domínio: `https://seu-dominio` (Coolify emite o certificado)
    - Health check: caminho `/api/health`, porta 3033
    - Servidor com **≥ 4 GB de RAM** para o `next build` (ou build em outro servidor)
-3. **Variáveis de ambiente** (aba *Environment Variables*). Marque **Build Variable** em `NEXT_PUBLIC_APP_URL`, `S3_BUCKET`, `S3_PUBLIC_URL` e `AWS_REGION` (entram no bundle do navegador e no `next.config`).
+3. **Variáveis de ambiente** (aba *Environment Variables*). Marque **Build Variable** em `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, `S3_BUCKET`, `S3_PUBLIC_URL` e `AWS_REGION` (entram no bundle do navegador e no `next.config`).
 
    | Variável | Valor |
    | --- | --- |
    | `NODE_ENV` | `production` |
-   | `DATABASE_URL` | URL interna do MySQL do Coolify |
+   | `DATABASE_URL` | URL interna do MySQL do Coolify, com pool: `...?connection_limit=10&pool_timeout=20` (limite ≈ `max_connections` do MySQL ÷ réplicas) |
    | `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL` | `https://seu-dominio` |
    | `NEXTAUTH_SECRET`, `JWT_SECRET` | ≥ 32 caracteres (`openssl rand -base64 48`) — o app não sobe sem eles |
    | `CRON_SECRET` | `openssl rand -hex 32` |
-   | `TRUST_PROXY` | `1` (o proxy do Coolify — Traefik/Caddy — define o IP real) |
+   | `TRUST_PROXY` | `cloudflare` atrás do Cloudflare (usa `CF-Connecting-IP`); `1` só com o proxy do Coolify sem Cloudflare |
+   | `RECAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | reCAPTCHA v3 (opcional): captcha adaptativo no login (após falhas) e no cadastro (muitos cadastros por IP). `RECAPTCHA_MIN_SCORE` padrão `0.5` |
+   | `NODE_OPTIONS` | `--max-old-space-size=<~75% da RAM do container em MB>` |
    | `S3_BUCKET`, `AWS_REGION` (ou `S3_REGION`), `S3_PUBLIC_URL` | bucket de mídia (obrigatório em produção) |
    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | usuário IAM com Put/Get/DeleteObject no bucket (fora da AWS não há IAM role) |
    | `SMTP_URL`, `EMAIL_FROM` | e-mail transacional (sem isso os e-mails são descartados em produção) |
    | `DB_PUSH_ON_START` | `1` para aplicar o schema ao iniciar (enquanto não houver `prisma/migrations`) |
-   | Opcionais | `API_NINJAS_KEY`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `APPLE_CLIENT_ID/SECRET`, `PAGARME_*`, `CORS_ORIGINS`, `BLOG_VIEW_SALT` |
+   | Opcionais | `INTERNAL_API_URL` (padrão `http://127.0.0.1:3033`), `CSP_REPORT_ONLY=1` (CSP só em modo relatório, para depurar), `API_NINJAS_KEY`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `APPLE_CLIENT_ID/SECRET`, `PAGARME_*`, `CORS_ORIGINS`, `BLOG_VIEW_SALT` |
 
 4. **Primeiro deploy / seed:** com `DB_PUSH_ON_START=1` o container cria as tabelas. Depois, no *Terminal* do container: `cd /app && SEED_ALLOW_PRODUCTION=1 SEED_ADMIN_EMAIL=admin@seu-dominio SEED_ADMIN_PASSWORD='senha-forte' yarn db:seed` (dados de referência + admin; sem usuários demo).
 5. **Jobs:** aba *Scheduled Tasks* da aplicação, uma tarefa por job (roda dentro do container; `CRON_SECRET` já está no ambiente). Comando: `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3033/api/v1/jobs/<job>` com os horários da tabela de Jobs abaixo (UTC).
@@ -81,6 +83,23 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 ```
+
+## Cloudflare
+
+O domínio passa pelo Cloudflare (proxy laranja). Configuração:
+
+- **Origem:** `TRUST_PROXY=cloudflare`. Libere 80/443 do servidor **só** para as [faixas de IP do Cloudflare](https://www.cloudflare.com/ips/) — senão qualquer um fala direto com a origem e forja `CF-Connecting-IP`.
+- **SSL/TLS:** modo *Full (strict)* (Coolify emite o certificado da origem; ou use um Origin Certificate do Cloudflare).
+- **Desligar:** Rocket Loader (quebra a hidratação do Next e o script de tema), Auto Minify, Mirage. 0-RTT desligado.
+- **Ligar:** Brotli/Zstd, HTTP/3. Com `TRUST_PROXY=cloudflare` a origem não comprime (o Cloudflare comprime).
+- **Cache Rules** (em ordem):
+  1. `/_next/static/*` e `/ffmpeg/*` → *Eligible for cache*, Edge TTL = respeitar origem (já vêm `immutable` / 7 dias).
+  2. `/api/v1/ref/*`, `/api/v1/public/*` → *Eligible for cache*, respeitar origem (a API manda `s-maxage` só em dados públicos que não dependem de quem vê).
+  3. Resto de `/api/*` → *Bypass cache*.
+  4. HTML: bypass (padrão). Opcional: `/p/*`, `/cursos/*` elegíveis quando **não** houver cookie `__Secure-next-auth.session-token`.
+- **WAF / Bot Fight Mode:** não desafie `/api/v1/jobs/*` nem `/api/v1/webhooks/*` (chamadas servidor→servidor). As páginas SSR chamam a API por `127.0.0.1` e não passam pelo Cloudflare.
+- **reCAPTCHA:** no console do Google, cadastre o domínio. A CSP já libera `www.google.com`, `www.gstatic.com` e o Web Analytics do Cloudflare (`static.cloudflareinsights.com`).
+- **Mídia no S3:** não passa pelo Cloudflare (a menos que `S3_PUBLIC_URL` seja um domínio próprio com proxy); Polish não tem efeito — as imagens já saem em WebP.
 
 ## Proxy reverso
 
@@ -150,7 +169,8 @@ Proteja o crontab (contém o segredo) ou use timers systemd com `EnvironmentFile
 
 - [ ] `.env` de produção completo, segredos gerados (`openssl rand -base64 48`, `openssl rand -hex 32`).
 - [ ] Porta 3033 e MySQL fechadas no security group / security list; só 80/443 (e SSH restrito) abertos.
-- [ ] `TRUST_PROXY=1` e proxy sobrescrevendo `X-Forwarded-For`.
+- [ ] `TRUST_PROXY=cloudflare` com origem aceitando só IPs do Cloudflare (ou `TRUST_PROXY=1` com proxy sobrescrevendo `X-Forwarded-For`).
+- [ ] Cache Rules do Cloudflare e Rocket Loader desligado (seção Cloudflare).
 - [ ] Crontab instalado e testado (`curl` manual de um job retorna `{ ok: true }`).
 - [ ] CORS do bucket S3 permite `PUT` da origem `NEXT_PUBLIC_APP_URL`.
 - [ ] Webhook Pagar.me apontando para `https://<domínio>/api/v1/webhooks/pagarme` com HTTP Basic.

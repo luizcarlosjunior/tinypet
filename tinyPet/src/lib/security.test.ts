@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeHref, bytesMatchMime, extensionForMime, withHttps, updatePartnerSchema, httpUrl } from "@tinypet/shared";
+import { safeHref, bytesMatchMime, extensionForMime, withHttps, updatePartnerSchema, httpUrl, parsePetSocialUsername } from "@tinypet/shared";
 import { safeNext } from "./safe-next";
 
 describe("safeHref", () => {
@@ -98,5 +98,26 @@ describe("URL schemas", () => {
     expect(withHttps("https://a.com")).toBe("https://a.com");
     expect(withHttps("javascript:alert(1)")).toBe("javascript:alert(1)");
     expect(withHttps("  ")).toBe("");
+  });
+});
+
+import { safeNext as safeNextRedirect } from "./safe-next";
+
+describe("safeNext — dot-segment open redirect", () => {
+  it("never returns a protocol-relative URL", () => {
+    for (const p of ["/.//evil.com", "/..//evil.com", "/%2e//evil.com", "/a/..//evil.com", "/./..//evil.com/x?y=1"]) expect(safeNextRedirect(p)).toBe("/inicio");
+  });
+  it("keeps normal paths", () => {
+    expect(safeNextRedirect("/pets/abc?tab=galeria#x")).toBe("/pets/abc?tab=galeria#x");
+    expect(safeNextRedirect("/a/../pets")).toBe("/pets");
+  });
+});
+
+describe("parsePetSocialUsername", () => {
+  it("rejects malformed percent-escapes instead of throwing (URIError → 500)", () => {
+    expect(parsePetSocialUsername("INSTAGRAM", "https://instagram.com/%E0%A4%A")).toEqual({ ok: false, message: "Link inválido" });
+  });
+  it("still parses a profile URL", () => {
+    expect(parsePetSocialUsername("INSTAGRAM", "https://www.instagram.com/rex.dog/")).toEqual({ ok: true, username: "rex.dog" });
   });
 });

@@ -60,10 +60,15 @@ async function applyWebhook(provider: PaymentProvider, type: string, payload: un
       const already = await prisma.payment.findFirst({ where: { gatewayOrderId: order.id } });
       if (inst && inst.status !== "PAID" && !already) {
         const amount = order.amountCents / 100;
-        await prisma.$transaction([
-          prisma.payment.create({ data: { installmentId: inst.id, paidAt: new Date(), amount, method: "GATEWAY", gatewayOrderId: order.id } }),
-          prisma.installment.update({ where: { id: inst.id }, data: { paidAmount: { increment: amount }, status: Number(inst.paidAmount) + amount >= Number(inst.amount) ? "PAID" : inst.status } }),
-        ]);
+        try {
+          // unique gatewayOrderId: concurrent/duplicated webhooks can't record the payment twice
+          await prisma.$transaction([
+            prisma.payment.create({ data: { installmentId: inst.id, paidAt: new Date(), amount, method: "GATEWAY", gatewayOrderId: order.id } }),
+            prisma.installment.update({ where: { id: inst.id }, data: { paidAmount: { increment: amount }, status: Number(inst.paidAmount) + amount >= Number(inst.amount) ? "PAID" : inst.status } }),
+          ]);
+        } catch (e) {
+          if ((e as { code?: string }).code !== "P2002") throw e;
+        }
       }
     }
   } else if (type.startsWith("subscription.")) {

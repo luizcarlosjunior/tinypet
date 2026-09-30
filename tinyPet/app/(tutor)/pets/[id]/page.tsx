@@ -1,6 +1,7 @@
 "use client";
 import { Suspense } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AtSign, ChevronLeft, FileText, GraduationCap, HeartPulse, History, Images, ListChecks, Trophy, Users, Utensils } from "lucide-react";
 import { ScrollTabs } from "@/components/ui/scroll-tabs";
@@ -8,18 +9,21 @@ import { canEditPet, usePet } from "@/hooks/use-pets";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, Empty, Spinner } from "@/components/ui";
 import { MemorialBanner, PetFicha } from "@/components/pets/pet-ficha";
-import { PetGallery } from "@/components/pets/pet-gallery";
-import { PetHistory } from "@/components/pets/pet-history";
-import { PetHealth } from "@/components/pets/pet-health";
-import { PetSkills } from "@/components/pets/pet-skills";
-import { PetRoutine } from "@/components/pets/pet-routine";
-import { PetFoods } from "@/components/pets/pet-foods";
-import { PetSocial } from "@/components/pets/pet-social";
-import { PetSharing } from "@/components/pets/pet-sharing";
-import { PetBadges } from "@/components/pets/pet-badges";
 import { BirthdayCard } from "@/components/pets/birthday-card";
 import { errorMessage } from "@/lib/errors";
 import { ageInMonths, formatAge, LIFE_STAGE_LABEL, lifeStageFor } from "@tinypet/shared";
+
+// Only one tab renders at a time: load the others on demand (Ficha, the default tab, stays in the page bundle).
+const tabLoading = () => <div className="flex justify-center py-10"><Spinner /></div>;
+const PetGallery = dynamic(() => import("@/components/pets/pet-gallery").then((m) => m.PetGallery), { loading: tabLoading });
+const PetHistory = dynamic(() => import("@/components/pets/pet-history").then((m) => m.PetHistory), { loading: tabLoading });
+const PetHealth = dynamic(() => import("@/components/pets/pet-health").then((m) => m.PetHealth), { loading: tabLoading });
+const PetSkills = dynamic(() => import("@/components/pets/pet-skills").then((m) => m.PetSkills), { loading: tabLoading });
+const PetRoutine = dynamic(() => import("@/components/pets/pet-routine").then((m) => m.PetRoutine), { loading: tabLoading });
+const PetFoods = dynamic(() => import("@/components/pets/pet-foods").then((m) => m.PetFoods), { loading: tabLoading });
+const PetSocial = dynamic(() => import("@/components/pets/pet-social").then((m) => m.PetSocial), { loading: tabLoading });
+const PetSharing = dynamic(() => import("@/components/pets/pet-sharing").then((m) => m.PetSharing), { loading: tabLoading });
+const PetBadges = dynamic(() => import("@/components/pets/pet-badges").then((m) => m.PetBadges), { loading: tabLoading });
 
 const TABS = [
   { key: "ficha", label: "Ficha", icon: FileText },

@@ -20,13 +20,16 @@ ARG NEXT_PUBLIC_APP_URL
 ARG S3_BUCKET
 ARG S3_PUBLIC_URL
 ARG AWS_REGION
-ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL S3_BUCKET=$S3_BUCKET S3_PUBLIC_URL=$S3_PUBLIC_URL AWS_REGION=$AWS_REGION
-RUN yarn workspace @tinypet/web db:generate && yarn workspace @tinypet/web build
+ARG NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL S3_BUCKET=$S3_BUCKET S3_PUBLIC_URL=$S3_PUBLIC_URL AWS_REGION=$AWS_REGION NEXT_PUBLIC_RECAPTCHA_SITE_KEY=$NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+# webpack cache (~600 MB) is useless at runtime: drop it so it never reaches the image
+RUN yarn workspace @tinypet/web db:generate && yarn workspace @tinypet/web build && rm -rf tinyPet/.next/cache && mkdir -p tinyPet/.next/cache
 
 FROM base AS runtime
 ENV NODE_ENV=production PORT=3033
-COPY --from=build /app /app
-RUN chmod +x /app/tinyPet/scripts/docker-start.sh && chown -R node:node /app/tinyPet/.next
+# --chown in the COPY (a later `chown -R` would duplicate every file into a new layer)
+COPY --from=build --chown=node:node /app /app
+RUN chmod +x /app/tinyPet/scripts/docker-start.sh
 USER node
 EXPOSE 3033
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD curl -fsS http://127.0.0.1:3033/api/health || exit 1

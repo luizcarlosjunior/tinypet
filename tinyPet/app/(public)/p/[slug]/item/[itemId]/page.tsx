@@ -13,6 +13,10 @@ import { isPromoActive, num, type PublicItem } from "@/components/public/types";
 import { SPECIES } from "@tinypet/shared";
 
 export const revalidate = 60;
+/** No build-time params: each page renders on its first visit and is then served from the ISR cache. */
+export async function generateStaticParams() {
+  return [];
+}
 
 async function getItem(id: string) {
   return serverApi<PublicItem>(`/public/items/${encodeURIComponent(id)}`);

@@ -1,3 +1,4 @@
+import { rateLimit } from "./api";
 import { randomUUID } from "node:crypto";
 import { prisma, type Prisma, type AppointmentStatus, type Recurrence, type LocationType, type Address } from "@/db";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
@@ -261,10 +262,13 @@ export async function findConflicts(input: ConflictCheck): Promise<string | null
   return hit ? `Conflito em ${formatLocal(input.startsAt, "dd/MM")}: ${hit.label}` : null;
 }
 
-/** Throws 409 CONFLICT when the interval is not free. */
-export async function checkConflicts(input: ConflictCheck) {
+/**
+ * Throws 409 CONFLICT when the interval is not free. The detailed reason names other clients / staff time-off, so it
+ * is only shown to the partner; tutors (bookings, reschedules) get a generic message.
+ */
+export async function checkConflicts(input: ConflictCheck, opts: { forPartner?: boolean } = { forPartner: true }) {
   const reason = await findConflicts(input);
-  if (reason) throw Errors.conflict(reason);
+  if (reason) throw Errors.conflict(opts.forPartner ? reason : "Horário indisponível. Escolha outro horário.");
 }
 
 // ───────── validation of references ─────────
@@ -383,7 +387,7 @@ export async function createAppointments(ctx: CreateCtx, input: CreateInput) {
 
   if (!ctx.force) {
     for (const d of dates) {
-      await checkConflicts({ partnerId: ctx.partnerId, membershipId, startsAt: d, endsAt: new Date(d.getTime() + durationMs), bufferMinutes: partner.bufferMinutes });
+      await checkConflicts({ partnerId: ctx.partnerId, membershipId, startsAt: d, endsAt: new Date(d.getTime() + durationMs), bufferMinutes: partner.bufferMinutes }, { forPartner: ctx.byPartner });
     }
   }
 
@@ -866,6 +870,7 @@ export async function ownerCancelAppointment(user: { id: string; name: string },
 
 /** Creates a REQUESTED proposal linked to the original via `rescheduleOfId` (server-side). */
 export async function ownerRescheduleAppointment(user: { id: string; name: string }, id: string, startsAt: string) {
+  await rateLimit(`reschedule:${user.id}`, 20, 60 * 60 * 1000);
   const a = await ownerAppointmentOrThrow(user.id, id);
   assertCancellationWindow(a);
   const created = await createAppointments(

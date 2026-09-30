@@ -33,7 +33,9 @@ export const phones = {
     const row = await prisma.phone.findFirst({ where: { id, ...scope } });
     if (!row) throw Errors.notFound("Telefone não encontrado");
     if (input.isPrimary) await prisma.phone.updateMany({ where: scope, data: { isPrimary: false } });
-    return prisma.phone.update({ where: { id }, data: { type: input.type, number: input.number ? toE164BR(input.number) : undefined, isPrimary: input.isPrimary } });
+    const number = input.number ? toE164BR(input.number) : undefined;
+    // a changed number must be verified again
+    return prisma.phone.update({ where: { id }, data: { type: input.type, number, isPrimary: input.isPrimary, ...(number && number !== row.number ? { verifiedAt: null } : {}) } });
   },
   async remove(scope: ContactScope, id: string) {
     const row = await prisma.phone.findFirst({ where: { id, ...scope } });
@@ -326,8 +328,8 @@ export async function inviteByToken(token: string) {
 export async function inviteMatchesUser(invite: { email: string | null; phone: string | null }, userId: string): Promise<boolean> {
   if (invite.email) {
     const target = invite.email.trim().toLowerCase();
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    if (user?.email.toLowerCase() === target) return true;
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerifiedAt: true } });
+    if (user?.emailVerifiedAt && user.email.toLowerCase() === target) return true;
     const verified = await prisma.email.findMany({ where: { userId, verifiedAt: { not: null } }, select: { address: true } });
     if (verified.some((e) => e.address.toLowerCase() === target)) return true;
   }
@@ -419,6 +421,7 @@ export async function exportClientsCsv(partnerId: string) {
 }
 
 export const IMPORT_MAX_ROWS = 5000;
+const IMPORT_MAX_COLUMNS = 40;
 const importEmail = z.string().trim().toLowerCase().email().max(200);
 
 /**
@@ -427,8 +430,11 @@ const importEmail = z.string().trim().toLowerCase().email().max(200);
  * same e-mail/phone) are skipped.
  */
 export async function importClientsCsv(partnerId: string, text: string) {
-  const rows = csvObjects(parseCsv(text));
-  if (rows.length > IMPORT_MAX_ROWS) throw Errors.badRequest(`O arquivo tem ${rows.length} linhas; o máximo é ${IMPORT_MAX_ROWS} por importação`);
+  const table = parseCsv(text);
+  // limits checked before building objects (rows × header columns would otherwise blow up memory)
+  if (table.length - 1 > IMPORT_MAX_ROWS) throw Errors.badRequest(`O arquivo tem ${table.length - 1} linhas; o máximo é ${IMPORT_MAX_ROWS} por importação`);
+  if ((table[0]?.length ?? 0) > IMPORT_MAX_COLUMNS) throw Errors.badRequest(`O cabeçalho tem colunas demais (máximo ${IMPORT_MAX_COLUMNS})`);
+  const rows = csvObjects(table);
   const species = await prisma.species.findMany({ where: { active: true } });
   const speciesFor = (v: string) => {
     const k = v.trim().toLowerCase();

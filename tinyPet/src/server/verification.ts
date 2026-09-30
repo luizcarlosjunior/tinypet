@@ -1,4 +1,4 @@
-import { createHash, randomInt, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/db";
 import { sendMail, layout } from "./mail";
 import { Errors } from "./errors";
@@ -8,8 +8,10 @@ type Channel = "EMAIL" | "PHONE";
 const CODE_TTL_MS = 15 * 60 * 1000;
 export const MAX_CODE_ATTEMPTS = 5;
 
+/** Keyed hash: a leaked `verification_codes` table can't be brute-forced offline (6-digit codes = 10⁶ guesses). */
 export function hashCode(code: string) {
-  return createHash("sha256").update(code.trim()).digest("hex");
+  const key = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET || "dev-secret-only-for-local-development";
+  return createHmac("sha256", key).update(code.trim()).digest("hex");
 }
 
 function sameHash(aHex: string, bHex: string) {

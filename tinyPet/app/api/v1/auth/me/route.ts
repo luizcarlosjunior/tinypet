@@ -2,6 +2,11 @@ import { prisma } from "@/db";
 import { updateProfileSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, requireUser, sessionContext, audit, clientIp, ApiError, Errors } from "@/server";
 import { assertUsernameFree } from "@/server/sharing";
+import { assertOwnMediaUrls } from "@/server/media";
+import { assertReauth } from "@/server/reauth";
+import { z } from "zod";
+
+const deleteSchema = z.object({ password: z.string().max(200).optional().nullable(), code: z.string().max(12).optional().nullable() });
 
 export const GET = handler(async (req) => {
   const user = await requireUser(req);
@@ -17,6 +22,7 @@ export const PATCH = handler(async (req) => {
     terms = { termsVersion: version, termsAcceptedAt: new Date() };
   }
   if (body.username) await assertUsernameFree(body.username, user.id);
+  if (body.avatarUrl) await assertOwnMediaUrls([body.avatarUrl], user.id, [user.avatarUrl]);
   try {
     await prisma.user.update({
       where: { id: user.id },
@@ -34,6 +40,9 @@ export const PATCH = handler(async (req) => {
 /** LGPD: delete account (soft delete + anonymize). Refused while the user is the only OWNER of an active partner. */
 export const DELETE = handler(async (req) => {
   const user = await requireUser(req);
+  // step-up: a stolen session/token alone can't erase the account (password, or e-mail code for Google/Apple accounts)
+  const proof = await parseBody(req, deleteSchema);
+  await assertReauth(user.id, "account_delete", proof);
   const owned = await prisma.membership.findMany({ where: { userId: user.id, role: "OWNER", partner: { deletedAt: null } }, select: { partnerId: true, partner: { select: { tradeName: true } } } });
   const blocking: string[] = [];
   for (const m of owned) {

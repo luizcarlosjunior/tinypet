@@ -9,7 +9,7 @@ export function Avatar({ src, name, size = 40, className, square = false }: { sr
   const safeSrc = safeHref(src);
   if (safeSrc) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={safeSrc} alt={name ?? ""} width={size} height={size} style={style} className={cn(shape, "shrink-0 object-cover bg-ink-100 dark:bg-ink-800", className)} />;
+    return <img src={safeSrc} alt={name ?? ""} width={size} height={size} loading="lazy" decoding="async" style={style} className={cn(shape, "shrink-0 object-cover bg-ink-100 dark:bg-ink-800", className)} />;
   }
   return (
     <span aria-hidden style={style} className={cn(shape, "inline-flex shrink-0 select-none items-center justify-center bg-brand-100 font-semibold text-brand-800 dark:bg-brand-900/40 dark:text-brand-200", className)}>

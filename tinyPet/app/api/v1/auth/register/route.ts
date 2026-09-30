@@ -1,12 +1,16 @@
 import { hash } from "@node-rs/argon2";
 import { prisma } from "@/db";
 import { registerSchema } from "@tinypet/shared";
-import { handler, ok, parseBody, rateLimit, clientIp, issueMobileToken, ensureDefaultSubscription, sessionContext, Errors } from "@/server";
+import { handler, ok, parseBody, rateLimit, clientIp, issueMobileToken, ensureDefaultSubscription, sessionContext, bumpCounter, checkCaptcha, captchaTokenFrom, Errors } from "@/server";
 import { sendVerificationCode } from "@/server/verification";
 import { assertUsernameFree } from "@/server/sharing";
 
 export const POST = handler(async (req) => {
-  await rateLimit(`register:ip:${clientIp(req)}`, 10, 60 * 60 * 1000);
+  const ip = clientIp(req);
+  await rateLimit(`register:ip:${ip}`, 10, 60 * 60 * 1000);
+  // reCAPTCHA: the web always sends a token; without one it becomes mandatory after 3 sign-ups/hour from the IP
+  const signups = await bumpCounter(`register:risk:ip:${ip}`, 60 * 60 * 1000);
+  await checkCaptcha(captchaTokenFrom(req), "register", ip, signups > 3);
   const body = await parseBody(req, registerSchema);
   const exists = await prisma.user.findUnique({ where: { email: body.email } });
   if (exists) throw Errors.conflict("Já existe uma conta com este e-mail");

@@ -18,5 +18,5 @@ const publicCoursesQuery = paginationQuery.extend({
 export const GET = handler(async (req) => {
   const q = parseQuery(req, publicCoursesQuery);
   const { items, total } = await listPublicCourses(q);
-  return ok(serialize(items), { meta: { page: q.page, pageSize: q.pageSize, total } });
+  return ok(serialize(items), { meta: { page: q.page, pageSize: q.pageSize, total }, cache: 60 });
 });

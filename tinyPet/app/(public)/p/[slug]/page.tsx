@@ -12,6 +12,10 @@ import { Empty } from "@/components/ui";
 import Link from "next/link";
 
 export const revalidate = 60;
+/** No build-time params: each page renders on its first visit and is then served from the ISR cache. */
+export async function generateStaticParams() {
+  return [];
+}
 
 async function getPartner(slug: string) {
   return serverApi<PublicPartner>(`/public/partners/${encodeURIComponent(slug)}`);

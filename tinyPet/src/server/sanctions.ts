@@ -38,6 +38,7 @@ export async function syncSuspension(userId: string) {
   const until = rows.length === 0 ? null : rows.some((r) => r.endsAt === null) ? PERMANENT_UNTIL : new Date(Math.max(...rows.map((r) => r.endsAt!.getTime())));
   await prisma.user.update({ where: { id: userId }, data: { suspendedUntil: until, ...(until ? { tokenVersion: { increment: 1 } } : {}) } });
   if (until) await prisma.session.deleteMany({ where: { userId } });
+  if (until) await prisma.session.deleteMany({ where: { userId } });
   invalidateIpCache();
 }
 

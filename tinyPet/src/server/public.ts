@@ -4,13 +4,27 @@ import type { PartnerSearchQuery } from "@tinypet/shared";
 import { Errors } from "./errors";
 import { catalogInclude } from "./catalog";
 
-const publicReviewInclude = { user: { select: { id: true, name: true, avatarUrl: true } }, reply: true, item: { select: { id: true, name: true } } } satisfies Prisma.ReviewInclude;
+/** Public reviews: no reviewer ids (user or review row), only name/avatar. */
+const publicReviewSelect = {
+  id: true,
+  itemId: true,
+  courseId: true,
+  rating: true,
+  comment: true,
+  verified: true,
+  createdAt: true,
+  user: { select: { name: true, avatarUrl: true } },
+  reply: { select: { id: true, body: true, createdAt: true } },
+  item: { select: { id: true, name: true } },
+} satisfies Prisma.ReviewSelect;
+/** Public business address: no private notes (access notes, reference) or owner links. */
+const publicAddressSelect = { id: true, zipCode: true, street: true, number: true, complement: true, district: true, city: true, state: true, country: true, latitude: true, longitude: true } satisfies Prisma.AddressSelect;
 
 // ───────────────────────────── partners ─────────────────────────────
 
 /**
- * Public search. Text/type/rating/city filters go to the DB; category, species, distance and radius
- * are resolved in memory (JSON columns + haversine). Ordered featured → rating → distance.
+ * Public search. Text/type/rating/city/category/species filters go to the DB; distance and radius are resolved
+ * in memory (haversine + each partner's service radius). Ordered featured → rating → distance.
  */
 export async function searchPartners(q: PartnerSearchQuery) {
   const where: Prisma.PartnerWhereInput = {
@@ -20,6 +34,15 @@ export async function searchPartners(q: PartnerSearchQuery) {
     ...(q.type ? { types: { some: { type: { key: q.type } } } } : {}),
     ...(q.minRating != null ? { ratingAvg: { gte: q.minRating } } : {}),
     ...(q.city || q.state ? { addresses: { some: { isPrimary: true, ...(q.city ? { city: { contains: q.city } } : {}), ...(q.state ? { state: q.state.toUpperCase() } : {}) } } } : {}),
+    // narrows the rows loaded; the in-memory filter below stays as the exact rule
+    ...(q.category || q.species
+      ? {
+          AND: [
+            ...(q.category ? [{ catalogItems: { some: { deletedAt: null, status: "PUBLISHED" as const, category: { key: q.category } } } }] : []),
+            ...(q.species ? [{ catalogItems: { some: { deletedAt: null, status: "PUBLISHED" as const, speciesKeys: { array_contains: [q.species] } } } }] : []),
+          ],
+        }
+      : {}),
   };
   const partners = await prisma.partner.findMany({
     where,
@@ -92,20 +115,33 @@ export async function searchPartners(q: PartnerSearchQuery) {
 export async function getPublicPartner(slug: string) {
   const p = await prisma.partner.findFirst({
     where: { slug, published: true, deletedAt: null },
-    include: {
+    select: {
+      id: true,
+      slug: true,
+      tradeName: true,
+      description: true,
+      logoUrl: true,
+      website: true,
+      serviceRadiusKm: true,
+      cancellationHours: true,
+      published: true,
+      featured: true,
+      ratingAvg: true,
+      ratingCount: true,
+      createdAt: true,
       types: { include: { type: { select: { key: true, label: true } } } },
       socialLinks: true,
       businessHours: { orderBy: { weekday: "asc" } },
       venuePhotos: { orderBy: { sortOrder: "asc" } },
-      addresses: { where: { isPrimary: true }, take: 1 },
+      addresses: { where: { isPrimary: true }, select: publicAddressSelect, take: 1 },
       phones: { where: { isPrimary: true }, select: { type: true, number: true }, take: 1 },
       catalogItems: { where: { deletedAt: null, status: "PUBLISHED" }, include: catalogInclude, orderBy: [{ type: "asc" }, { name: "asc" }] },
-      reviews: { where: { status: "VISIBLE" }, include: publicReviewInclude, orderBy: { createdAt: "desc" }, take: 50 },
+      reviews: { where: { status: "VISIBLE" }, select: publicReviewSelect, orderBy: { createdAt: "desc" }, take: 50 },
       courses: { where: { status: "PUBLISHED" }, select: { id: true, title: true, coverUrl: true, level: true, price: true, ratingAvg: true, ratingCount: true } },
     },
   });
   if (!p) throw Errors.notFound("Parceiro não encontrado");
-  const { document: _doc, documentType: _dt, legalName: _ln, plan: _plan, ...rest } = p;
+  const { addresses: _a, phones: _p, ...rest } = p;
   return { ...rest, types: p.types.map((t) => t.type), address: p.addresses[0] ?? null, phone: p.phones[0] ?? null };
 }
 
@@ -114,8 +150,8 @@ export async function getPublicItem(id: string) {
     where: { id, deletedAt: null, status: "PUBLISHED", partner: { published: true, deletedAt: null } },
     include: {
       ...catalogInclude,
-      partner: { select: { id: true, slug: true, tradeName: true, logoUrl: true, ratingAvg: true, ratingCount: true, serviceRadiusKm: true, cancellationHours: true, addresses: { where: { isPrimary: true }, take: 1 } } },
-      reviews: { where: { status: "VISIBLE" }, include: publicReviewInclude, orderBy: { createdAt: "desc" } },
+      partner: { select: { id: true, slug: true, tradeName: true, logoUrl: true, ratingAvg: true, ratingCount: true, serviceRadiusKm: true, cancellationHours: true, addresses: { where: { isPrimary: true }, select: publicAddressSelect, take: 1 } } },
+      reviews: { where: { status: "VISIBLE" }, select: publicReviewSelect, orderBy: { createdAt: "desc" }, take: 50 },
     },
   });
   if (!item) throw Errors.notFound("Item não encontrado");
@@ -160,7 +196,7 @@ export async function getPublicCourse(id: string) {
       category: { select: { key: true, label: true } },
       modules: { orderBy: { sortOrder: "asc" }, include: { lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true, description: true, durationMinutes: true, exerciseTitle: true, sortOrder: true } } } },
       lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true, description: true, durationMinutes: true, exerciseTitle: true, sortOrder: true, moduleId: true } },
-      reviews: { where: { status: "VISIBLE" }, include: publicReviewInclude, orderBy: { createdAt: "desc" } },
+      reviews: { where: { status: "VISIBLE" }, select: publicReviewSelect, orderBy: { createdAt: "desc" }, take: 50 },
       _count: { select: { lessons: true, enrollments: true } },
     },
   });

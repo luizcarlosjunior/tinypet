@@ -5,6 +5,7 @@ import { Errors } from "./errors";
 import { handler, ok } from "./api";
 import { notify, notifyPartner } from "./notify";
 import { awardBadge } from "./badges";
+import { cleanupPendingUploads } from "./media-audit";
 import { allDueDone, allDueResolved, dateOnly, shiftDays, todaySP, weightAlertSetting, weightAlerts, ymd } from "./pets";
 
 const WEAK_CRON_SECRETS = new Set(["change-me-cron", "dev-cron-secret"]);
@@ -116,7 +117,8 @@ export async function jobStreaks() {
 /** Soft-deletes stories past their 24h expiry. */
 export async function jobStoriesCleanup() {
   const r = await prisma.petMedia.updateMany({ where: { isStory: true, deletedAt: null, expiresAt: { lt: new Date() } }, data: { deletedAt: new Date() } });
-  return { deleted: r.count };
+  const pendingUploads = await cleanupPendingUploads();
+  return { deleted: r.count, pendingUploads };
 }
 
 /** Vaccines/dewormers due in the next 7 days → notify the owner (once per dose). */

@@ -8,3 +8,4 @@ export * from "./notify";
 export * from "./audit";
 export * from "./geo";
 export * from "./sanctions";
+export * from "./captcha";

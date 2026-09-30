@@ -1,14 +1,14 @@
 import { prisma } from "@/db";
 import { vaccinationSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, Errors } from "@/server";
-import { petActor, dateOnly, assertPartnerOwnsRow, partnerHasType, vaccinationInclude } from "@/server/pets";
+import { petActor, dateOnly, assertRowAuthor, partnerHasType, vaccinationInclude } from "@/server/pets";
 
 /** `weightG`: number → creates/updates the linked measurement; null → removes it; omitted → unchanged (date follows appliedAt). */
 export const PATCH = handler<{ id: string; vid: string }>(async (req, { params }) => {
   const actor = await petActor(req, params.id, "EDIT");
   const row = await prisma.vaccination.findFirst({ where: { id: params.vid, petId: params.id } });
   if (!row) throw Errors.notFound("Registro não encontrado");
-  assertPartnerOwnsRow(actor, row.partnerId);
+  assertRowAuthor(actor, row.partnerId);
   const { weightG, ...body } = await parseBody(req, vaccinationSchema.partial());
   if (weightG && actor.pet.status === "DECEASED") throw Errors.conflict("Pet em memorial: não é possível registrar peso");
   const appliedAt = body.appliedAt ? dateOnly(body.appliedAt) : row.appliedAt;
@@ -43,7 +43,7 @@ export const DELETE = handler<{ id: string; vid: string }>(async (req, { params 
   const actor = await petActor(req, params.id, "EDIT");
   const row = await prisma.vaccination.findFirst({ where: { id: params.vid, petId: params.id } });
   if (!row) throw Errors.notFound("Registro não encontrado");
-  assertPartnerOwnsRow(actor, row.partnerId);
+  assertRowAuthor(actor, row.partnerId);
   await prisma.vaccination.delete({ where: { id: row.id } });
   return ok({ deleted: true });
 });

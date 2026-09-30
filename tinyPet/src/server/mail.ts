@@ -20,7 +20,7 @@ export function textToHtml(text: string) {
 export async function sendMail(to: string, subject: string, html: string, text?: string) {
   const from = process.env.EMAIL_FROM ?? "tinyPet <no-reply@tinypet.local>";
   // Header injection guard: nodemailer already rejects CR/LF in addresses, but keep subjects single-line.
-  const safeSubject = subject.replace(/[\r\n]+/g, " ");
+  const safeSubject = subject.replace(/[\r\n]+/g, " ").slice(0, 150); // names in subjects (trade names) are user-controlled
   if (!transport) {
     if (process.env.NODE_ENV === "production") {
       console.warn(`[mail] SMTP not configured, dropped message to ${to.split("@")[1] ?? "unknown"}`);

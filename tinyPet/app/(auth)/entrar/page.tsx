@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -8,6 +8,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginInput } from "@tinypet/shared";
 import { Button, Input } from "@/components/ui";
 import { SocialButtons, safeNext } from "@/components/forms/social-buttons";
+import { RECAPTCHA_NOTICE, RECAPTCHA_SITE_KEY, captchaToken, loadRecaptcha } from "@/lib/recaptcha";
+
+const CAPTCHA_MSG: Record<string, string> = {
+  CAPTCHA_REQUIRED: "Confirme que você não é um robô: recarregue a página e tente de novo.",
+  CAPTCHA_FAILED: "Não conseguimos confirmar que você não é um robô. Tente novamente.",
+  CAPTCHA_UNAVAILABLE: "Verificação anti-robô indisponível. Tente novamente em instantes.",
+};
+
+const LOGIN_ERRORS: Record<string, string> = {
+  suspensa: "Sua conta está suspensa por violar as regras da comunidade. Entre em contato com o suporte se achar que foi um engano.",
+  bloqueado: "O acesso a partir desta rede está bloqueado temporariamente por violar as regras da comunidade.",
+};
 
 export default function EntrarPage() {
   return (
@@ -21,14 +33,15 @@ function EntrarForm() {
   const sp = useSearchParams();
   const router = useRouter();
   const next = safeNext(sp.get("next") ?? sp.get("callbackUrl"));
-  const [error, setError] = useState<string | null>(sp.get("erro") === "suspensa" ? "Sua conta está suspensa por violar as regras da comunidade. Entre em contato com o suporte se achar que foi um engano." : null);
+  const [error, setError] = useState<string | null>(LOGIN_ERRORS[sp.get("erro") ?? ""] ?? null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
+  useEffect(() => void loadRecaptcha(), []);
 
   async function onSubmit(v: LoginInput) {
     setError(null);
-    const r = await signIn("credentials", { email: v.email, password: v.password, redirect: false });
+    const r = await signIn("credentials", { email: v.email, password: v.password, captchaToken: (await captchaToken("login")) ?? "", redirect: false });
     // authorize() throws pt-BR messages for suspended accounts, blocked IPs and rate limits; wrong credentials → "CredentialsSignin".
-    if (r?.error) return setError(r.error === "CredentialsSignin" ? "E-mail ou senha incorretos." : r.error);
+    if (r?.error) return setError(CAPTCHA_MSG[r.error] ?? (r.error === "CredentialsSignin" ? "E-mail ou senha incorretos." : r.error));
     router.push(next);
     router.refresh();
   }
@@ -48,6 +61,7 @@ function EntrarForm() {
         <Button type="submit" className="w-full" loading={isSubmitting}>
           Entrar
         </Button>
+        {RECAPTCHA_SITE_KEY && <p className="text-center text-[11px] text-[var(--muted)]">{RECAPTCHA_NOTICE}</p>}
       </form>
       <div className="mt-3 text-right">
         <Link href="/recuperar-senha" className="text-xs text-brand-600 hover:underline dark:text-brand-400">

@@ -144,6 +144,33 @@ export async function purgeMedia(asset: MediaAsset) {
   return { usages, deletedAssets: assetIds.length };
 }
 
+/**
+ * After a user removes an item (e.g. a gallery photo), deletes the stored file when nothing else uses it anymore,
+ * so a removed photo's public URL stops working. `ignorePetMediaIds`: soft-deleted rows that no longer count as usage.
+ */
+export async function releaseMediaIfUnused(url: string, ignorePetMediaIds: string[] = []) {
+  const asset = await prisma.mediaAsset.findFirst({ where: { OR: [{ url }, { thumbUrl: url }], purpose: { not: "VIDEO_COVER" } } });
+  if (!asset) return false;
+  const ignore = new Set(ignorePetMediaIds);
+  const deletedRows = await prisma.petMedia.findMany({ where: { deletedAt: { not: null }, OR: [{ url: asset.url }, ...(asset.thumbUrl ? [{ thumbUrl: asset.thumbUrl }] : [])] }, select: { id: true } });
+  for (const r of deletedRows) ignore.add(r.id);
+  const usages = (await mediaUsages(asset)).filter((u) => !(u.type === "PET_MEDIA" && ignore.has(u.id)));
+  if (usages.length) return false;
+  if (await prisma.mediaReport.count({ where: { mediaAssetId: asset.id, status: "OPEN" } })) return false; // keep evidence for the audit queue
+  await purgeMedia(asset);
+  return true;
+}
+
+/** Uploads never completed (PENDING after 24 h): delete the bytes (if any were PUT) and the row. */
+export async function cleanupPendingUploads() {
+  const stale = await prisma.mediaAsset.findMany({ where: { status: "PENDING", createdAt: { lt: new Date(Date.now() - 86_400_000) } }, select: { id: true, key: true }, take: 500 });
+  for (const a of stale) {
+    await deleteBytes(a.key).catch(() => undefined);
+    await prisma.mediaAsset.delete({ where: { id: a.id } }).catch(() => undefined);
+  }
+  return stale.length;
+}
+
 // ───────────────────────────── admin queue ─────────────────────────────
 
 const userCard = { id: true, name: true, email: true, username: true, lastIp: true, suspendedUntil: true } as const;
