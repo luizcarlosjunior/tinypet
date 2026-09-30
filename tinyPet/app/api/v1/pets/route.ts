@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma, type Prisma } from "@/db";
 import { petSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, parseQuery, requireUser, assertLimit } from "@/server";
-import { myPetsWhere, ownerPetCount, petData, petInclude, lifeStageRules, petLifeStageSync, petAgeMonths } from "@/server/pets";
+import { myPetsWhere, ownerPetCount, petData, petInclude, lifeStageRules, petLifeStageSync, petAgeMonths, ensurePublicSlug } from "@/server/pets";
 import { awardBadge } from "@/server/badges";
 import { formatAge } from "@tinypet/shared";
 
@@ -38,5 +38,9 @@ export const POST = handler(async (req) => {
   const data = await petData(body);
   const pet = await prisma.pet.create({ data: { ...(data as Prisma.PetUncheckedCreateInput), name: body.name, speciesId: data.speciesId as string, ownerId: user.id }, include: petInclude });
   if (pet.avatarUrl) await awardBadge(pet.id, "first_steps");
+  if (pet.publicProfile) {
+    await ensurePublicSlug(pet.id);
+    return ok(await prisma.pet.findUniqueOrThrow({ where: { id: pet.id }, include: petInclude }), { status: 201 });
+  }
   return ok(pet, { status: 201 });
 });

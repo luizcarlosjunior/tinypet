@@ -42,6 +42,9 @@ export type OwnerTerm = { id: string; label: string; isDefault?: boolean };
 export type Brand = { id: string; name: string; lines?: { id: string; name: string; imageUrl?: string | null; flavors?: { id: string; name: string; imageUrl: string | null }[] }[] };
 
 export type Pet = {
+  /** Owner opt-in public profile at /pet/<publicSlug>. */
+  publicProfile?: boolean;
+  publicSlug?: string | null;
   id: string;
   name: string;
   /** Never sent by the API — use speciesKeyOf(pet) (reads species.key). */

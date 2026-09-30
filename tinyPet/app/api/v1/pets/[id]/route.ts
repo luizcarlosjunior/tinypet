@@ -1,7 +1,7 @@
 import { prisma } from "@/db";
 import { updatePetSchema } from "@tinypet/shared";
 import { handler, ok, parseBody, Errors, serialize, audit, clientIp } from "@/server";
-import { petActor, petData, petWithAge, assertOwnerControlled, petRole } from "@/server/pets";
+import { petActor, petData, petWithAge, assertOwnerControlled, petRole, ensurePublicSlug } from "@/server/pets";
 import { awardBadge } from "@/server/badges";
 
 export const GET = handler<{ id: string }>(async (req, { params }) => {
@@ -38,6 +38,7 @@ export const PATCH = handler<{ id: string }>(async (req, { params }) => {
   const body = await parseBody(req, updatePetSchema);
   const data = await petData(body);
   const pet = await prisma.pet.update({ where: { id: params.id }, data });
+  await ensurePublicSlug(pet.id);
   if (pet.avatarUrl) await awardBadge(pet.id, "first_steps");
   return ok(await petWithAge(pet.id));
 });

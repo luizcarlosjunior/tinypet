@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { formatInTimeZone } from "date-fns-tz";
 import { prisma, Prisma, type PetSize } from "@/db";
@@ -10,6 +11,7 @@ import {
   WEIGHT_ALERT_PCT,
   WEIGHT_ALERT_DAYS,
   type LifeStage,
+  slugify,
 } from "@tinypet/shared";
 import { Errors } from "./errors";
 import { requireUser, requirePartner, assertPetAccess, type AuthUser, type PetAccessLevel } from "./auth";
@@ -233,6 +235,22 @@ export async function petData(body: {
     data.breedId = breedId;
   }
   return data;
+}
+
+/** Gives the pet a public slug the first time its public profile is enabled ("thor-k3x9q"); kept afterwards. */
+export async function ensurePublicSlug(petId: string) {
+  const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { name: true, publicProfile: true, publicSlug: true } });
+  if (!pet?.publicProfile || pet.publicSlug) return;
+  const base = slugify(pet.name).slice(0, 40) || "pet";
+  for (let i = 0; i < 5; i++) {
+    const slug = `${base}-${randomBytes(4).toString("base64url").replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 5) || "x"}`;
+    try {
+      await prisma.pet.update({ where: { id: petId }, data: { publicSlug: slug } });
+      return;
+    } catch (e) {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
+    }
+  }
 }
 
 export async function petWithAge(petId: string) {

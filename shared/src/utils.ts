@@ -404,3 +404,15 @@ export function preferredWeightUnit(g: number | null | undefined, fallback: Weig
   if (!g) return fallback;
   return g >= 1000 ? "kg" : "g";
 }
+
+/**
+ * Age for celebration cards: under 1 year in months ("1 mês", "5 meses", "menos de 1 mês"), then whole years
+ * ("1 ano", "3 anos"). null when unknown.
+ */
+export function celebrationAge(months: number | null | undefined): string | null {
+  if (months == null || months < 0) return null;
+  if (months < 1) return "menos de 1 mês";
+  if (months < 12) return `${months} ${months === 1 ? "mês" : "meses"}`;
+  const y = Math.floor(months / 12);
+  return `${y} ${y === 1 ? "ano" : "anos"}`;
+}

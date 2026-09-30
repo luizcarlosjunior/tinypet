@@ -89,6 +89,12 @@ O pet é o centro do app: uma ficha única que o tutor controla e que os parceir
 - O tutor digita o `@usuário` ou cola o link do perfil; o sistema extrai e **grava só o nome de usuário** (o link é montado na exibição). Links de outra rede, links curtos e links de publicação são recusados com mensagem clara.
 - Quem vê o pet (conta compartilhada, parceiro vinculado) vê as redes; só o dono edita (ou o parceiro que cadastrou um pet ainda sem tutor).
 
+**Perfil público do pet**
+
+- Opção "Permitir perfil público" na ficha (desligada por padrão). Gera um link `/pet/nome-codigo` (difícil de adivinhar, fora dos buscadores).
+- Mostra nome, foto, espécie, raça, sexo e idade, as fotos/vídeos da galeria marcados como "Público", conquistas, comandos dominados e redes sociais. Nunca mostra microchip, saúde, endereço ou dados do tutor. Desligar tira o perfil do ar na hora.
+- O "Compartilhar" (cartão comemorativo) inclui o link quando o perfil é público. Abaixo de 1 ano, o cartão mostra a idade em meses ("Feliz mesversário").
+
 **Compartilhamento do pet e transferência de posse**
 
 - O dono convida outra conta pelo `@usuario` ou e-mail; a pessoa aceita ou recusa. Convites expiram em 14 dias.

@@ -61,3 +61,17 @@ describe("microchip rules (ISO 11784/11785)", () => {
     expect(microchipParts("12345")).toBeNull();
   });
 });
+
+import { celebrationAge } from "@tinypet/shared";
+
+describe("celebrationAge (birthday card)", () => {
+  it("months under 1 year, whole years after", () => {
+    expect(celebrationAge(0)).toBe("menos de 1 mês");
+    expect(celebrationAge(1)).toBe("1 mês");
+    expect(celebrationAge(5)).toBe("5 meses");
+    expect(celebrationAge(11)).toBe("11 meses");
+    expect(celebrationAge(12)).toBe("1 ano");
+    expect(celebrationAge(42)).toBe("3 anos");
+    expect(celebrationAge(null)).toBeNull();
+  });
+});

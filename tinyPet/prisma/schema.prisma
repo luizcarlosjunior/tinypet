@@ -520,6 +520,9 @@ enum PetStatus {
 model Pet {
   id                 String    @id @default(cuid())
   name               String
+  /// Public profile at /pet/<publicSlug> (opt-in by the owner). Slug = name + random suffix, kept once created.
+  publicProfile      Boolean   @default(false) @map("public_profile")
+  publicSlug         String?   @unique @map("public_slug") @db.VarChar(80)
   speciesId          String    @map("species_id")
   breedId            String?   @map("breed_id")
   breedOther         String?   @map("breed_other")

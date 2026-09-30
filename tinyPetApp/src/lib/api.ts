@@ -8,7 +8,8 @@ function resolveBaseUrl(): string {
   }
   return (env || "http://localhost:3033").replace(/\/$/, "");
 }
-const BASE_URL = resolveBaseUrl();
+/** Site origin (also used for public web links such as /pet/<slug>). */
+export const BASE_URL = resolveBaseUrl();
 export const API_BASE = `${BASE_URL}/api/v1`;
 /** Origin of the API/web app (e.g. `https://tinypet.com.br`), used for public web links. */
 export const API_ORIGIN = BASE_URL;

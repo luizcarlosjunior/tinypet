@@ -5,6 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { petSchema, type PetInput } from "@tinypet/shared";
 import { useSpecies } from "@/hooks/use-ref";
 import { Button, Input, Select, Textarea } from "@/components/ui";
+import { Globe } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { AvatarUpload } from "@/components/media/avatar-upload";
 import type { Pet } from "@/hooks/use-pets";
 import { MicrochipField, MicrochipLookupLinks } from "./microchip";
@@ -27,6 +29,7 @@ function toInput(pet?: Pet | null): Partial<PetInput> {
     approxAgeMonths: pet.approxAgeMonths ?? null,
     neutered: pet.neutered ?? null,
     microchip: pet.microchip ?? null,
+    publicProfile: pet.publicProfile ?? false,
     avatarUrl: pet.avatarUrl ?? null,
     temperament: pet.temperament ?? null,
     specialCare: pet.specialCare ?? null,
@@ -124,6 +127,7 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel, readOnl
         </Select>
         <MicrochipField showLookups={!readOnly} value={watch("microchip")} onChange={(v) => setValue("microchip", v, { shouldValidate: true, shouldDirty: true })} error={errors.microchip?.message} />
       </div>
+      <PublicProfileField enabled={!!watch("publicProfile")} onChange={(v) => setValue("publicProfile", v, { shouldDirty: true })} slug={pet?.publicSlug ?? null} savedEnabled={!!pet?.publicProfile} />
       <Textarea id="pet-temperament" label="Temperamento" placeholder="Ex.: dócil, tímido com estranhos" {...register("temperament", { setValueAs: empty })} />
       <Textarea id="pet-care" label="Cuidados especiais" placeholder="Alergias, medicamentos, restrições" {...register("specialCare", { setValueAs: empty })} />
       <Textarea id="pet-feeding" label="Observações de alimentação" {...register("feedingNotes", { setValueAs: empty })} />
@@ -141,5 +145,47 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel, readOnl
         </Button>
       </div>}
     </form>
+  );
+}
+
+/** "Perfil público" switch + the public link (after saving) with copy. */
+function PublicProfileField({ enabled, onChange, slug, savedEnabled }: { enabled: boolean; onChange: (v: boolean) => void; slug: string | null; savedEnabled: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const url = slug && typeof window !== "undefined" ? `${window.location.origin}/pet/${slug}` : null;
+  return (
+    <div className="rounded-xl border p-3">
+      <label className="flex items-center gap-3 text-sm font-medium" htmlFor="pet-public-toggle">
+        <button id="pet-public-toggle" type="button" role="switch" aria-checked={enabled} onClick={() => onChange(!enabled)} className={cn("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition", enabled ? "bg-brand-500" : "bg-ink-300 dark:bg-ink-700")}>
+          <span className={cn("inline-block h-5 w-5 rounded-full bg-white shadow transition", enabled ? "translate-x-5" : "translate-x-0.5")} />
+        </button>
+        <span className="inline-flex items-center gap-1">
+          <Globe className="h-4 w-4 text-[var(--muted)]" aria-hidden /> Permitir perfil público
+        </span>
+      </label>
+      <p className="mt-1 text-xs text-[var(--muted)]">Qualquer pessoa com o link vê nome, foto, espécie, raça, idade, as fotos marcadas como “Público” na galeria, conquistas, comandos e redes sociais. Microchip, saúde e seus dados nunca aparecem.</p>
+      {enabled && savedEnabled && url && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="break-all font-mono underline">
+            {url}
+          </a>
+          <button
+            type="button"
+            className="btn-secondary h-8 px-2 text-xs"
+            onClick={() =>
+              navigator.clipboard
+                .writeText(url)
+                .then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                })
+                .catch(() => undefined)
+            }
+          >
+            {copied ? "Copiado" : "Copiar link"}
+          </button>
+        </div>
+      )}
+      {enabled && !savedEnabled && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">Salve a ficha para gerar o link público.</p>}
+    </div>
   );
 }

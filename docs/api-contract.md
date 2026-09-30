@@ -89,6 +89,7 @@ Cover of another owner → 403; unknown cover → 404; `/media/:id/cover` on a n
 - `GET /public/items/:id` → item + partner summary + reviews
 - `GET /public/partners/:slug/slots?itemId&date&membershipId?` → `Slot[]` (delegates to scheduling)
 - `GET /public/courses` · `GET /public/courses/:id`
+- `GET /public/pets/:slug` → public pet profile, only when the owner enabled `Pet.publicProfile` (404 otherwise, immediately): `{ name, avatarUrl, sex, status, deceasedAt, species, breed, ageLabel, media[] (visibility PUBLIC, not stories), badges[], skills[] (mastered), socialProfiles[] }` — never microchip, health, addresses or owner data. Page: `/pet/<slug>` (SSR, no cache, `noindex`). `publicSlug` = slugified name + random suffix, generated on first enable (PATCH/POST `/pets` with `publicProfile: true`) and kept.
 
 ## Catalog
 - `GET /catalog` (partner ctx; `?status&type&q`) · `POST /catalog` (catalogItemSchema; assertLimit catalog_items) · `GET|PATCH|DELETE /catalog/:id`

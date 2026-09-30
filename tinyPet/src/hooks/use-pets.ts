@@ -6,6 +6,9 @@ import type { PetInput } from "@tinypet/shared";
 export type Pet = {
   id: string;
   name: string;
+  /** Owner opt-in public profile at /pet/<publicSlug>. */
+  publicProfile?: boolean;
+  publicSlug?: string | null;
   speciesId: string;
   species?: { id: string; key: string; label: string } | null;
   speciesKey?: string;

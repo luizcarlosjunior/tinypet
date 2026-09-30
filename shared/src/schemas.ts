@@ -216,6 +216,8 @@ export const petSchema = z.object({
       .nullable(),
   ).optional(),
   avatarUrl: httpUrl.optional().nullable(),
+  /** Owner opt-in: public page /pet/<slug> (basic info, PUBLIC gallery items, badges/skills, social profiles). */
+  publicProfile: z.boolean().optional(),
   temperament: z.string().max(2000).optional().nullable(),
   specialCare: z.string().max(5000).optional().nullable(),
   feedingNotes: z.string().max(5000).optional().nullable(),

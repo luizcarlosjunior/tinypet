@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, Switch, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { petSchema, type PetInput } from "@tinypet/shared";
 import { useSpecies } from "@/hooks/use-ref";
 import { pickAndUpload } from "@/lib/upload";
-import { errorMessage } from "@/lib/api";
+import { BASE_URL, errorMessage } from "@/lib/api";
 import { spacing, useTheme } from "@/lib/theme";
 import type { Pet } from "@/lib/types";
 import { MicrochipField } from "./Microchip";
@@ -37,6 +38,7 @@ export function PetForm({ initial, onSubmit, submitLabel = "Salvar" }: Props) {
       approxAgeMonths: initial?.approxAgeMonths ?? null,
       neutered: initial?.neutered ?? null,
       microchip: initial?.microchip ?? null,
+      publicProfile: initial?.publicProfile ?? false,
       avatarUrl: initial?.avatarUrl ?? null,
       temperament: initial?.temperament ?? null,
       specialCare: initial?.specialCare ?? null,
@@ -129,6 +131,33 @@ export function PetForm({ initial, onSubmit, submitLabel = "Salvar" }: Props) {
       <Controller control={control} name="neutered" render={({ field }) => <Segmented items={[{ key: "yes", label: "Sim" }, { key: "no", label: "Não" }, { key: "na", label: "Não sei" }]} value={field.value === true ? "yes" : field.value === false ? "no" : "na"} onChange={(k) => field.onChange(k === "yes" ? true : k === "no" ? false : null)} />} />
       <View style={{ height: spacing.md }} />
       <Controller control={control} name="microchip" render={({ field, fieldState }) => <MicrochipField value={field.value} onChange={field.onChange} error={fieldState.error?.message} />} />
+      <Controller
+        control={control}
+        name="publicProfile"
+        render={({ field }) => (
+          <View style={{ borderWidth: 1, borderColor: t.border, borderRadius: 12, padding: spacing.md, marginBottom: spacing.md }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontWeight: "600", flex: 1 }}>Permitir perfil público</Text>
+              <Switch accessibilityLabel="Permitir perfil público" value={!!field.value} onValueChange={field.onChange} trackColor={{ true: t.primary, false: t.border }} />
+            </View>
+            <Text variant="small" tone="muted" style={{ marginTop: 4 }}>
+              Quem tiver o link vê nome, foto, espécie, raça, idade, fotos “Público” da galeria, conquistas, comandos e redes sociais. Microchip, saúde e seus dados nunca aparecem.
+            </Text>
+            {field.value && initial?.publicProfile && initial.publicSlug ? (
+              <Pressable onPress={() => void Clipboard.setStringAsync(`${BASE_URL}/pet/${initial.publicSlug}`).then(() => Alert.alert("Link copiado", `${BASE_URL}/pet/${initial.publicSlug}`))} accessibilityRole="button" style={{ marginTop: spacing.sm, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="link-outline" size={16} color={t.primary} />
+                <Text variant="small" tone="primary">
+                  Copiar link do perfil público
+                </Text>
+              </Pressable>
+            ) : field.value ? (
+              <Text variant="small" tone="muted" style={{ marginTop: spacing.sm }}>
+                Salve para gerar o link público.
+              </Text>
+            ) : null}
+          </View>
+        )}
+      />
       <Controller control={control} name="temperament" render={({ field }) => <Input label="Temperamento" multiline value={field.value ?? ""} onChangeText={field.onChange} />} />
       <Controller control={control} name="specialCare" render={({ field }) => <Input label="Cuidados especiais" multiline value={field.value ?? ""} onChangeText={field.onChange} />} />
       <Controller control={control} name="feedingNotes" render={({ field }) => <Input label="Observações de alimentação" multiline value={field.value ?? ""} onChangeText={field.onChange} />} />
