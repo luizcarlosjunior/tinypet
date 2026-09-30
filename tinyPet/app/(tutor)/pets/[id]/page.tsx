@@ -2,7 +2,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { AtSign, ChevronLeft, FileText, GraduationCap, HeartPulse, History, Images, ListChecks, Trophy, Users, Utensils } from "lucide-react";
+import { ScrollTabs } from "@/components/ui/scroll-tabs";
 import { canEditPet, usePet } from "@/hooks/use-pets";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, Empty, Spinner } from "@/components/ui";
@@ -19,21 +20,20 @@ import { PetBadges } from "@/components/pets/pet-badges";
 import { BirthdayCard } from "@/components/pets/birthday-card";
 import { errorMessage } from "@/lib/errors";
 import { ageInMonths, formatAge, LIFE_STAGE_LABEL, lifeStageFor } from "@tinypet/shared";
-import { cn } from "@/lib/utils";
 
 const TABS = [
-  ["ficha", "Ficha"],
-  ["galeria", "Galeria"],
-  ["historico", "Histórico"],
-  ["saude", "Saúde"],
-  ["comandos", "Comandos"],
-  ["rotina", "Rotina"],
-  ["alimentacao", "Alimentação"],
-  ["redes", "Redes sociais"],
-  ["compartilhamento", "Compartilhamento"],
-  ["conquistas", "Conquistas"],
+  { key: "ficha", label: "Ficha", icon: FileText },
+  { key: "galeria", label: "Galeria", icon: Images },
+  { key: "historico", label: "Histórico", icon: History },
+  { key: "saude", label: "Saúde", icon: HeartPulse },
+  { key: "comandos", label: "Comandos", icon: GraduationCap },
+  { key: "rotina", label: "Rotina", icon: ListChecks },
+  { key: "alimentacao", label: "Alimentação", icon: Utensils },
+  { key: "redes", label: "Redes sociais", icon: AtSign },
+  { key: "compartilhamento", label: "Compartilhamento", icon: Users },
+  { key: "conquistas", label: "Conquistas", icon: Trophy },
 ] as const;
-type Tab = (typeof TABS)[number][0];
+type Tab = (typeof TABS)[number]["key"];
 
 export default function PetPage({ params }: { params: { id: string } }) {
   return (
@@ -47,7 +47,7 @@ function PetDetail({ id }: { id: string }) {
   const sp = useSearchParams();
   const router = useRouter();
   const rawTab = sp.get("tab") === "familia" ? "compartilhamento" : sp.get("tab"); // old links
-  const tab = (TABS.some((t) => t[0] === rawTab) ? rawTab : "ficha") as Tab;
+  const tab = (TABS.some((t) => t.key === rawTab) ? rawTab : "ficha") as Tab;
   const pet = usePet(id);
   if (pet.isLoading) return <Spinner />;
   if (pet.isError || !pet.data) return <Empty title="Pet não encontrado" description={errorMessage(pet.error)} action={<Link href="/pets" className="btn-secondary">Voltar</Link>} />;
@@ -80,18 +80,8 @@ function PetDetail({ id }: { id: string }) {
         {!deceased && <BirthdayCard pet={p} />}
       </header>
       <MemorialBanner pet={p} />
-      <nav className="-mx-4 overflow-x-auto px-4" aria-label="Seções do pet">
-        <ul className="flex gap-1 border-b" role="tablist">
-          {TABS.map(([key, label]) => (
-            <li key={key} role="presentation">
-              <button type="button" role="tab" aria-selected={tab === key} onClick={() => router.replace(`/pets/${id}?tab=${key}`, { scroll: false })} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium", tab === key ? "border-brand-500 text-brand-600 dark:text-brand-400" : "border-transparent text-[var(--muted)] hover:text-[var(--fg)]")}>
-                {label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <section role="tabpanel" aria-label={TABS.find((t) => t[0] === tab)?.[1]}>
+      <ScrollTabs items={TABS} value={tab} onChange={(key) => router.replace(`/pets/${id}?tab=${key}`, { scroll: false })} label="Seções do pet" />
+      <section role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === "ficha" && <PetFicha pet={p} />}
         {tab === "galeria" && <PetGallery petId={p.id} deceased={deceased} readOnly={readOnly} />}
         {tab === "historico" && <PetHistory petId={p.id} deceased={deceased} readOnly={readOnly} />}
