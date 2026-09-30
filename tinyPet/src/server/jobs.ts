@@ -5,7 +5,7 @@ import { Errors } from "./errors";
 import { handler, ok } from "./api";
 import { notify, notifyPartner } from "./notify";
 import { awardBadge } from "./badges";
-import { allDueDone, dateOnly, shiftDays, todaySP, weightAlertSetting, weightAlerts, ymd } from "./pets";
+import { allDueDone, allDueResolved, dateOnly, shiftDays, todaySP, weightAlertSetting, weightAlerts, ymd } from "./pets";
 
 const WEAK_CRON_SECRETS = new Set(["change-me-cron", "dev-cron-secret"]);
 
@@ -79,14 +79,14 @@ export async function jobWeightAlerts() {
   return { checked: pets.length, notified };
 }
 
-/** Resets streaks of pets that missed a due task yesterday; awards "vaccines_up_to_date". */
+/** Resets streaks of pets that missed a due task yesterday (a task skipped with a reason doesn't count as missed); awards "vaccines_up_to_date". */
 export async function jobStreaks() {
   const today = todaySP();
   const yesterday = shiftDays(today, -1);
   const streaking = await prisma.pet.findMany({ where: { deletedAt: null, status: "ACTIVE", streakDays: { gt: 0 } }, select: { id: true } });
   let reset = 0;
   for (const p of streaking) {
-    if (!(await allDueDone(p.id, yesterday))) {
+    if (!(await allDueResolved(p.id, yesterday))) {
       await prisma.pet.update({ where: { id: p.id }, data: { streakDays: 0 } });
       reset++;
     }

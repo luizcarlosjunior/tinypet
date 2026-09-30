@@ -5,7 +5,7 @@ import { sessionContextKey } from "./use-session-context";
 import type { Appointment } from "./use-appointments";
 
 export type HomeData = {
-  tasksToday: { id: string; petId: string; petName?: string; pet?: { id: string; name: string; avatarUrl?: string | null } | null; title: string; time?: string | null; times?: string[]; done?: boolean; completed?: boolean; completedAt?: string | null }[];
+  tasksToday: { id: string; petId: string; petName?: string; pet?: { id: string; name: string; avatarUrl?: string | null } | null; title: string; time?: string | null; times?: string[]; done?: boolean; completed?: boolean; completedAt?: string | null; skipped?: boolean; skipNote?: string | null }[];
   upcomingAppointments: Appointment[];
   recentBadges: { id: string; petId?: string; pet?: { id: string; name: string } | null; badge?: { key: string; name: string; description?: string | null; iconUrl?: string | null } | null; name?: string; earnedAt: string }[];
   pets: { id: string; name: string; avatarUrl: string | null; status?: string; role?: "owner" | "shared" }[];

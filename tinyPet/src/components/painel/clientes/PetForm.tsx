@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { petSchema, type PetInput } from "@tinypet/shared";
@@ -42,13 +42,22 @@ export function PetForm({ initial, partnerId, onSubmit, submitting, submitLabel 
       feedingNotes: initial?.feedingNotes ?? "",
     },
   });
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = form;
+  const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = form;
   const speciesKey = watch("speciesKey");
   const breedId = watch("breedId");
   const avatarUrl = watch("avatarUrl");
   const name = watch("name");
   const sp = species.data?.find((s) => s.key === speciesKey);
   const breeds = sp?.breeds ?? [];
+
+  // Species/breed options arrive after the form mounts: a native <select> registered before its <option>s exist shows
+  // the first option while the form keeps the saved id. Re-apply the values once the options render.
+  const optionsReady = !!species.data?.length;
+  useEffect(() => {
+    if (!optionsReady) return;
+    setValue("speciesKey", getValues("speciesKey"));
+    setValue("breedId", getValues("breedId"));
+  }, [optionsReady, breeds.length, getValues, setValue]);
 
   async function onCrop(f: File, crop: { x: number; y: number; width: number; height: number }) {
     setUploading(true);

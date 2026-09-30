@@ -78,8 +78,9 @@ export function Drawer({ open, onClose, title, children, className, wide }: { op
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
   if (!open) return null;
+  // No close on outside click (only ✕ / Escape / the caller's buttons): keeps half-filled forms.
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/40">
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined} className={cn("flex h-full w-full flex-col bg-[var(--bg)] shadow-xl outline-none", wide ? "sm:max-w-2xl" : "sm:max-w-lg", className)} onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between gap-3 border-b bg-[var(--card)] px-4 py-3">
           <div className="min-w-0 flex-1 text-base font-semibold">{title}</div>
@@ -103,7 +104,7 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, description, co
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" className="w-full max-w-md rounded-2xl bg-[var(--card)] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3">
           {danger && <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden />}

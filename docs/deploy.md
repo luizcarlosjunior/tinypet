@@ -6,7 +6,7 @@ A web/API roda como processo Node (`next start`, porta 3033) numa VM própria �
 
 | Peça | Onde |
 | --- | --- |
-| Web + API (projeto `tinyPet/`) | VM, `pnpm --filter @tinypet/web start` (porta 3033, bloqueada no firewall — acesso só pelo proxy) gerenciado por systemd (ou pm2) |
+| Web + API (projeto `tinyPet/`) | VM, `yarn workspace @tinypet/web start` (porta 3033, bloqueada no firewall — acesso só pelo proxy) gerenciado por systemd (ou pm2) |
 | Proxy reverso + TLS | nginx (certbot) ou Caddy na mesma VM, portas 80/443 |
 | MySQL 8 | AWS RDS / Oracle MySQL HeatWave, ou MySQL na própria VM (não exponha a porta). Schema e seed em `tinyPet/prisma/` |
 | Mídia | AWS S3 (+ CloudFront), ver README → Mídia |
@@ -16,16 +16,16 @@ A web/API roda como processo Node (`next start`, porta 3033) numa VM própria �
 ## Build e start
 
 ```bash
-# Node 20 LTS + pnpm 10 (corepack enable)
+# Node 20 LTS + Yarn 1 (npm i -g yarn)
 # Só a web vai para o servidor; o tinyPetApp é publicado nas lojas via EAS.
-pnpm install --frozen-lockfile --filter @tinypet/web...
-pnpm db:generate
-pnpm db:push                        # ainda não há tinyPet/prisma/migrations; quando houver: pnpm --filter @tinypet/web db:migrate:deploy
-pnpm --filter @tinypet/web build
-pnpm --filter @tinypet/web start    # next start -p 3033
+yarn install --frozen-lockfile        # Yarn 1 instala o workspace inteiro (o app não roda no servidor)
+yarn db:generate
+yarn db:push                        # ainda não há tinyPet/prisma/migrations; quando houver: yarn workspace @tinypet/web db:migrate:deploy
+yarn workspace @tinypet/web build
+yarn workspace @tinypet/web start    # next start -p 3033
 ```
 
-Nunca rode `pnpm db:migrate` (`prisma migrate dev`) em produção.
+Nunca rode `yarn db:migrate` (`prisma migrate dev`) em produção.
 
 O `.env` fica em `tinyPet/.env` (ver `tinyPet/.env.example`) — lido pelo Next.js e pelo Prisma CLI. Em produção são obrigatórios `NODE_ENV=production`, `JWT_SECRET`/`NEXTAUTH_SECRET` fortes, `NEXTAUTH_URL`/`NEXT_PUBLIC_APP_URL` com o domínio HTTPS, `S3_BUCKET`, `CRON_SECRET` e `TRUST_PROXY=1`. Seed em produção: ver README → Rodando local.
 
@@ -38,11 +38,11 @@ After=network.target
 
 [Service]
 User=tinypet
-# raiz do repositório (pnpm workspace); o .env fica em tinyPet/
+# raiz do repositório (workspace Yarn); o .env fica em tinyPet/
 WorkingDirectory=/srv/tinypet
 EnvironmentFile=/srv/tinypet/tinyPet/.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/env pnpm --filter @tinypet/web start
+ExecStart=/usr/bin/env yarn workspace @tinypet/web start
 Restart=always
 
 [Install]
@@ -51,7 +51,7 @@ WantedBy=multi-user.target
 
 ## Proxy reverso
 
-- Defina `TRUST_PROXY=1`. A API usa o **primeiro** IP de `X-Forwarded-For` (rate limit por IP, auditoria), então o proxy precisa **sobrescrever** o header com o IP real do cliente — nunca repassar o valor recebido. Sem `TRUST_PROXY`, o limite por IP vira um limite global por chave.
+- Defina `TRUST_PROXY=1` — obrigatório também para o **bloqueio de IP** da auditoria de mídia (sem ele o IP é desconhecido e não é gravado nem bloqueado). A API usa o **primeiro** IP de `X-Forwarded-For` (rate limit por IP, auditoria), então o proxy precisa **sobrescrever** o header com o IP real do cliente — nunca repassar o valor recebido. Sem `TRUST_PROXY`, o limite por IP vira um limite global por chave.
 - Upload de mídia vai direto ao S3; pela API só passam multipart do blog (≤ 10 MB) e importação de clientes (CSV). `client_max_body_size 12m` basta.
 
 ```nginx

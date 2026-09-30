@@ -34,6 +34,7 @@ export class ApiError extends Error {
 let _token: string | null = null;
 let _partnerId: string | null = null;
 let _onUnauthorized: (() => void) | null = null;
+let _onSuspended: ((message: string) => void) | null = null;
 
 export function setApiContext(ctx: { token?: string | null; partnerId?: string | null }) {
   if (ctx.token !== undefined) _token = ctx.token;
@@ -44,6 +45,10 @@ export function getApiContext() {
 }
 export function onUnauthorized(cb: (() => void) | null) {
   _onUnauthorized = cb;
+}
+/** Called once per request when the account was suspended by an admin (403 ACCOUNT_SUSPENDED). */
+export function onSuspended(cb: ((message: string) => void) | null) {
+  _onSuspended = cb;
 }
 
 export type ApiInit = Omit<RequestInit, "body"> & {
@@ -81,6 +86,7 @@ async function request<T>(path: string, init?: ApiInit): Promise<{ data: T; meta
   }
   if (!body.ok) {
     if (res.status === 401 && _token && _onUnauthorized) _onUnauthorized();
+    if (body.error.code === "ACCOUNT_SUSPENDED" && _token && _onSuspended) _onSuspended(body.error.message);
     throw new ApiError(res.status, body.error.code, body.error.message, body.error.details);
   }
   return { data: body.data, meta: body.meta, status: res.status };

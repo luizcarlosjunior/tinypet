@@ -6,6 +6,7 @@ import { CrudPage } from "@/components/admin/CrudPage";
 import { NestedCrud } from "@/components/admin/NestedCrud";
 import { useAdminMutations } from "@/hooks/use-admin";
 import type { FieldDef, Row } from "@/components/admin/AdminTable";
+import { safeHref } from "@tinypet/shared";
 
 type Brand = Row & { name: string; status?: "PENDING" | "APPROVED" | "REJECTED"; lines?: Row[] };
 const STATUS_OPTS = [
@@ -17,7 +18,19 @@ const fields: FieldDef[] = [
   { key: "name", label: "Marca", required: true },
   { key: "status", label: "Status", type: "select", options: STATUS_OPTS, emptyAs: "omit" },
 ];
-const lineFields: FieldDef[] = [{ key: "name", label: "Linha", required: true }];
+const lineFields: FieldDef[] = [
+  { key: "name", label: "Linha", required: true },
+  { key: "imageUrl", label: "Imagem da embalagem", type: "image", uploadPurpose: "PRODUCT_IMAGE" },
+];
+const flavorFields: FieldDef[] = [
+  { key: "name", label: "Sabor", required: true, placeholder: "Ex.: Frango e arroz" },
+  { key: "imageUrl", label: "Imagem da embalagem", type: "image", uploadPurpose: "PRODUCT_IMAGE" },
+];
+
+function Thumb({ url }: { url?: unknown }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return typeof url === "string" && url ? <img src={safeHref(url)} alt="" className="h-10 w-10 rounded-lg border bg-white object-contain" /> : <span className="text-xs text-[var(--muted)]">—</span>;
+}
 
 function StatusBadge({ s }: { s?: string }) {
   if (s === "PENDING") return <Badge tone="amber">Pendente</Badge>;
@@ -34,7 +47,7 @@ export default function MarcasPage() {
     <CrudPage<Brand>
       resource="brands"
       title="Marcas e linhas"
-      description="Marcas de produtos (ração, acessórios). Sugestões de tutores entram como pendentes até a aprovação."
+      description="Marcas de produtos (ração, acessórios), com linhas e sabores. A imagem da embalagem aparece para o tutor ao escolher o alimento. Sugestões de tutores entram como pendentes até a aprovação."
       fields={fields}
       params={tab === "pending" ? { status: "PENDING" } : undefined}
       header={
@@ -74,9 +87,24 @@ export default function MarcasPage() {
           title={`Nova linha de ${r.name}`}
           fields={lineFields}
           columns={[
+            { key: "imageUrl", label: "Imagem", render: (l) => <Thumb url={l.imageUrl} /> },
             { key: "name", label: "Linha" },
             { key: "status", label: "Status", render: (l) => <StatusBadge s={l.status as string} /> },
           ]}
+          expand={(l) => (
+            <NestedCrud
+              resource="product-flavors"
+              parentResource="product-lines"
+              parentKey="lineId"
+              parentId={l.id}
+              title={`Novo sabor de ${String(l.name)}`}
+              fields={flavorFields}
+              columns={[
+                { key: "imageUrl", label: "Imagem", render: (f) => <Thumb url={f.imageUrl} /> },
+                { key: "name", label: "Sabor" },
+              ]}
+            />
+          )}
         />
       )}
     />

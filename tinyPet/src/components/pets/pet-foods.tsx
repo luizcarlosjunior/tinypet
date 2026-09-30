@@ -1,21 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { Pencil, Plus, ShoppingBag, Trash2, Utensils } from "lucide-react";
-import { petFoodSchema, formatBRL } from "@tinypet/shared";
+import { petFoodSchema, formatBRL, safeHref } from "@tinypet/shared";
 import { usePetMutation, usePetResource } from "@/hooks/use-pets";
 import { useBrands } from "@/hooks/use-ref";
 import { api } from "@/lib/api-client";
 import { Button, Empty, Input, Modal, Select, Spinner } from "@/components/ui";
+import { WeightInput } from "@/components/ui/weight-input";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/errors";
 import { fmtKm, fmtDay } from "@/lib/format";
 
 type FoodInput = z.infer<typeof petFoodSchema>;
-type Food = { id: string; type: FoodInput["type"]; brandId: string | null; productLineId: string | null; brandOther: string | null; packageSizeG: number | null; dailyGrams: number | null; lastPurchaseAt: string | null; offersEnabled: boolean; brand?: { name: string } | null; productLine?: { name: string } | null };
+type Food = { id: string; type: FoodInput["type"]; brandId: string | null; productLineId: string | null; flavorId?: string | null; brandOther: string | null; packageSizeG: number | null; dailyGrams: number | null; lastPurchaseAt: string | null; offersEnabled: boolean; brand?: { name: string } | null; productLine?: { name: string; imageUrl?: string | null } | null; flavor?: { name: string; imageUrl?: string | null } | null };
+
+const foodImage = (f: Pick<Food, "productLine" | "flavor">) => f.flavor?.imageUrl ?? f.productLine?.imageUrl ?? null;
+const fmtGrams = (g: number) => (g >= 1000 ? `${String(g / 1000).replace(".", ",")} kg` : `${g} g`);
 type SuggestionItem = { id: string; name: string; price: string | number | null; promoPrice: string | number | null; promoUntil: string | null; brand?: { id: string; name: string } | null; productLine?: { id: string; name: string } | null };
 /** GET /pets/:id/foods/suggestions → { origin, partners[] } (partners sorted by distance from the owner's primary address). */
 type Suggestion = { partner: { id: string; slug: string; tradeName: string; logoUrl: string | null; city: string | null; state: string | null }; distanceKm: number | null; items: SuggestionItem[]; offers: SuggestionItem[] };
@@ -45,15 +49,33 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
   const [suggestBrand, setSuggestBrand] = useState("");
   const form = useForm<FoodInput>({ resolver: zodResolver(petFoodSchema), defaultValues: { type: "DRY", offersEnabled: true } });
   const brandId = form.watch("brandId");
+  const lineId = form.watch("productLineId");
+  const flavorId = form.watch("flavorId");
   const lines = brands.data?.find((b) => b.id === brandId)?.lines ?? [];
+  const line = lines.find((l) => l.id === lineId);
+  const flavors = line?.flavors ?? [];
+  const preview = flavors.find((f) => f.id === flavorId)?.imageUrl ?? line?.imageUrl ?? null;
+  const packageSizeG = form.watch("packageSizeG");
+  const dailyGrams = form.watch("dailyGrams");
+  // WeightInput reports undefined while the typed value is invalid: block saving until fixed
+  const [weightsInvalid, setWeightsInvalid] = useState({ pack: false, daily: false });
+  // Brand/line/flavor options arrive after the modal opens: re-apply the values so native selects show them.
+  useEffect(() => {
+    if (!brands.data?.length) return;
+    form.setValue("brandId", form.getValues("brandId") ?? null);
+    form.setValue("productLineId", form.getValues("productLineId") ?? null);
+    form.setValue("flavorId", form.getValues("flavorId") ?? null);
+  }, [brands.data, lines.length, flavors.length, form]);
   const empty = (v: unknown) => (v === "" ? null : v);
 
   function openNew() {
-    form.reset({ type: "DRY", brandId: null, productLineId: null, brandOther: null, packageSizeG: null, dailyGrams: null, lastPurchaseAt: null, offersEnabled: true });
+    form.reset({ type: "DRY", brandId: null, productLineId: null, flavorId: null, brandOther: null, packageSizeG: null, dailyGrams: null, lastPurchaseAt: null, offersEnabled: true });
+    setWeightsInvalid({ pack: false, daily: false });
     setEditing("new");
   }
   function openEdit(f: Food) {
-    form.reset({ type: f.type, brandId: f.brandId, productLineId: f.productLineId, brandOther: f.brandOther, packageSizeG: f.packageSizeG, dailyGrams: f.dailyGrams, lastPurchaseAt: f.lastPurchaseAt?.slice(0, 10) ?? null, offersEnabled: f.offersEnabled });
+    form.reset({ type: f.type, brandId: f.brandId, productLineId: f.productLineId, flavorId: f.flavorId ?? null, brandOther: f.brandOther, packageSizeG: f.packageSizeG, dailyGrams: f.dailyGrams, lastPurchaseAt: f.lastPurchaseAt?.slice(0, 10) ?? null, offersEnabled: f.offersEnabled });
+    setWeightsInvalid({ pack: false, daily: false });
     setEditing(f);
   }
   async function submit(v: FoodInput) {
@@ -99,11 +121,23 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
             const left = daysLeft(f);
             return (
               <li key={f.id} className="card">
-                <p className="text-xs text-[var(--muted)]">{TYPE_LABEL[f.type]}</p>
-                <p className="font-medium">{f.brand?.name ?? f.brandOther ?? "Marca não informada"}{f.productLine?.name ? ` · ${f.productLine.name}` : ""}</p>
+                <div className="flex gap-3">
+                  {foodImage(f) && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={safeHref(foodImage(f)!)} alt="" className="h-16 w-16 shrink-0 rounded-lg bg-white object-contain" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs text-[var(--muted)]">{TYPE_LABEL[f.type]}</p>
+                    <p className="font-medium">
+                      {f.brand?.name ?? f.brandOther ?? "Marca não informada"}
+                      {f.productLine?.name ? ` · ${f.productLine.name}` : ""}
+                    </p>
+                    {f.flavor?.name && <p className="text-sm">{f.flavor.name}</p>}
+                  </div>
+                </div>
                 <p className="mt-1 text-xs text-[var(--muted)]">
-                  {f.packageSizeG ? `Embalagem ${f.packageSizeG >= 1000 ? `${f.packageSizeG / 1000} kg` : `${f.packageSizeG} g`}` : ""}
-                  {f.dailyGrams ? ` · ${f.dailyGrams} g/dia` : ""}
+                  {f.packageSizeG ? `Embalagem ${fmtGrams(f.packageSizeG)}` : ""}
+                  {f.dailyGrams ? ` · ${fmtGrams(f.dailyGrams)}/dia` : ""}
                   {f.lastPurchaseAt ? ` · comprada em ${fmtDay(f.lastPurchaseAt)}` : ""}
                 </p>
                 {left != null && <p className={`mt-1 text-xs ${left <= 5 ? "font-semibold text-amber-700 dark:text-amber-300" : "text-[var(--muted)]"}`}>{left > 0 ? `Acaba em cerca de ${left} ${left === 1 ? "dia" : "dias"}` : "Provavelmente acabou — hora de repor!"}</p>}
@@ -170,7 +204,7 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
               </option>
             ))}
           </Select>
-          <Select id="f-brand" label="Marca" {...form.register("brandId", { setValueAs: empty })}>
+          <Select id="f-brand" label="Marca" {...form.register("brandId", { setValueAs: empty, onChange: () => { form.setValue("productLineId", null); form.setValue("flavorId", null); } })}>
             <option value="">Outra / não listada</option>
             {(brands.data ?? []).map((b) => (
               <option key={b.id} value={b.id}>
@@ -179,7 +213,7 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
             ))}
           </Select>
           {brandId ? (
-            <Select id="f-line" label="Linha / produto" {...form.register("productLineId", { setValueAs: empty })}>
+            <Select id="f-line" label="Linha / produto" {...form.register("productLineId", { setValueAs: empty, onChange: () => form.setValue("flavorId", null) })}>
               <option value="">—</option>
               {lines.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -190,8 +224,24 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
           ) : (
             <Input id="f-brand-other" label="Qual marca?" {...form.register("brandOther", { setValueAs: empty })} />
           )}
-          <Input id="f-pack" type="number" min={0} label="Embalagem (g)" {...form.register("packageSizeG", { setValueAs: (v) => (v === "" ? null : Number(v)) })} />
-          <Input id="f-daily" type="number" min={0} label="Quantidade diária (g)" {...form.register("dailyGrams", { setValueAs: (v) => (v === "" ? null : Number(v)) })} />
+          {brandId && lineId && flavors.length > 0 && (
+            <Select id="f-flavor" label="Sabor" {...form.register("flavorId", { setValueAs: empty })}>
+              <option value="">—</option>
+              {flavors.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </Select>
+          )}
+          {preview && (
+            <div className="flex items-center justify-center rounded-xl bg-white p-2 sm:col-span-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={safeHref(preview)} alt={`Embalagem de ${line?.name ?? "ração"}`} className="max-h-40 object-contain" />
+            </div>
+          )}
+          <WeightInput id="f-pack" label="Embalagem" defaultUnit="kg" valueG={packageSizeG ?? null} onChange={(g) => { setWeightsInvalid((s) => ({ ...s, pack: g === undefined })); if (g !== undefined) form.setValue("packageSizeG", g); }} />
+          <WeightInput id="f-daily" label="Quantidade diária" defaultUnit="g" valueG={dailyGrams ?? null} onChange={(g) => { setWeightsInvalid((s) => ({ ...s, daily: g === undefined })); if (g !== undefined) form.setValue("dailyGrams", g); }} />
           <Input id="f-last" type="date" label="Última compra" {...form.register("lastPurchaseAt", { setValueAs: empty })} />
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" {...form.register("offersEnabled")} className="h-4 w-4 accent-brand-500" /> Receber ofertas desta marca (requer consentimento de marketing em Conta)
@@ -208,7 +258,7 @@ export function PetFoods({ petId, deceased: isDeceased, readOnly = false }: { pe
             <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
               Cancelar
             </Button>
-            <Button type="submit" loading={create.isPending || update.isPending}>
+            <Button type="submit" loading={create.isPending || update.isPending} disabled={weightsInvalid.pack || weightsInvalid.daily}>
               Salvar
             </Button>
           </div>

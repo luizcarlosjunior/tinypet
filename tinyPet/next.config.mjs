@@ -65,6 +65,8 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Lets a second dev server (e.g. a test instance on another port) use its own build dir instead of sharing .next.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   transpilePackages: ["@tinypet/shared"],
   experimental: { serverComponentsExternalPackages: ["@prisma/client", "@node-rs/argon2", "sharp"] },

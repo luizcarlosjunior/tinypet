@@ -6,7 +6,7 @@ Spec: `docs/tinyPet — Especificação do Produto (MVP).md`. API contract: `doc
 - `tinyPet/` = **web project** (`@tinypet/web`): Next.js 14 App Router + Tailwind 3. UI **and** REST API (`app/api/v1/**`). Port 3033. Owns the **database**: `prisma/schema.prisma`, `prisma/seed.ts`, `docker-compose.yml` (MySQL, port 3307), Prisma client in `src/db` — import `{ prisma, Prisma }` from `@/db`. Env: `tinyPet/.env`.
 - `tinyPetApp/` = **app project** (`@tinypet/app`): Expo SDK 52 + Expo Router 4, iOS/Android. Talks to the API only (HTTP + JWT); never imports from `tinyPet/` or the DB. Env: `tinyPetApp/.env` (`EXPO_PUBLIC_API_URL`).
 - `shared/` (`@tinypet/shared`): Zod schemas (= API contract), constants, utils — the only code both projects share. Exception: blog schemas live in `tinyPet/src/server/blog/*`.
-- Root: pnpm workspace + turbo only (no app code, no `.env`). DB scripts from root proxy to the web: `pnpm db:up`, `pnpm db:push`, `pnpm db:seed`.
+- Root: Yarn 1 workspaces + turbo only (use `yarn`, never npm/pnpm) (no app code, no `.env`). DB scripts from root proxy to the web: `yarn db:up`, `yarn db:push`, `yarn db:seed`.
 - Hosting: self-hosted Node on AWS EC2 / Oracle Cloud behind nginx/Caddy (`TRUST_PROXY=1`). **No Vercel**: jobs (`/api/v1/jobs/*`, `cronRoute`) run from the server crontab. Media on AWS S3.
 
 ## Rules
@@ -18,9 +18,11 @@ Spec: `docs/tinyPet — Especificação do Produto (MVP).md`. API contract: `doc
 - Soft delete (`deletedAt`) for Client, Pet, CatalogItem, Partner, User, PetMedia, BlogPost, BlogMedia, BlogComment. Always filter `deletedAt: null`.
 - Media: client calls `POST /api/v1/media/upload` → PUT bytes to `uploadUrl` → `POST /api/v1/media/complete`. Never accept raw files in other routes — only exceptions (multipart, allowed in `middleware.ts`): `/admin/blog/media`, `/admin/blog/media/estimate`, `/clients/import`.
 - Docs: when changing an endpoint, update `docs/api-contract.md` (or `docs/blog-contract.md`) in the same commit.
+- Moderation: users report media via `POST /media/report`; admins decide in `/admin/auditoria` (`src/server/media-audit.ts`, `sanctions.ts`). Never soft-delete audited media — `purgeMedia()` removes storage + every reference.
+- Second dev server (tests): `NEXT_DIST_DIR=.next-test npx next dev -p 3034` so it doesn't share `.next` with `yarn dev:web`.
 - Notifications: `notify()` / `notifyPartner()` from `@/server`.
 - Web client: `api()` / `apiList()` from `@/lib/api-client` (React Query hooks in `src/hooks`).
 - Demo logins (pw `tinypet123`): admin@tinypet.local, tutor@tinypet.local, parceiro@tinypet.local.
 
 ## Commands
-`pnpm dev:web` · `pnpm dev:app` · `pnpm --filter @tinypet/web typecheck` · `pnpm --filter @tinypet/web test` · `pnpm --filter @tinypet/app typecheck` · `pnpm typecheck` (all)
+`yarn dev:web` · `yarn dev:app` · `yarn workspace @tinypet/web typecheck` · `yarn workspace @tinypet/web test` · `yarn workspace @tinypet/app typecheck` · `yarn typecheck` (all)

@@ -319,19 +319,31 @@ export async function tasksForDate(petIds: string[], dateStr: string) {
   });
   return tasks
     .filter((t) => isTaskDueOn(t, dateStr))
-    .map(({ completions, ...t }) => ({
-      ...t,
-      forDate: dateStr,
-      completed: completions.length > 0,
-      completedAt: completions[0]?.completedAt ?? null,
-      completedBy: completions[0]?.user ?? null,
-    }));
+    .map(({ completions, ...t }) => {
+      const c = completions[0];
+      return {
+        ...t,
+        forDate: dateStr,
+        completed: c?.status === "DONE",
+        /** "Não deu hoje" with a reason: not done, but doesn't break the streak. */
+        skipped: c?.status === "SKIPPED",
+        skipNote: c?.status === "SKIPPED" ? c.note : null,
+        completedAt: c?.completedAt ?? null,
+        completedBy: c?.user ?? null,
+      };
+    });
 }
 
-/** True when every task due on that day for the pet is completed (or nothing was due). */
+/** True when every task due on that day for the pet is DONE (or nothing was due). Only such days add to the streak. */
 export async function allDueDone(petId: string, dateStr: string): Promise<boolean> {
   const due = await tasksForDate([petId], dateStr);
   return due.every((t) => t.completed);
+}
+
+/** True when every task due on that day is DONE or SKIPPED with a reason: the streak continues (without adding). */
+export async function allDueResolved(petId: string, dateStr: string): Promise<boolean> {
+  const due = await tasksForDate([petId], dateStr);
+  return due.every((t) => t.completed || t.skipped);
 }
 
 export async function completeTask(taskId: string, petId: string, userId: string, forDate: string) {
@@ -341,7 +353,7 @@ export async function completeTask(taskId: string, petId: string, userId: string
   const wasAllDone = await allDueDone(petId, forDate);
   const completion = await prisma.taskCompletion.upsert({
     where: { taskId_forDate: { taskId, forDate: dateOnly(forDate) } },
-    update: { userId, completedAt: new Date() },
+    update: { userId, completedAt: new Date(), status: "DONE", note: null },
     create: { taskId, userId, forDate: dateOnly(forDate) },
   });
   const rule = task.rule as TaskRule;
@@ -350,7 +362,8 @@ export async function completeTask(taskId: string, petId: string, userId: string
   let streakDays: number | null = null;
   if (forDate === todaySP() && !wasAllDone && (await allDueDone(petId, forDate))) {
     const pet = await prisma.pet.findUniqueOrThrow({ where: { id: petId }, select: { streakDays: true, status: true } });
-    const yesterdayDone = await allDueDone(petId, shiftDays(forDate, -1));
+    // a justified day (skipped with a reason) keeps the streak alive without adding to it
+    const yesterdayDone = await allDueResolved(petId, shiftDays(forDate, -1));
     streakDays = yesterdayDone && pet.streakDays > 0 ? pet.streakDays + 1 : 1;
     await prisma.pet.update({ where: { id: petId }, data: { streakDays } });
     if (streakDays >= 30) await awardBadge(petId, "iron_routine");
@@ -358,7 +371,58 @@ export async function completeTask(taskId: string, petId: string, userId: string
   return { completion, streakDays };
 }
 
+/** Marks a due task as "não feita" for `forDate` with the reason. Past/today only; a DONE day can't be skipped. */
+export async function skipTask(taskId: string, petId: string, userId: string, forDate: string, note: string) {
+  const task = await prisma.task.findFirst({ where: { id: taskId, petId } });
+  if (!task) throw Errors.notFound("Tarefa não encontrada");
+  if (task.status !== "ACTIVE") throw Errors.badRequest("A tarefa não está ativa");
+  if (forDate > todaySP()) throw Errors.badRequest("Só é possível justificar hoje ou dias anteriores");
+  const existing = await prisma.taskCompletion.findUnique({ where: { taskId_forDate: { taskId, forDate: dateOnly(forDate) } } });
+  if (existing?.status === "DONE") throw Errors.conflict("Esta tarefa já foi concluída neste dia");
+  return prisma.taskCompletion.upsert({
+    where: { taskId_forDate: { taskId, forDate: dateOnly(forDate) } },
+    update: { userId, status: "SKIPPED", note, completedAt: new Date() },
+    create: { taskId, userId, forDate: dateOnly(forDate), status: "SKIPPED", note },
+    select: { id: true, forDate: true, status: true, note: true, completedAt: true },
+  });
+}
+
+/** Undoes a "não feita" mark (the day goes back to pending). */
+export async function unskipTask(taskId: string, petId: string, forDate: string) {
+  const task = await prisma.task.findFirst({ where: { id: taskId, petId }, select: { id: true } });
+  if (!task) throw Errors.notFound("Tarefa não encontrada");
+  const r = await prisma.taskCompletion.deleteMany({ where: { taskId, forDate: dateOnly(forDate), status: "SKIPPED" } });
+  return { removed: r.count > 0 };
+}
+
 // ───────────────────────────── measurements ─────────────────────────────
+
+/** PetFood include: brand, line (with package photo) and flavor. */
+export const petFoodInclude = {
+  brand: { select: { id: true, name: true, status: true } },
+  productLine: { select: { id: true, name: true, imageUrl: true } },
+  flavor: { select: { id: true, name: true, imageUrl: true } },
+} as const;
+
+/** Validates brand → line → flavor consistency and fills parents from the child (flavor → line → brand). */
+export async function resolveFoodProduct<T extends { brandId?: string | null; productLineId?: string | null; flavorId?: string | null }>(body: T): Promise<T> {
+  const out = { ...body };
+  if (out.flavorId) {
+    const f = await prisma.productFlavor.findUnique({ where: { id: out.flavorId }, select: { lineId: true, line: { select: { brandId: true } } } });
+    if (!f || (out.productLineId && f.lineId !== out.productLineId)) throw Errors.badRequest("Sabor não pertence à linha");
+    out.productLineId = f.lineId;
+    out.brandId = out.brandId ?? f.line.brandId;
+  }
+  if (out.productLineId) {
+    const line = await prisma.productLine.findUnique({ where: { id: out.productLineId } });
+    if (!line || (out.brandId && line.brandId !== out.brandId)) throw Errors.badRequest("Linha não pertence à marca");
+    out.brandId = out.brandId ?? line.brandId;
+  }
+  return out;
+}
+
+/** Vaccination rows as returned by the API (partner + the weight taken at the dose). */
+export const vaccinationInclude = { partner: { select: { id: true, tradeName: true } }, measurement: { select: { id: true, weightG: true } } } as const;
 
 export async function partnerHasType(partnerId: string, typeKey: string) {
   const link = await prisma.partnerTypeLink.findFirst({ where: { partnerId, type: { key: typeKey } } });

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Cpu } from "lucide-react";
-import { MICROCHIP_DIGITS, MICROCHIP_LOOKUPS, isValidMicrochip, normalizeMicrochip } from "@tinypet/shared";
+import { Check, Copy, ExternalLink, Cpu, Info, TriangleAlert } from "lucide-react";
+import { MICROCHIP_DIGITS, MICROCHIP_INFO, MICROCHIP_LOOKUPS, MICROCHIP_PROBLEM_MESSAGE, isValidMicrochip, microchipParts, microchipProblem, normalizeMicrochip } from "@tinypet/shared";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,6 +14,11 @@ export function MicrochipField({ id = "pet-microchip", value, onChange, error, s
   useEffect(() => {
     if (digits.length > 0) setEnabled(true);
   }, [digits.length]);
+
+  // live feedback once the 15 digits are typed (e.g. a 900… test chip); shorter input just shows the counter
+  const problem = digits.length === MICROCHIP_DIGITS ? microchipProblem(digits) : null;
+  const liveProblem = problem ? MICROCHIP_PROBLEM_MESSAGE[problem] : null;
+  const parts = !problem ? microchipParts(digits) : null;
 
   const toggle = (on: boolean) => {
     setEnabled(on);
@@ -47,16 +52,26 @@ export function MicrochipField({ id = "pet-microchip", value, onChange, error, s
             inputMode="numeric"
             autoComplete="off"
             // no maxLength: a pasted "985 112 003 456 789" would be cut to 15 chars (12 digits); onChange keeps 15 digits
-            placeholder="Ex.: 963000012345678"
+            placeholder="Ex.: 981020000123456"
             className={cn("input font-mono tracking-wider", error && "border-red-500")}
             aria-invalid={!!error}
             aria-describedby={`${id}-hint`}
             value={digits}
             onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, MICROCHIP_DIGITS) || null)}
           />
-          <p id={`${id}-hint`} className={cn("mt-1 text-xs", error ? "text-red-600" : "text-[var(--muted)]")}>
-            {error ?? `${digits.length}/${MICROCHIP_DIGITS} dígitos`}
+          <p id={`${id}-hint`} className={cn("mt-1 text-xs", error || liveProblem ? "text-red-600" : "text-[var(--muted)]")}>
+            {error ?? liveProblem ?? `${digits.length}/${MICROCHIP_DIGITS} dígitos`}
           </p>
+          {parts && !error && (
+            <p className="mt-1 font-mono text-xs">
+              <span className="rounded bg-brand-100 px-1 text-brand-800 dark:bg-brand-900/40 dark:text-brand-200">{parts.code}</span>{" "}
+              <span className="rounded bg-ink-100 px-1 dark:bg-ink-800">{parts.serial}</span>
+              <span className="ml-2 font-sans text-[var(--muted)]">
+                {parts.label} · número de série único
+              </span>
+            </p>
+          )}
+          <MicrochipInfo className="mt-2" />
           {showLookups && isValidMicrochip(digits) && <MicrochipLookupLinks chip={digits} className="mt-3" />}
         </div>
       )}
@@ -118,5 +133,34 @@ export function MicrochipLookupLinks({ chip, className }: { chip: string; classN
         })}
       </div>
     </section>
+  );
+}
+
+/** Collapsible "Sobre o microchip" help: how the 15 digits are split and what makes a number invalid. */
+export function MicrochipInfo({ className }: { className?: string }) {
+  return (
+    <details className={cn("rounded-xl border p-3 text-xs", className)}>
+      <summary className="flex cursor-pointer items-center gap-1.5 font-medium">
+        <Info className="h-3.5 w-3.5" aria-hidden /> Sobre o número do microchip
+      </summary>
+      <div className="mt-2 space-y-2 text-[var(--muted)]">
+        <p>{MICROCHIP_INFO.intro}</p>
+        <ul className="space-y-1">
+          {MICROCHIP_INFO.parts.map((p) => (
+            <li key={p.title}>
+              <strong className="text-[var(--fg)]">{p.title}:</strong> {p.text}
+            </li>
+          ))}
+        </ul>
+        <p className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
+          <TriangleAlert className="h-3.5 w-3.5" aria-hidden /> {MICROCHIP_INFO.invalidTitle}
+        </p>
+        <ul className="list-disc space-y-0.5 pl-5">
+          {MICROCHIP_INFO.invalid.map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }

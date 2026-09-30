@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PetInput } from "@tinypet/shared";
+import type { PetInput, PetSocialNetworkKey } from "@tinypet/shared";
 import { api, qs } from "@/lib/api";
 import type { Badge, FoodSuggestion, HistoryEvent, Measurement, MeasurementsResponse, Pet, PetFood, PetMedia, PetSkill, PetTask, SkillComparison, SkillsResponse, Vaccination } from "@/lib/types";
 
@@ -70,6 +70,8 @@ export function useVaccinationMutations(id: string) {
   const inv = () => {
     qc.invalidateQueries({ queryKey: petKeys.sub(id, "vaccinations") });
     qc.invalidateQueries({ queryKey: petKeys.sub(id, "history") });
+    // the optional weight at the dose becomes a measurement
+    qc.invalidateQueries({ queryKey: petKeys.sub(id, "measurements") });
   };
   const create = useMutation({ mutationFn: (input: Record<string, unknown>) => api(`/pets/${id}/vaccinations`, { method: "POST", json: input }), onSuccess: inv });
   const remove = useMutation({ mutationFn: (vid: string) => api(`/pets/${id}/vaccinations/${vid}`, { method: "DELETE" }), onSuccess: inv });
@@ -123,7 +125,11 @@ function normalizeTasks(r: TasksResponse | PetTask[]): PetTask[] {
     ...t,
     proposedBy: t.proposedBy ?? t.proposedByPartner ?? null,
     completedToday: t.completedToday ?? !!today.get(t.id)?.completed,
-    lastCompletedAt: t.lastCompletedAt ?? t.completions?.[0]?.completedAt ?? null,
+    skippedToday: !!today.get(t.id)?.skipped,
+    skipNote: today.get(t.id)?.skipNote ?? null,
+    dueToday: today.has(t.id),
+    // completions include "não feita" days (status SKIPPED): only DONE ones count as the last completion
+    lastCompletedAt: t.lastCompletedAt ?? t.completions?.find((c) => (c.status ?? "DONE") === "DONE")?.completedAt ?? null,
     forDate: today.get(t.id)?.forDate ?? r.date,
   }));
 }
@@ -140,7 +146,10 @@ export function useTaskMutations(petId: string) {
   const complete = useMutation({ mutationFn: ({ tid, forDate }: { tid: string; forDate?: string }) => api(`/pets/${petId}/tasks/${tid}/complete`, { method: "POST", json: { forDate } }), onSuccess: inv });
   const accept = useMutation({ mutationFn: (tid: string) => api(`/pets/${petId}/tasks/${tid}/accept`, { method: "POST" }), onSuccess: inv });
   const remove = useMutation({ mutationFn: (tid: string) => api(`/pets/${petId}/tasks/${tid}`, { method: "DELETE" }), onSuccess: inv });
-  return { create, complete, accept, remove };
+  const skip = useMutation({ mutationFn: ({ tid, note, forDate }: { tid: string; note: string; forDate?: string }) => api(`/pets/${petId}/tasks/${tid}/skip`, { method: "POST", json: { note, forDate } }), onSuccess: inv });
+  const unskip = useMutation({ mutationFn: ({ tid, forDate }: { tid: string; forDate?: string }) => api(`/pets/${petId}/tasks/${tid}/skip${forDate ? `?forDate=${forDate}` : ""}`, { method: "DELETE" }), onSuccess: inv });
+  const update = useMutation({ mutationFn: ({ tid, ...input }: { tid: string } & Record<string, unknown>) => api(`/pets/${petId}/tasks/${tid}`, { method: "PATCH", json: input }), onSuccess: inv });
+  return { create, complete, accept, remove, update, skip, unskip };
 }
 
 // ── foods ──
@@ -166,6 +175,19 @@ export function useFoodMutations(id: string) {
   const create = useMutation({ mutationFn: (input: Record<string, unknown>) => api(`/pets/${id}/foods`, { method: "POST", json: input }), onSuccess: inv });
   const remove = useMutation({ mutationFn: (fid: string) => api(`/pets/${id}/foods/${fid}`, { method: "DELETE" }), onSuccess: inv });
   return { create, remove };
+}
+
+// ── social profiles (only usernames are stored) ──
+export type PetSocialProfile = { network: PetSocialNetworkKey; username: string; updatedAt: string };
+export function useSocialProfiles(id: string) {
+  return useQuery({ queryKey: petKeys.sub(id, "social"), queryFn: () => api<PetSocialProfile[]>(`/pets/${id}/social`) });
+}
+export function useSaveSocialProfiles(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (profiles: { network: PetSocialNetworkKey; username: string }[]) => api<PetSocialProfile[]>(`/pets/${id}/social`, { method: "PUT", json: { profiles } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: petKeys.sub(id, "social") }),
+  });
 }
 
 // ── badges ──

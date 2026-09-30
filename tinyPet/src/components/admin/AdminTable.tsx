@@ -4,11 +4,16 @@ import { Pencil, Trash2, Check, X } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { Table, th, td } from "@/components/painel/ui";
 import { cn } from "@/lib/utils";
+import { safeHref } from "@tinypet/shared";
+import { uploadFile } from "@/lib/upload";
+import { errorMessage } from "@/lib/errors";
 
 export type FieldDef = {
   key: string;
   label: string;
-  type?: "text" | "number" | "checkbox" | "select" | "json" | "textarea" | "url";
+  type?: "text" | "number" | "checkbox" | "select" | "json" | "textarea" | "url" | "image";
+  /** `image` fields: media purpose used for the upload (stored value = the public URL). */
+  uploadPurpose?: "PRODUCT_IMAGE";
   options?: { value: string; label: string }[];
   placeholder?: string;
   required?: boolean;
@@ -76,6 +81,7 @@ export function FieldInput({ f, defaultValue, idPrefix }: { f: FieldDef; default
       </div>
     );
   }
+  if (f.type === "image") return <ImageFieldInput id={id} name={f.key} label={f.label} defaultValue={defaultValue == null ? "" : String(defaultValue)} purpose={f.uploadPurpose ?? "PRODUCT_IMAGE"} />;
   if (f.type === "json" || f.type === "textarea") {
     const dv = f.type === "json" ? (defaultValue === undefined ? "" : JSON.stringify(defaultValue, null, 2)) : defaultValue == null ? "" : String(defaultValue);
     return (
@@ -261,5 +267,51 @@ export function CreateForm({ fields, onSubmit, submitting, title = "Novo registr
         </p>
       )}
     </form>
+  );
+}
+
+/** Uncontrolled image field for admin forms: uploads the file and keeps the URL in a hidden input read by FormData. */
+function ImageFieldInput({ id, name, label, defaultValue, purpose }: { id: string; name: string; label: string; defaultValue: string; purpose: "PRODUCT_IMAGE" }) {
+  const [url, setUrl] = useState(defaultValue);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const m = await uploadFile(file, purpose, { partnerId: null });
+      setUrl(m.url);
+    } catch (e) {
+      setErr(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div>
+      <span className="label" id={`${id}-label`}>
+        {label}
+      </span>
+      <input type="hidden" name={name} value={url} />
+      <div className="flex items-center gap-2">
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={safeHref(url)} alt="" className="h-12 w-12 rounded-lg border bg-white object-contain" />
+        ) : (
+          <span className="flex h-12 w-12 items-center justify-center rounded-lg border text-xs text-[var(--muted)]">—</span>
+        )}
+        <label htmlFor={id} className={cn("btn-secondary h-9 cursor-pointer px-3 text-xs", busy && "pointer-events-none opacity-60")} aria-labelledby={`${id}-label`}>
+          {busy ? "Enviando…" : url ? "Trocar" : "Enviar imagem"}
+        </label>
+        <input id={id} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+        {url && (
+          <button type="button" className="btn-ghost h-9 px-2 text-xs" onClick={() => setUrl("")}>
+            Remover
+          </button>
+        )}
+      </div>
+      {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+    </div>
   );
 }

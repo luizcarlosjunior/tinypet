@@ -4,6 +4,7 @@ import * as FileSystem from "expo-file-system";
 import { useMeasurementMutations, useMeasurements, useVaccinationMutations, useVaccinations } from "@/hooks/use-pets";
 import { API_BASE, errorMessage, getApiContext } from "@/lib/api";
 import { fmtDate, fmtWeight, todayISO, fmtDay } from "@/lib/format";
+import { parseKgToGrams } from "@tinypet/shared";
 import { spacing, useTheme } from "@/lib/theme";
 import type { Measurement, MeasurementsResponse } from "@/lib/types";
 import { Badge, Button, Card, ErrorState, Input, ListItem, Loading, Section, Segmented, Sheet, Text } from "@/components/ui";
@@ -22,7 +23,8 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
   const measM = useMeasurementMutations(petId);
   const [vaccOpen, setVaccOpen] = useState(false);
   const [measOpen, setMeasOpen] = useState(false);
-  const [vf, setVf] = useState({ kind: "VACCINE" as "VACCINE" | "DEWORMING", name: "", appliedAt: todayISO(), nextDueAt: "", notes: "" });
+  const [vf, setVf] = useState({ kind: "VACCINE" as "VACCINE" | "DEWORMING", name: "", appliedAt: todayISO(), nextDueAt: "", notes: "", weightKg: "" });
+  const vfWeightG = parseKgToGrams(vf.weightKg);
   const [mf, setMf] = useState({ measuredAt: todayISO(), weightG: "", heightCm: "", neckCm: "", chestCm: "", abdomenCm: "", bodyScore: "", notes: "" });
 
   const [exporting, setExporting] = useState(false);
@@ -59,9 +61,11 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
 
   const saveVacc = async () => {
     try {
-      await vaccM.create.mutateAsync({ ...vf, nextDueAt: vf.nextDueAt || null, notes: vf.notes || null });
+      if (vfWeightG === undefined) return;
+      const { weightKg: _kg, ...dose } = vf;
+      await vaccM.create.mutateAsync({ ...dose, nextDueAt: vf.nextDueAt || null, notes: vf.notes || null, weightG: vfWeightG ?? undefined });
       setVaccOpen(false);
-      setVf({ kind: "VACCINE", name: "", appliedAt: todayISO(), nextDueAt: "", notes: "" });
+      setVf({ kind: "VACCINE", name: "", appliedAt: todayISO(), nextDueAt: "", notes: "", weightKg: "" });
     } catch (e) {
       Alert.alert("Erro", errorMessage(e));
     }
@@ -135,7 +139,7 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
             <ListItem
               key={v.id}
               title={v.name}
-              subtitle={`${v.kind === "DEWORMING" ? "Vermífugo" : "Vacina"} · aplicada em ${fmtDay(v.appliedAt)}${v.nextDueAt ? ` · próxima ${fmtDay(v.nextDueAt)}` : ""}${v.partner ? ` · ${v.partner.tradeName}` : ""}`}
+              subtitle={`${v.kind === "DEWORMING" ? "Vermífugo" : "Vacina"} · aplicada em ${fmtDay(v.appliedAt)}${v.nextDueAt ? ` · próxima ${fmtDay(v.nextDueAt)}` : ""}${v.measurement ? ` · peso ${fmtWeight(v.measurement.weightG)}` : ""}${v.partner ? ` · ${v.partner.tradeName}` : ""}`}
               right={v.nextDueAt ? <Badge label={overdue ? "Atrasada" : "Em dia"} tone={overdue ? "danger" : "success"} /> : undefined}
               chevron={false}
             />
@@ -149,8 +153,9 @@ export function SaudeTab({ petId, canEdit }: { petId: string; canEdit: boolean }
         <Input label="Nome" value={vf.name} onChangeText={(v) => setVf({ ...vf, name: v })} placeholder="V10, antirrábica…" />
         <Input label="Data de aplicação" placeholder="AAAA-MM-DD" value={vf.appliedAt} onChangeText={(v) => setVf({ ...vf, appliedAt: v })} />
         <Input label="Próxima dose" placeholder="AAAA-MM-DD" value={vf.nextDueAt} onChangeText={(v) => setVf({ ...vf, nextDueAt: v })} />
+        <Input label="Peso do pet (kg) — opcional" keyboardType="decimal-pad" value={vf.weightKg} onChangeText={(v) => setVf({ ...vf, weightKg: v })} placeholder="Ex.: 8,5" error={vfWeightG === undefined ? "Informe o peso em kg (ex.: 8,5)" : undefined} hint="Entra no histórico de peso na data da aplicação." />
         <Input label="Observações" value={vf.notes} onChangeText={(v) => setVf({ ...vf, notes: v })} />
-        <Button title="Salvar" onPress={saveVacc} loading={vaccM.create.isPending} disabled={!vf.name} />
+        <Button title="Salvar" onPress={saveVacc} loading={vaccM.create.isPending} disabled={!vf.name || vfWeightG === undefined} />
       </Sheet>
       <Sheet visible={measOpen} onClose={() => setMeasOpen(false)} title="Nova medição">
         <Input label="Data" placeholder="AAAA-MM-DD" value={mf.measuredAt} onChangeText={(v) => setMf({ ...mf, measuredAt: v })} />

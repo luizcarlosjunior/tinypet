@@ -15,7 +15,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{ toast }}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-4 left-1/2 z-[60] flex -translate-x-1/2 flex-col gap-2">
         {items.map((t) => (
           <div key={t.id} role="status" className={cn("rounded-xl px-4 py-2 text-sm text-white shadow-lg", t.kind === "success" && "bg-emerald-600", t.kind === "error" && "bg-red-600", t.kind === "info" && "bg-ink-800")}>
             {t.title}

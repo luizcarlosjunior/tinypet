@@ -11,7 +11,7 @@ export type CropRect = { x: number; y: number; width: number; height: number };
  * `aspect` = width / height of the crop (1 = square, 16/9, 9/16…); `size` is the viewport's long side.
  * Emits the crop rect in SOURCE-IMAGE pixels (exactly `aspect`, rounded) via `onConfirm(file, crop)`.
  */
-export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, aspect = 1, submitting, accept = "image/jpeg,image/png,image/webp", confirmLabel = "Salvar", hint }: { file: File | null; onFile: (f: File | null) => void; onConfirm: (file: File, crop: CropRect) => void; onCancel?: () => void; size?: number; aspect?: number; submitting?: boolean; accept?: string; confirmLabel?: string; hint?: string }) {
+export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, aspect = 1, submitting, accept = "image/jpeg,image/png,image/webp", confirmLabel = "Salvar", hint, onCropChange, embedded = false }: { file: File | null; onFile: (f: File | null) => void; onConfirm?: (file: File, crop: CropRect) => void; onCancel?: () => void; size?: number; aspect?: number; submitting?: boolean; accept?: string; confirmLabel?: string; hint?: string; /** Reports the current crop (source px) on every change — for forms with their own submit button. */ onCropChange?: (crop: CropRect | null) => void; /** Hide the cropper's own buttons (the parent form submits). */ embedded?: boolean }) {
   const view = viewportSize(size, aspect);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
@@ -68,6 +68,11 @@ export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, as
 
   useEffect(() => setOffset((o) => clamp(o)), [zoom, clamp]);
 
+  useEffect(() => {
+    onCropChange?.(img ? viewportCropRect({ imgW: img.naturalWidth, imgH: img.naturalHeight, viewW: view.width, viewH: view.height, scale, offset, aspect }) : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [img, scale, offset, aspect, view.width, view.height]);
+
   function crop(): CropRect | null {
     if (!img) return null;
     return viewportCropRect({ imgW: img.naturalWidth, imgH: img.naturalHeight, viewW: view.width, viewH: view.height, scale, offset, aspect });
@@ -123,6 +128,7 @@ export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, as
             </label>
             <p className="text-xs text-[var(--muted)]">{hint ?? (aspect === 1 ? "Arraste a imagem para posicionar o recorte quadrado." : `Arraste a imagem para posicionar o recorte ${aspect > 1 ? "16:9 (horizontal)" : "9:16 (vertical)"}.`)}</p>
           </div>
+          {!embedded && (
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => onFile(null)}>
               Trocar imagem
@@ -137,12 +143,13 @@ export function ImageCropper({ file, onFile, onConfirm, onCancel, size = 280, as
               loading={submitting}
               onClick={() => {
                 const c = crop();
-                if (c && file) onConfirm(file, c);
+                if (c && file) onConfirm?.(file, c);
               }}
             >
               {confirmLabel}
             </Button>
           </div>
+          )}
         </>
       )}
     </div>

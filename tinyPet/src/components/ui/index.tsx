@@ -3,9 +3,12 @@ import { cn } from "@/lib/utils";
 import { forwardRef, useEffect, useId, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type ButtonHTMLAttributes } from "react";
 import { Loader2, X } from "lucide-react";
 
-export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger"; loading?: boolean }>(
+// Literal class names: Tailwind drops @layer components classes it can't find verbatim in the source (`btn-${v}` isn't).
+const BUTTON_CLASS = { primary: "btn-primary", secondary: "btn-secondary", ghost: "btn-ghost", danger: "btn-danger" } as const;
+
+export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof BUTTON_CLASS; loading?: boolean }>(
   ({ className, variant = "primary", loading, children, disabled, ...props }, ref) => (
-    <button ref={ref} className={cn(`btn-${variant}`, className)} disabled={disabled || loading} {...props}>
+    <button ref={ref} className={cn(BUTTON_CLASS[variant], className)} disabled={disabled || loading} {...props}>
       {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
       {children}
     </button>
@@ -106,7 +109,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
   );
 }
 
-/** Dialog: closes on overlay click, Escape and the ✕ button (all go through `onClose`, so callers can block it while busy). */
+/** Dialog: closes on Escape and the ✕ button (both go through `onClose`, so callers can block it while busy) — never on an outside click, so a half-filled form isn't lost. */
 export function Modal({ open, onClose, title, children, className }: { open: boolean; onClose: () => void; title?: string; children: React.ReactNode; className?: string }) {
   const titleId = useId();
   useEffect(() => {
@@ -119,7 +122,7 @@ export function Modal({ open, onClose, title, children, className }: { open: boo
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}>
       <div className={cn("max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-[var(--card)] p-5 sm:max-w-lg sm:rounded-2xl", className)} onClick={(e) => e.stopPropagation()}>
         <div className={cn("flex items-start justify-between gap-3", title ? "mb-4" : "-mb-2")}>
           {title ? (

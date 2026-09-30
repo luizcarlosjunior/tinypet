@@ -12,3 +12,4 @@ export * from "./Tabs";
 export * from "./Select";
 export * from "./Checkbox";
 export * from "./Section";
+export * from "./WeightInput";

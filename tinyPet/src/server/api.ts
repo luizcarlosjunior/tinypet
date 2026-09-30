@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type ZodType } from "zod";
 import { Prisma, prisma } from "@/db";
 import { ApiError } from "./errors";
+import { ipBlockedError, isIpBlocked } from "./sanctions";
 
 export type Ctx<P = Record<string, string>> = { params: P };
 
@@ -14,12 +15,18 @@ export function fail(status: number, code: string, message: string, details?: un
   return NextResponse.json({ ok: false, error: { code, message, details } }, { status });
 }
 
-/** Wraps a route handler: catches ApiError/Zod/Prisma errors and returns the shared envelope. */
+/**
+ * Wraps a route handler: refuses requests from blocked IPs (media-audit sanctions), catches ApiError/Zod/Prisma errors
+ * and returns the shared envelope.
+ */
 export function handler<P = Record<string, string>>(fn: (req: NextRequest, ctx: Ctx<P>) => Promise<Response>) {
   return async (req: NextRequest, ctx: Ctx<P>) => {
     try {
+      if (await isIpBlocked(clientIp(req))) throw ipBlockedError();
       return await fn(req, ctx);
     } catch (e) {
+      // Next's "this route is dynamic" signal (thrown when reading headers during `next build`) must propagate.
+      if (e && typeof e === "object" && (e as { digest?: unknown }).digest === "DYNAMIC_SERVER_USAGE") throw e;
       return errorResponse(e);
     }
   };

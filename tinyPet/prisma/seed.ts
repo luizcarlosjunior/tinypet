@@ -85,7 +85,7 @@ const PLANS: { key: string; name: string; audience: "OWNER" | "PARTNER"; priceMo
   },
   {
     key: "owner_free", name: "Free", audience: "OWNER", priceMonthly: 0, priceYearly: 0, isDefault: true, sortOrder: 0,
-    limits: [["owner_pets", true, 5], ["owner_gallery", false, null], ["owner_stories", false, null], ["owner_storage_mb", true, 50], ["owner_videos_per_day", true, 1], ["owner_video_max_seconds", true, 30]],
+    limits: [["owner_pets", true, 5], ["owner_gallery", true, null], ["owner_stories", false, null], ["owner_storage_mb", true, 50], ["owner_videos_per_day", true, 1], ["owner_video_max_seconds", true, 30]],
   },
   {
     key: "owner_plus", name: "Plus", audience: "OWNER", priceMonthly: null, priceYearly: null, isDefault: false, sortOrder: 1,

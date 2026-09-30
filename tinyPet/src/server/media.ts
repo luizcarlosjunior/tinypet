@@ -61,6 +61,8 @@ export const PURPOSE_RULES: Record<MediaPurpose, { kinds: ("IMAGE" | "VIDEO")[];
   RECEIPT: { kinds: ["IMAGE"], maxPx: GALLERY_MAX_PX },
   /** Poster of a video: cropped to 16:9 or 9:16, WebP, long side VIDEO_COVER_MAX_PX. */
   VIDEO_COVER: { kinds: ["IMAGE"], maxPx: VIDEO_COVER_MAX_PX },
+  /** Admin only: package photo of a food line/flavor. */
+  PRODUCT_IMAGE: { kinds: ["IMAGE"], maxPx: 1200 },
 };
 
 /** 400 with a pt-BR message and `details.reason` (machine-readable) for video/cover rule violations. */
@@ -101,6 +103,9 @@ export async function createUploadTarget(input: {
   durationSeconds?: number;
   userId?: string;
   partnerId?: string;
+  /** Client IP (only stored when attributable), for IP blocks after a media audit. */
+  uploadIp?: string | null;
+  uploadedByUserId?: string;
 }) {
   assertStorageConfigured();
   // Any video/* must already be the client-transcoded MP4 (VIDEO_OUTPUT) — checked before the generic rules.
@@ -131,6 +136,8 @@ export async function createUploadTarget(input: {
       status: "PENDING",
       userId: input.userId,
       partnerId: input.partnerId,
+      uploadIp: input.uploadIp ?? null,
+      uploadedByUserId: input.uploadedByUserId ?? input.userId ?? null,
       // Declared dimensions; for videos they must match the real file at /media/complete.
       width: input.width,
       height: input.height,

@@ -11,7 +11,8 @@ export function Sheet({ visible, onClose, title, children, scroll = true }: { vi
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Fechar" />
+        {/* Backdrop doesn't close (keeps half-filled forms): only ✕, the caller's buttons or Android back. */}
+        <View style={StyleSheet.absoluteFill} />
         <View style={[styles.sheet, { backgroundColor: t.surface, paddingBottom: insets.bottom + spacing.lg }]}>
           <View style={styles.handleRow}>
             <View style={[styles.handle, { backgroundColor: t.border }]} />

@@ -39,6 +39,10 @@ model User {
   termsAcceptedAt     DateTime?  @map("terms_accepted_at")
   twoFactorSecret     String?    @map("two_factor_secret")
   tokenVersion        Int        @default(0) @map("token_version")
+  /// Denormalized from the active ACCOUNT_SUSPENSION sanction (9999-12-31 = permanent); null = not suspended.
+  suspendedUntil      DateTime?  @map("suspended_until")
+  /// Last known client IP (login / upload), used for IP blocks. Only set when the IP is known (TRUST_PROXY).
+  lastIp              String?    @map("last_ip") @db.VarChar(64)
   locale              String     @default("pt-BR")
   timezone            String     @default("America/Sao_Paulo")
   createdAt           DateTime   @default(now()) @map("created_at")
@@ -78,6 +82,11 @@ model User {
   blogPostHearts          BlogPostHeart[]
   blogCommentHearts       BlogCommentHeart[]
   blogCommentReports      BlogCommentReport[]
+  mediaReports            MediaReport[]          @relation("MediaReporter")
+  mediaReportsResolved    MediaReport[]          @relation("MediaReportResolver")
+  sanctions               UserSanction[]         @relation("SanctionTarget")
+  sanctionsIssued         UserSanction[]         @relation("SanctionIssuer")
+  sanctionsRevoked        UserSanction[]         @relation("SanctionRevoker")
 
   @@map("users")
 }
@@ -550,6 +559,7 @@ model Pet {
   appointments       AppointmentPet[]
   contracts          ContractPet[]
   foods              PetFood[]
+  socialProfiles     PetSocialProfile[]
   measurements       BodyMeasurement[]
   skills             PetSkill[]
   vaccinations       Vaccination[]
@@ -744,23 +754,50 @@ enum FoodType {
 }
 
 model PetFood {
-  id             String       @id @default(cuid())
-  petId          String       @map("pet_id")
+  id             String         @id @default(cuid())
+  petId          String         @map("pet_id")
   type           FoodType
-  brandId        String?      @map("brand_id")
-  productLineId  String?      @map("product_line_id")
-  brandOther     String?      @map("brand_other")
-  packageSizeG   Int?         @map("package_size_g")
-  dailyGrams     Int?         @map("daily_grams")
-  lastPurchaseAt DateTime?    @map("last_purchase_at") @db.Date
-  offersEnabled  Boolean      @default(true) @map("offers_enabled")
-  pet            Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
-  brand          Brand?       @relation(fields: [brandId], references: [id])
-  productLine    ProductLine? @relation(fields: [productLineId], references: [id])
+  brandId        String?        @map("brand_id")
+  productLineId  String?        @map("product_line_id")
+  flavorId       String?        @map("flavor_id")
+  brandOther     String?        @map("brand_other")
+  packageSizeG   Int?           @map("package_size_g")
+  dailyGrams     Int?           @map("daily_grams")
+  lastPurchaseAt DateTime?      @map("last_purchase_at") @db.Date
+  offersEnabled  Boolean        @default(true) @map("offers_enabled")
+  pet            Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  brand          Brand?         @relation(fields: [brandId], references: [id])
+  productLine    ProductLine?   @relation(fields: [productLineId], references: [id])
+  flavor         ProductFlavor? @relation(fields: [flavorId], references: [id], onDelete: SetNull)
 
   @@index([petId])
   @@index([brandId])
   @@map("pet_foods")
+}
+
+enum PetSocialNetwork {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  FACEBOOK
+  X
+  THREADS
+  PINTEREST
+}
+
+/// Pet social profiles: only the username is stored (lowercase, no "@"); the link is rebuilt in the client
+/// (`petSocialProfileUrl` in @tinypet/shared).
+model PetSocialProfile {
+  id        String           @id @default(cuid())
+  petId     String           @map("pet_id")
+  network   PetSocialNetwork
+  username  String           @db.VarChar(60)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  pet       Pet              @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@unique([petId, network])
+  @@map("pet_social_profiles")
 }
 
 // ───────────────────────────── Catalog ─────────────────────────────
@@ -811,16 +848,33 @@ model Brand {
 }
 
 model ProductLine {
-  id       String         @id @default(cuid())
-  brandId  String         @map("brand_id")
+  id       String          @id @default(cuid())
+  brandId  String          @map("brand_id")
   name     String
-  status   ApprovalStatus @default(APPROVED)
-  brand    Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  status   ApprovalStatus  @default(APPROVED)
+  /// Package photo registered by the admin (shown when choosing the food); a flavor image takes precedence.
+  imageUrl String?         @map("image_url")
+  brand    Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
   items    CatalogItem[]
   petFoods PetFood[]
+  flavors  ProductFlavor[]
 
   @@unique([brandId, name])
   @@map("product_lines")
+}
+
+/// Flavor/variant of a product line (e.g. "Frango e arroz"), with an optional package photo.
+model ProductFlavor {
+  id       String         @id @default(cuid())
+  lineId   String         @map("line_id")
+  name     String
+  status   ApprovalStatus @default(APPROVED)
+  imageUrl String?        @map("image_url")
+  line     ProductLine    @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  petFoods PetFood[]
+
+  @@unique([lineId, name])
+  @@map("product_flavors")
 }
 
 enum ItemType {
@@ -1536,14 +1590,23 @@ model Task {
   @@map("tasks")
 }
 
+enum TaskCompletionStatus {
+  DONE
+  /// Not done that day, with a reason (rain, appointment…): doesn't break the streak but doesn't add to it.
+  SKIPPED
+}
+
 model TaskCompletion {
-  id          String   @id @default(cuid())
-  taskId      String   @map("task_id")
-  userId      String   @map("user_id")
-  completedAt DateTime @default(now()) @map("completed_at")
-  forDate     DateTime @map("for_date") @db.Date
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id])
+  id          String               @id @default(cuid())
+  taskId      String               @map("task_id")
+  userId      String               @map("user_id")
+  status      TaskCompletionStatus @default(DONE)
+  /// Reason when SKIPPED.
+  note        String?              @db.VarChar(500)
+  completedAt DateTime             @default(now()) @map("completed_at")
+  forDate     DateTime             @map("for_date") @db.Date
+  task        Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User                 @relation(fields: [userId], references: [id])
 
   @@unique([taskId, forDate])
   @@map("task_completions")
@@ -1555,41 +1618,45 @@ enum VaccinationKind {
 }
 
 model Vaccination {
-  id        String          @id @default(cuid())
-  petId     String          @map("pet_id")
-  kind      VaccinationKind @default(VACCINE)
-  name      String
-  appliedAt DateTime        @map("applied_at") @db.Date
-  nextDueAt DateTime?       @map("next_due_at") @db.Date
-  partnerId String?         @map("partner_id")
-  notes     String?
-  createdAt DateTime        @default(now()) @map("created_at")
-  pet       Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
-  partner   Partner?        @relation(fields: [partnerId], references: [id])
+  id            String           @id @default(cuid())
+  petId         String           @map("pet_id")
+  kind          VaccinationKind  @default(VACCINE)
+  name          String
+  appliedAt     DateTime         @map("applied_at") @db.Date
+  nextDueAt     DateTime?        @map("next_due_at") @db.Date
+  partnerId     String?          @map("partner_id")
+  notes         String?
+  /// Weight taken at the dose (optional): a regular BodyMeasurement on `appliedAt`, so it shows in the weight chart.
+  measurementId String?          @unique @map("measurement_id")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  pet           Pet              @relation(fields: [petId], references: [id], onDelete: Cascade)
+  partner       Partner?         @relation(fields: [partnerId], references: [id])
+  measurement   BodyMeasurement? @relation(fields: [measurementId], references: [id], onDelete: SetNull)
 
   @@index([petId, nextDueAt])
   @@map("vaccinations")
 }
 
 model BodyMeasurement {
-  id          String   @id @default(cuid())
-  petId       String   @map("pet_id")
-  measuredAt  DateTime @map("measured_at") @db.Date
-  weightG     Int      @map("weight_g")
-  heightCm    Decimal? @map("height_cm") @db.Decimal(6, 2)
-  lengthCm    Decimal? @map("length_cm") @db.Decimal(6, 2)
-  neckCm      Decimal? @map("neck_cm") @db.Decimal(6, 2)
-  chestCm     Decimal? @map("chest_cm") @db.Decimal(6, 2)
-  abdomenCm   Decimal? @map("abdomen_cm") @db.Decimal(6, 2)
-  bodyScore   Int?     @map("body_score") // 1-9
+  id          String       @id @default(cuid())
+  petId       String       @map("pet_id")
+  measuredAt  DateTime     @map("measured_at") @db.Date
+  weightG     Int          @map("weight_g")
+  heightCm    Decimal?     @map("height_cm") @db.Decimal(6, 2)
+  lengthCm    Decimal?     @map("length_cm") @db.Decimal(6, 2)
+  neckCm      Decimal?     @map("neck_cm") @db.Decimal(6, 2)
+  chestCm     Decimal?     @map("chest_cm") @db.Decimal(6, 2)
+  abdomenCm   Decimal?     @map("abdomen_cm") @db.Decimal(6, 2)
+  bodyScore   Int?         @map("body_score") // 1-9
   notes       String?
-  userId      String?  @map("user_id")
-  partnerId   String?  @map("partner_id")
-  vetVerified Boolean  @default(false) @map("vet_verified")
-  createdAt   DateTime @default(now()) @map("created_at")
-  pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
-  user        User?    @relation(fields: [userId], references: [id])
-  partner     Partner? @relation(fields: [partnerId], references: [id])
+  userId      String?      @map("user_id")
+  partnerId   String?      @map("partner_id")
+  vetVerified Boolean      @default(false) @map("vet_verified")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  vaccination Vaccination?
+  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id])
+  partner     Partner?     @relation(fields: [partnerId], references: [id])
 
   @@index([petId, measuredAt])
   @@map("body_measurements")
@@ -1648,6 +1715,8 @@ enum MediaPurpose {
   ATTACHMENT
   RECEIPT
   VIDEO_COVER
+  /// Admin: package photo of a product line/flavor.
+  PRODUCT_IMAGE
 }
 
 enum MediaStatus {
@@ -1658,26 +1727,102 @@ enum MediaStatus {
 }
 
 model MediaAsset {
-  id        String       @id @default(cuid())
-  key       String       @unique // storage key
-  url       String
-  thumbUrl  String?      @map("thumb_url")
-  kind      MediaKind
-  purpose   MediaPurpose
-  mimeType  String       @map("mime_type")
-  sizeBytes Int          @map("size_bytes")
-  width     Int?
-  height    Int?
-  status    MediaStatus  @default(PENDING)
-  userId    String?      @map("user_id")
-  partnerId String?      @map("partner_id")
-  createdAt DateTime     @default(now()) @map("created_at")
-  user      User?        @relation(fields: [userId], references: [id])
-  partner   Partner?     @relation(fields: [partnerId], references: [id])
+  id               String        @id @default(cuid())
+  key              String        @unique // storage key
+  url              String
+  thumbUrl         String?       @map("thumb_url")
+  kind             MediaKind
+  purpose          MediaPurpose
+  mimeType         String        @map("mime_type")
+  sizeBytes        Int           @map("size_bytes")
+  width            Int?
+  height           Int?
+  status           MediaStatus   @default(PENDING)
+  /// Client IP at upload time (null when unknown), used to block the uploader's IP after an audit.
+  uploadIp         String?       @map("upload_ip") @db.VarChar(64)
+  /// Account that uploaded it (also for partner assets, where `userId` is null) — target of audit sanctions.
+  uploadedByUserId String?       @map("uploaded_by_user_id")
+  userId           String?       @map("user_id")
+  partnerId        String?       @map("partner_id")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  user             User?         @relation(fields: [userId], references: [id])
+  partner          Partner?      @relation(fields: [partnerId], references: [id])
+  reports          MediaReport[]
 
   @@index([userId])
   @@index([partnerId])
   @@map("media_assets")
+}
+
+// ───────────────────────────── Media audit & sanctions ─────────────────────────────
+
+enum MediaReportReason {
+  NUDITY_SEXUAL
+  VIOLENCE_CRUELTY
+  HATE_HARASSMENT
+  SPAM_SCAM
+  PERSONAL_DATA
+  NOT_PET_RELATED
+  OTHER
+}
+
+/// A user's report of a photo/video that breaks the community rules. Kept after the media is deleted (history,
+/// false-report sanctions): `mediaAssetId` becomes null and `snapshot` keeps what the admin saw.
+model MediaReport {
+  id           String            @id @default(cuid())
+  mediaAssetId String?           @map("media_asset_id")
+  reporterId   String            @map("reporter_id")
+  reason       MediaReportReason
+  details      String?           @db.VarChar(1000)
+  reporterIp   String?           @map("reporter_ip") @db.VarChar(64)
+  status       ReportStatus      @default(OPEN)
+  /// { kind, purpose, uploaderUserId, uploaderPartnerId, url } captured when the media is deleted.
+  snapshot     Json?
+  resolvedAt   DateTime?         @map("resolved_at")
+  resolvedById String?           @map("resolved_by_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  mediaAsset   MediaAsset?       @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  reporter     User              @relation("MediaReporter", fields: [reporterId], references: [id])
+  resolvedBy   User?             @relation("MediaReportResolver", fields: [resolvedById], references: [id])
+
+  @@unique([mediaAssetId, reporterId])
+  @@index([status, createdAt])
+  @@index([reporterId])
+  @@map("media_reports")
+}
+
+enum SanctionKind {
+  /// Account blocked: no login, every authenticated request is refused.
+  ACCOUNT_SUSPENSION
+  /// Every API request from `ip` is refused.
+  IP_BLOCK
+  /// The user can't file new reports (false / abusive reports).
+  REPORT_BAN
+}
+
+/// Sanctions applied by admins after a media audit. `endsAt` null = permanent. Revocable (revokedAt).
+model UserSanction {
+  id            String       @id @default(cuid())
+  userId        String       @map("user_id")
+  kind          SanctionKind
+  ip            String?      @db.VarChar(64)
+  reason        String       @db.VarChar(1000)
+  startsAt      DateTime     @default(now()) @map("starts_at")
+  endsAt        DateTime?    @map("ends_at")
+  /// Media that motivated it (kept as a plain id: the media may have been deleted).
+  mediaAssetId  String?      @map("media_asset_id")
+  mediaReportId String?      @map("media_report_id")
+  createdById   String       @map("created_by_id")
+  revokedAt     DateTime?    @map("revoked_at")
+  revokedById   String?      @map("revoked_by_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  user          User         @relation("SanctionTarget", fields: [userId], references: [id])
+  createdBy     User         @relation("SanctionIssuer", fields: [createdById], references: [id])
+  revokedBy     User?        @relation("SanctionRevoker", fields: [revokedById], references: [id])
+
+  @@index([userId, kind])
+  @@index([kind, ip])
+  @@map("user_sanctions")
 }
 
 model AuditLog {

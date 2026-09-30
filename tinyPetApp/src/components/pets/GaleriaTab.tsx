@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Alert, Dimensions, Pressable, ScrollView, View } from "react-native";
 import { Image } from "expo-image";
+import { useAuth } from "@/lib/auth-store";
+import { ReportMediaButton } from "@/components/media/ReportMedia";
 import { Ionicons } from "@expo/vector-icons";
 import { usePetMedia, usePetMediaMutations } from "@/hooks/use-pets";
 import { usePlan } from "@/hooks/use-me";
@@ -19,6 +21,8 @@ const COLS = 3;
 
 /** Galeria: stories row (24h) + 3-column grid; locked state when the plan blocks gallery (402). */
 export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean }) {
+  // Items added by someone else (partner, owner of a shared pet) can be reported.
+  const { user } = useAuth();
   const t = useTheme();
   const feed = usePetMedia(petId, false);
   const stories = usePetMedia(petId, true);
@@ -161,6 +165,11 @@ export function GaleriaTab({ petId, canEdit }: { petId: string; canEdit: boolean
               <Text variant="small" tone="muted" style={{ marginTop: 4 }}>
                 {selected.notes}
               </Text>
+            ) : null}
+            {user && selected.uploadedByUserId !== user.id ? (
+              <View style={{ marginTop: spacing.sm, alignSelf: "flex-start" }}>
+                <ReportMediaButton url={selected.url} kind={selected.kind} />
+              </View>
             ) : null}
             {canEdit ? (
               <Button

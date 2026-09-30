@@ -24,7 +24,7 @@ Dois projetos no mesmo repositório — **tinyPet** (web Next.js 14, App Router,
 
 &#91;embedded content: arquitetura · 2 clientes, 1 API, 4 serviços\]
 
-- **Repositório:** um repo (pnpm + Turborepo) com dois projetos: `tinyPet/` (web + API + banco: Next.js, Prisma em `tinyPet/prisma`) e `tinyPetApp/` (app iOS/Android em Expo, só consome a API), e `shared/` (schemas Zod, tipos, constantes) usado pelos dois.
+- **Repositório:** um repo (Yarn workspaces + Turborepo) com dois projetos: `tinyPet/` (web + API + banco: Next.js, Prisma em `tinyPet/prisma`) e `tinyPetApp/` (app iOS/Android em Expo, só consome a API), e `shared/` (schemas Zod, tipos, constantes) usado pelos dois.
 - **Banco:** MySQL com Prisma ORM; soft delete (`deletedAt`) em cliente, pet, item de catálogo, parceiro, usuário, mídia do pet e blog (posts, mídia, comentários).
 - **Auth:** NextAuth (e-mail/senha + Google e Apple); o app usa token JWT emitido pela mesma API.
 - **Mídia:** upload direto do dispositivo ao AWS S3 por URL assinada; a API só registra, valida e processa (thumbnails, WebP). Vídeos são convertidos no dispositivo.
@@ -78,10 +78,16 @@ O pet é o centro do app: uma ficha única que o tutor controla e que os parceir
 **Ficha do pet**
 
 - Nome, espécie (cachorro, gato, pássaro, tartaruga, peixe, roedor, réptil, outro), raça (lista por espécie, com "SRD" e "outra"), cor/pelagem, sexo (obrigatório no cadastro), porte, data de nascimento (ou idade aproximada), castrado, microchip.
-- Microchip: chave "tem microchip"; quando ligada, exige exatamente 15 dígitos (ISO 11784/11785; espaços, pontos e traços ignorados) e mostra links de consulta em bases de registro (SinPatinhas, AAHA, Tag MeuPet, PetLink, Animalltag).
+- Microchip: chave "tem microchip"; quando ligada, exige exatamente 15 dígitos numéricos (ISO 11784/11785; espaços, pontos e traços ignorados) e recusa números iniciados em 900 (chips de teste de fábrica, que podem se repetir). Mostra a divisão do número (3 dígitos de fabricante ou país + 12 de série), um bloco "Sobre o número do microchip" com a explicação e links de consulta em bases de registro (SinPatinhas, AAHA, Tag MeuPet, PetLink, Animalltag).
 - Avatar com recorte quadrado.
 - Observações: temperamento, cuidados especiais, alimentação.
 - Um tutor principal (dono) por pet, que pode compartilhar o pet com outras contas (ver abaixo).
+
+**Redes sociais do pet**
+
+- Aba "Redes sociais" na ficha (web e app): Instagram, TikTok, YouTube, Facebook, X, Threads e Pinterest.
+- O tutor digita o `@usuário` ou cola o link do perfil; o sistema extrai e **grava só o nome de usuário** (o link é montado na exibição). Links de outra rede, links curtos e links de publicação são recusados com mensagem clara.
+- Quem vê o pet (conta compartilhada, parceiro vinculado) vê as redes; só o dono edita (ou o parceiro que cadastrou um pet ainda sem tutor).
 
 **Compartilhamento do pet e transferência de posse**
 
@@ -98,7 +104,8 @@ O tutor informa o que cada pet come, e o tinyPet usa isso para indicar lojas e o
 
 - Por pet, um ou mais itens: tipo (ração seca, ração úmida, alimentação natural, petisco, suplemento), marca, linha/produto (ex.: filhote raças pequenas), tamanho da embalagem.
 - Opcional: quantidade diária e data da última compra, para estimar quando a embalagem acaba e lembrar da reposição alguns dias antes.
-- Marcas e linhas vêm de uma lista mantida pelo admin; se não existir, o tutor sugere e o admin aprova.
+- Marcas, linhas e sabores vêm de uma lista mantida pelo admin, que pode cadastrar a foto da embalagem de cada linha ou sabor (mostrada ao tutor ao escolher o alimento); se não existir, o tutor sugere e o admin aprova.
+- Pesos (embalagem e quantidade diária) com seletor kg/g: em kg aceita decimais (2,5 kg); em g, só números inteiros.
 - Indicações: lojas e pet shops próximos que têm a marca no catálogo, ofertas ativas dessa marca, e alternativas da mesma linha quando o produto estiver em falta.
 - Receber ofertas depende de consentimento de marketing do tutor (LGPD) e pode ser desligado por pet ou por marca.
 - Para parceiros e admin, a demanda por marca aparece de forma agregada nos relatórios (ex.: marcas mais usadas por cidade), sem identificar tutores.
@@ -309,6 +316,7 @@ Estes módulos dão motivo para o tutor abrir o app toda semana, mesmo sem agend
 - Lista de tarefas por pet, avulsas ou recorrentes (diária, semanal ou mensal em um dia do mês): passeio, remédio, escovar dentes, trocar água do aquário, limpar gaiola.
 - Modelos prontos por espécie; o parceiro pode enviar uma rotina (ex.: exercícios do adestrador, pós-operatório da clínica) que o tutor aceita.
 - Tarefas compartilhadas com a família: quem marcou como feito aparece no histórico.
+- Quando não der para fazer (chuva, compromisso, pet indisposto…), marca-se "não deu hoje" com o motivo. O dia justificado não zera a sequência de dias de rotina, mas também não soma; pode ser desfeito ou trocado por "feito".
 
 **Saúde preventiva**
 
@@ -389,17 +397,17 @@ Cada plano define, módulo por módulo, o que está liberado e quanto; tudo é c
 
 **Planos do tutor (cliente final)**
 
-O tutor também tem plano: o Free permite até 5 pets e só o avatar de cada um; galeria e stories são do plano pago.
+O tutor também tem plano: o Free permite até 5 pets e a galeria de fotos e vídeos com limites menores (1 vídeo/dia de até 30 s, 50 MB); stories são do plano pago.
 
 | Recurso | Free | Plus (valores a definir) |
 | --- | --- | --- |
 | Pets cadastrados | 5 | 20 (seed; a confirmar) |
 | Avatar do pet | Sim | Sim |
-| Galeria de fotos e vídeos (feed) | Não | Sim |
+| Galeria de fotos e vídeos (feed) | Sim | Sim |
 | Stories | Não | Sim |
-| Armazenamento de mídia | 50 MB (só avatares) | 10 GB (seed; a confirmar) |
-| Vídeos por dia (galeria) | — | 10 |
-| Duração máxima do vídeo | — | 60 s |
+| Armazenamento de mídia | 50 MB | 10 GB (seed; a confirmar) |
+| Vídeos por dia (galeria) | 1 | 10 |
+| Duração máxima do vídeo | 30 s | 60 s |
 | Agenda, tarefas, vacinas, badges, avaliações | Sim | Sim |
 | Cursos gratuitos de parceiros | Sim | Sim |
 
@@ -477,13 +485,13 @@ Todo arquivo passa pelo mesmo pipeline: validação no dispositivo, upload diret
 | Logomarca do parceiro | JPG, PNG, WebP | 10 MB de entrada | Recorte quadrado no sistema; salva no máx. 1000×1000 px |
 | Avatar (tutor e pet) | JPG, PNG, WebP, HEIC | 10 MB de entrada | Recorte quadrado; 512×512 px |
 | Fotos internas da loja | JPG, PNG, WebP, HEIC | 10 MB cada, até 10 fotos | WebP, lado maior 1920 px + miniatura |
-| Fotos de galeria e catálogo | JPG, PNG, WebP, HEIC | 10 MB cada | WebP, lado maior 1920 px + miniatura |
+| Fotos de galeria e catálogo | JPG, PNG, WebP, HEIC, GIF, AVIF (galeria: até 40 MB na escolha) | 10 MB cada após a conversão | Galeria: recorte no navegador em 1:1, 16:9 ou 9:16, convertida para WebP com lado maior ≤ 1920 px antes do envio; servidor revalida e gera miniatura |
 | Vídeos | Entrada no dispositivo: MP4, MOV, WebM, MKV, 3GP. Enviado: só MP4 (H.264 + AAC) | 10 MB cada (~70 s); 16:9 ou 9:16; duração e quantidade por dia conforme o plano | Convertido no dispositivo para 1080p ou 720p, vídeo ≤ 1 Mbps, áudio ≤ 128 kbps; servidor revalida contêiner, codecs, dimensões, bitrate e duração; capa = quadro do vídeo ou imagem escolhida (16:9/9:16, WebP 1280 px), trocável depois |
 
 - Todo vídeo é convertido antes do envio, na web e no app (não só os acima de 10 MB); se ainda passar de 10 MB ou da duração do plano, o usuário é avisado para cortar o trecho.
 - Metadados de localização (EXIF/GPS) removidos de toda foto.
 - Imagens públicas (catálogo, fotos da loja, logo) passam por moderação automática; conteúdo sinalizado vai para revisão do admin. *(Hoje só a revisão manual no admin está implementada.)*
-- Cota de armazenamento definida pelo plano (ver Planos e limites); tutor no Free só envia avatares de pets e o próprio.
+- Cota de armazenamento definida pelo plano (ver Planos e limites); no Free o tutor tem 50 MB (avatares e galeria).
 
 ## Blog
 
@@ -496,6 +504,14 @@ Blog de conteúdo do tinyPet (contrato completo em `docs/blog-contract.md`).
 - Contas logadas curtem posts e comentários e comentam (uma resposta de nível, até 2 links, limite por minuto e por dia); denúncias vão para a moderação do admin.
 - Gerido por Admin e Editor do blog.
 
+## Denúncias, auditoria de mídia e sanções
+
+- **Denúncia:** qualquer tutor pode denunciar uma foto ou vídeo de outra pessoa (galeria de pet compartilhado, fotos do local e mídia do catálogo nas páginas públicas) escolhendo um motivo das [regras da comunidade](/regras-da-comunidade): nudez/sexual, violência ou maus-tratos, ódio/assédio, spam/golpe, dados pessoais, fora do tema ou outro. Uma denúncia por mídia por pessoa; não dá para denunciar a própria mídia.
+- **Auditoria (admin):** fila das mídias denunciadas (mais denunciadas primeiro) com a mídia, quem enviou (e o IP do envio), onde ela aparece e o histórico de cada denunciante (quantas denúncias procederam ou foram descartadas).
+- **Conteúdo impróprio → excluir:** exclusão real — o arquivo sai do storage e a mídia é removida de todos os lugares. Sanções para quem enviou: bloqueio do IP por 7 dias e/ou bloqueio da conta por 7, 15, 30 dias ou para sempre. A pessoa é avisada com o motivo.
+- **Denúncia caluniosa → descartar:** a mídia continua; quem denunciou de forma inverídica pode ter a conta bloqueada ou ser impedido de fazer novas denúncias por 7, 15, 30 dias ou para sempre.
+- Toda sanção fica registrada (motivo, quem aplicou) e pode ser revogada pelo admin. Conta bloqueada não entra no site nem no app; IP bloqueado não acessa a API.
+
 ## Modelo de dados
 
 Tabelas, modelos, campos, enums e código ficam em inglês; a interface continua em português. São cerca de 30 tabelas em 8 grupos; contatos, endereços e mídia são polimórficos para servir usuário, cliente do parceiro e parceiro.
@@ -505,12 +521,13 @@ Tabelas, modelos, campos, enums e código ficam em inglês; a interface continua
 | Identity | User (com `username`, `tokenVersion`), Session, OwnerTerm, Membership (user ↔ partner, com papel), VerificationCode (código com hash), RateLimit |
 | Partner | Partner, PartnerType, SocialLink, BusinessHours, VenuePhoto |
 | Contacts | Phone, Email, Address (dono: user, client ou partner) |
-| Pets & CRM | Client, FamilyMember, Pet, Species, Breed, PetAccess, PetShareInvite, PetOwnershipTransfer, PetMedia, PetHistoryEvent, LifeStageRule, Skill, PetSkill, SkillStat (agregado diário), PetFood (pet, tipo, marca, linha, embalagem, consumo diário, última compra) |
-| Catalog | Category, Subcategory, Brand, ProductLine, CatalogItem, CatalogItemMedia, Review, ReviewReply, Report |
+| Pets & CRM | Client, FamilyMember, Pet, Species, Breed, PetAccess, PetShareInvite, PetOwnershipTransfer, PetSocialProfile, PetMedia, PetHistoryEvent, LifeStageRule, Skill, PetSkill, SkillStat (agregado diário), PetFood (pet, tipo, marca, linha, embalagem, consumo diário, última compra) |
+| Catalog | Category, Subcategory, Brand, ProductLine, ProductFlavor, CatalogItem, CatalogItemMedia, Review, ReviewReply, Report |
 | Courses | Course, CourseModule, Lesson, LessonAttachment, Enrollment, LessonProgress, Certificate |
 | Scheduling | Appointment, AppointmentPet, Availability, TimeOff, TravelLeg (distância e tempo entre visitas, bloco reservado) |
 | Finance | Contract, ContractItem, Installment, Payment, Transaction |
 | Billing | Plan, Feature, PlanFeatureLimit, AddOn, Subscription, SubscriptionAddOn, PaymentRecipient, GatewayOrder, WebhookEvent |
+| Moderation | MediaReport, UserSanction |
 | Engagement | Task, TaskCompletion, Vaccination, BodyMeasurement, MeasurementReference, Badge, EarnedBadge |
 | Blog | BlogCategory, BlogPost, BlogPostCategory, BlogSlugRedirect, BlogMedia, BlogPostViewLog, BlogPostDailyStat, BlogComment, BlogPostHeart, BlogCommentHeart, BlogCommentReport |
 
@@ -644,7 +661,7 @@ O app tem duas navegações conforme o contexto ativo (tutor ou parceiro); a web
 | Tutor | Início (tarefas do dia, próximas visitas, conquistas), Meus pets, ficha e galeria do pet, Agenda, Contratos e parcelas, Avaliações | App primeiro, web responsiva |
 | Parceiro | Painel (agenda do dia, a receber, vencidas), Clientes, ficha do cliente e pets, Agenda, Catálogo, Financeiro, Perfil e página pública, Equipe | Web primeiro, app para agenda e clientes |
 | Blog | Lista de posts, post (comentários e curtidas), categoria, tag, RSS | Web; leitura também no app |
-| Admin | Categorias, termos do tutor, espécies e raças, badges, moderação, usuários e parceiros, blog (posts, categorias, mídia, estatísticas, comentários) | Só web |
+| Admin | Categorias, termos do tutor, espécies e raças, badges, moderação, auditoria de mídia e sanções, usuários e parceiros, blog (posts, categorias, mídia, estatísticas, comentários) | Só web |
 
 **Fluxos-chave para validar primeiro**
 

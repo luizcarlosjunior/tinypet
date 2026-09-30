@@ -1,4 +1,4 @@
-import { normalizeMicrochip, normalizeUsername, usernameProblem } from "./utils";
+import { MICROCHIP_PROBLEM_MESSAGE, microchipProblem, normalizeMicrochip, normalizeUsername, parsePetSocialUsername, usernameProblem } from "./utils";
 import { z } from "zod";
 
 // ───────── primitives ─────────
@@ -56,7 +56,7 @@ export const CourseStatusEnum = z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]);
 export const MembershipRoleEnum = z.enum(["OWNER", "STAFF"]);
 export const SocialNetworkEnum = z.enum(["INSTAGRAM", "FACEBOOK", "TIKTOK", "YOUTUBE", "WHATSAPP", "LINKEDIN"]);
 export const MediaPurposeEnum = z.enum([
-  "PARTNER_LOGO", "USER_AVATAR", "PET_AVATAR", "VENUE_PHOTO", "PET_GALLERY", "CATALOG", "COURSE", "ATTACHMENT", "RECEIPT", "VIDEO_COVER",
+  "PARTNER_LOGO", "USER_AVATAR", "PET_AVATAR", "VENUE_PHOTO", "PET_GALLERY", "CATALOG", "COURSE", "ATTACHMENT", "RECEIPT", "VIDEO_COVER", "PRODUCT_IMAGE",
 ]);
 export const AccessLevelEnum = z.enum(["VIEW", "EDIT"]);
 export const VaccinationKindEnum = z.enum(["VACCINE", "DEWORMING"]);
@@ -207,7 +207,13 @@ export const petSchema = z.object({
   /** Null when the pet has no microchip; otherwise exactly 15 digits (spaces, dots and dashes are ignored). */
   microchip: z.preprocess(
     (v) => (typeof v === "string" ? normalizeMicrochip(v) || null : v),
-    z.string().regex(/^\d{15}$/, "O microchip deve ter 15 dígitos").nullable(),
+    z
+      .string()
+      .superRefine((v, ctx) => {
+        const p = microchipProblem(v);
+        if (p) ctx.addIssue({ code: z.ZodIssueCode.custom, message: MICROCHIP_PROBLEM_MESSAGE[p] });
+      })
+      .nullable(),
   ).optional(),
   avatarUrl: httpUrl.optional().nullable(),
   temperament: z.string().max(2000).optional().nullable(),
@@ -253,6 +259,7 @@ export const petFoodSchema = z.object({
   type: FoodTypeEnum,
   brandId: id.optional().nullable(),
   productLineId: id.optional().nullable(),
+  flavorId: id.optional().nullable(),
   brandOther: z.string().max(120).optional().nullable(),
   packageSizeG: z.coerce.number().int().min(0).optional().nullable(),
   dailyGrams: z.coerce.number().int().min(0).optional().nullable(),
@@ -294,6 +301,8 @@ export const vaccinationSchema = z.object({
   appliedAt: dateString,
   nextDueAt: dateString.optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
+  /** Optional weight at the dose, in grams (recorded as a body measurement on `appliedAt`). null on update removes it. */
+  weightG: z.coerce.number().int().min(1, "Peso inválido").max(1_000_000, "Peso inválido").optional().nullable(),
 });
 
 export const historyEventSchema = z.object({
@@ -318,6 +327,8 @@ export const taskSchema = z.object({
   dueAt: isoDateTime.optional().nullable(),
 });
 export const taskCompleteSchema = z.object({ forDate: dateString.optional() });
+/** POST /pets/:id/tasks/:tid/skip — "não deu hoje" with the reason (e.g. "Estava chovendo"). */
+export const taskSkipSchema = z.object({ forDate: dateString.optional(), note: z.string().trim().min(2, "Conte o motivo").max(500) });
 
 // ───────── catalog ─────────
 export const catalogItemSchema = z.object({
@@ -533,7 +544,8 @@ export const subcategorySchema = categorySchema.extend({ categoryId: id });
 export const speciesSchema = z.object({ key: z.string().min(1).max(40), label: z.string().min(1).max(120), sortOrder: z.number().int().optional(), active: z.boolean().optional() });
 export const breedSchema = z.object({ speciesId: id, name: z.string().min(1).max(120), isMixed: z.boolean().optional(), isOther: z.boolean().optional() });
 export const brandSchema = z.object({ name: z.string().min(1).max(120), status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional() });
-export const productLineSchema = z.object({ brandId: id, name: z.string().min(1).max(120) });
+export const productLineSchema = z.object({ brandId: id, name: z.string().min(1).max(120), imageUrl: httpUrl.optional().nullable() });
+export const productFlavorSchema = z.object({ lineId: id, name: z.string().min(1).max(120), imageUrl: httpUrl.optional().nullable(), status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional() });
 export const planSchema = z.object({
   key: z.string().min(1).max(60),
   name: z.string().min(1).max(120),
@@ -573,3 +585,65 @@ export const petReportQuery = paginationQuery.extend({
   tag: z.string().max(40).optional(),
   groupBy: z.enum(["state", "city", "species", "breed", "lifeStage", "birthMonth", "createdMonth"]).optional(),
 });
+
+export const PetSocialNetworkEnum = z.enum(["INSTAGRAM", "TIKTOK", "YOUTUBE", "FACEBOOK", "X", "THREADS", "PINTEREST"]);
+
+/**
+ * PUT /pets/:id/social — replaces the pet's social profiles. `username` accepts "@user", "user" or a profile URL and is
+ * normalized to the bare lowercase username (only that is stored). Empty usernames are dropped (= remove).
+ */
+export const petSocialProfilesSchema = z.object({
+  profiles: z
+    .array(z.object({ network: PetSocialNetworkEnum, username: z.string().max(500) }))
+    .max(PetSocialNetworkEnum.options.length)
+    .transform((items, ctx) => {
+      const out: { network: z.infer<typeof PetSocialNetworkEnum>; username: string }[] = [];
+      items.forEach((item, i) => {
+        if (!item.username.trim()) return;
+        if (out.some((o) => o.network === item.network)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i, "network"], message: "Rede social repetida" });
+          return;
+        }
+        const r = parsePetSocialUsername(item.network, item.username);
+        if (!r.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i, "username"], message: r.message });
+        else out.push({ network: item.network, username: r.username });
+      });
+      return out;
+    }),
+});
+
+export const MediaReportReasonEnum = z.enum(["NUDITY_SEXUAL", "VIOLENCE_CRUELTY", "HATE_HARASSMENT", "SPAM_SCAM", "PERSONAL_DATA", "NOT_PET_RELATED", "OTHER"]);
+
+/** POST /media/report — `url` is the photo/video URL shown on screen (or its thumbnail). */
+export const mediaReportSchema = z
+  .object({
+    url: z.string().url().max(2000),
+    reason: MediaReportReasonEnum,
+    details: z.string().trim().max(1000).optional().nullable(),
+  })
+  .refine((v) => v.reason !== "OTHER" || (v.details?.length ?? 0) >= 5, { path: ["details"], message: "Descreva o motivo da denúncia" });
+
+export const SanctionDurationEnum = z.union([z.literal(7), z.literal(15), z.literal(30), z.literal("PERMANENT")]);
+
+/**
+ * POST /admin/media-audit/:assetId — DELETE removes the media everywhere (storage + references) and may sanction the
+ * uploader; DISMISS keeps it and may sanction reporters for false reports.
+ */
+export const mediaAuditDecisionSchema = z
+  .object({
+    action: z.enum(["DELETE", "DISMISS"]),
+    reason: z.string().trim().min(5, "Informe o motivo (será registrado e enviado ao usuário)").max(1000),
+    uploader: z
+      .object({
+        blockIp: z.boolean().default(false),
+        account: SanctionDurationEnum.nullable().default(null),
+      })
+      .optional(),
+    /** False reports: per reporter, block the account or only the ability to report. */
+    reporters: z
+      .array(z.object({ userId: z.string().min(1), type: z.enum(["ACCOUNT", "REPORTS"]), duration: SanctionDurationEnum }))
+      .max(100)
+      .default([]),
+  })
+  .refine((v) => v.action === "DELETE" || !v.uploader || (!v.uploader.blockIp && v.uploader.account == null), { path: ["uploader"], message: "Sanção de quem enviou só ao excluir a mídia" })
+  .refine((v) => v.action === "DISMISS" || v.reporters.length === 0, { path: ["reporters"], message: "Sanção por denúncia falsa só ao descartar" });

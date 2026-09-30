@@ -25,7 +25,7 @@ function TaskRow({ task }: { task: PetTask }) {
       disabled={!!(task.completedToday ?? task.completed) || !petId}
       onChange={() => complete.mutateAsync({ tid: task.id, forDate: task.forDate }).catch((e) => Alert.alert("Erro", errorMessage(e)))}
       label={task.title}
-      description={[task.pet?.name, describeRule(task.rule, task.dueAt)].filter(Boolean).join(" · ")}
+      description={[task.pet?.name, describeRule(task.rule, task.dueAt), task.skipped ? `não feita hoje: ${task.skipNote}` : null].filter(Boolean).join(" · ")}
     />
   );
 }

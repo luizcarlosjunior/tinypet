@@ -11,7 +11,7 @@ export function Footer() {
         </div>
         <FooterCol title="Para tutores" links={[["/buscar", "Buscar parceiros"], ["/cursos", "Cursos"], ["/blog", "Blog"], ["/cadastro", "Criar conta"], ["/inicio", "Minha área"]]} />
         <FooterCol title="Para parceiros" links={[["/painel/novo", "Criar meu negócio"], ["/painel", "Painel do parceiro"], ["/entrar", "Entrar"]]} />
-        <FooterCol title="tinyPet" links={[["/termos", "Termos de uso"], ["/privacidade", "Política de privacidade"]]} />
+        <FooterCol title="tinyPet" links={[["/termos", "Termos de uso"], ["/privacidade", "Política de privacidade"], ["/regras-da-comunidade", "Regras da comunidade"]]} />
       </div>
       <div className="border-t py-4 text-center text-xs text-[var(--muted)]">© {new Date().getFullYear()} tinyPet · Feito com carinho para quem ama pets.</div>
     </footer>

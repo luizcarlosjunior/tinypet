@@ -2,13 +2,13 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { vaccinationSchema } from "@tinypet/shared";
+import { vaccinationSchema, gramsToKgInput, parseKgToGrams } from "@tinypet/shared";
 import type { z } from "zod";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
 import { ConfirmDialog, ErrorBox, Table, td, th } from "@/components/painel/ui";
 import { useApiMutation, usePetVaccinations } from "@/hooks/use-crm";
-import { todayISO, fmtDay } from "@/lib/format";
+import { todayISO, fmtDay, fmtWeight } from "@/lib/format";
 import { useActivePartner } from "@/hooks/use-partner";
 import type { Vaccination } from "@/types/api";
 
@@ -19,7 +19,8 @@ export function VaccinationsTab({ petId }: { petId: string }) {
   const { partnerId } = useActivePartner();
   const [modal, setModal] = useState<{ open: boolean; row?: Vaccination }>({ open: false });
   const [del, setDel] = useState<Vaccination | null>(null);
-  const keys = [["pet", petId, "vaccinations"], ["pet", petId, "history"]];
+  // the optional weight becomes a measurement → refresh measurements too
+  const keys = [["pet", petId, "vaccinations"], ["pet", petId, "history"], ["pet", petId, "measurements"]];
   const save = useApiMutation<{ id?: string; body: VaccinationInput }>({ path: (v) => (v.id ? `/pets/${petId}/vaccinations/${v.id}` : `/pets/${petId}/vaccinations`), method: (v) => (v.id ? "PATCH" : "POST"), body: (v) => v.body, invalidate: keys, success: "Salvo", onSuccess: () => setModal({ open: false }) });
   const remove = useApiMutation<string>({ path: (id) => `/pets/${petId}/vaccinations/${id}`, method: "DELETE", invalidate: keys, success: "Removido", onSuccess: () => setDel(null) });
   const today = todayISO();
@@ -73,7 +74,10 @@ export function VaccinationsTab({ petId }: { petId: string }) {
                       "—"
                     )}
                   </td>
-                  <td className={`${td} hidden max-w-[200px] truncate sm:table-cell`}>{v.notes ?? ""}</td>
+                  <td className={`${td} hidden max-w-[200px] truncate sm:table-cell`}>
+                    {v.measurement ? `Peso ${fmtWeight(v.measurement.weightG)}${v.notes ? " · " : ""}` : ""}
+                    {v.notes ?? ""}
+                  </td>
                   <td className={`${td} whitespace-nowrap text-right`}>
                     {/* only rows registered by this partner can be changed (tutor/other partners' rows → 403) */}
                     {v.partnerId === partnerId && (<>
@@ -101,12 +105,19 @@ export function VaccinationsTab({ petId }: { petId: string }) {
 
 function VaccinationForm({ initial, onSubmit, onCancel, submitting }: { initial?: Vaccination; onSubmit: (v: VaccinationInput) => void; onCancel: () => void; submitting?: boolean }) {
   const clean = (v: VaccinationInput): VaccinationInput => ({ ...v, nextDueAt: v.nextDueAt || null, notes: v.notes || null });
+  const [weightKg, setWeightKg] = useState(gramsToKgInput(initial?.measurement?.weightG));
+  const weightG = parseKgToGrams(weightKg);
   const { register, handleSubmit, formState: { errors } } = useForm<VaccinationInput>({
     resolver: (values, ctx, opts) => zodResolver(vaccinationSchema)(clean(values), ctx, opts),
     defaultValues: { kind: initial?.kind ?? "VACCINE", name: initial?.name ?? "", appliedAt: initial?.appliedAt?.slice(0, 10) ?? todayISO(), nextDueAt: initial?.nextDueAt?.slice(0, 10) ?? "", notes: initial?.notes ?? "" },
   });
   return (
-    <form noValidate className="space-y-3" onSubmit={handleSubmit((v) => onSubmit(v))}>
+    <form
+      noValidate
+      className="space-y-3"
+      // on edit, an emptied weight (null) removes the one recorded with the dose
+      onSubmit={handleSubmit((v) => weightG !== undefined && onSubmit({ ...v, weightG: weightG ?? (initial?.measurement ? null : undefined) }))}
+    >
       <div className="grid gap-3 sm:grid-cols-2">
         <Select id="vc-kind" label="Tipo" {...register("kind")}>
           <option value="VACCINE">Vacina</option>
@@ -116,6 +127,7 @@ function VaccinationForm({ initial, onSubmit, onCancel, submitting }: { initial?
         <Input id="vc-applied" type="date" label="Aplicada em" {...register("appliedAt")} error={errors.appliedAt?.message} />
         <Input id="vc-next" type="date" label="Próxima dose" {...register("nextDueAt")} error={errors.nextDueAt?.message} />
       </div>
+      <Input id="vc-weight" label="Peso do pet (kg) — opcional" inputMode="decimal" placeholder="ex.: 8,5" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} error={weightG === undefined ? "Informe o peso em kg (ex.: 8,5)" : undefined} />
       <Textarea id="vc-notes" label="Observações" className="min-h-[60px]" {...register("notes")} />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onCancel}>

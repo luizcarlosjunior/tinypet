@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { Award, BarChart3, BookA, Boxes, Cog, Crown, Dog, Flag, FolderTree, Image as ImageIcon, LayoutGrid, LogOut, Menu, MessageSquare, Newspaper, PawPrint, Puzzle, Store, Tag, Users, X, Baby, ListTree } from "lucide-react";
+import { Award, BarChart3, BookA, Boxes, Cog, Crown, Dog, Flag, FolderTree, Image as ImageIcon, LayoutGrid, LogOut, Menu, MessageSquare, Newspaper, PawPrint, Puzzle, Store, Tag, Users, X, Baby, ListTree, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 
@@ -21,6 +21,7 @@ export const ADMIN_NAV = [
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
   { href: "/admin/parceiros", label: "Parceiros", icon: Store },
   { href: "/admin/moderacao", label: "Moderação", icon: Flag },
+  { href: "/admin/auditoria", label: "Auditoria de mídia", icon: ShieldAlert },
 ];
 
 /** Blog section — the only one visible to EDITOR accounts. */

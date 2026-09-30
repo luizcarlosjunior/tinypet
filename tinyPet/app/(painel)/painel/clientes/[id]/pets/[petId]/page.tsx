@@ -18,8 +18,9 @@ import { VaccinationsTab } from "@/components/painel/clientes/pet/VaccinationsTa
 import { SkillsTab } from "@/components/painel/clientes/pet/SkillsTab";
 import { RoutineTab } from "@/components/painel/clientes/pet/RoutineTab";
 import { MicrochipLookupLinks } from "@/components/pets/microchip";
+import { PetSocial } from "@/components/pets/pet-social";
 
-type Tab = "ficha" | "historico" | "medidas" | "vacinas" | "comandos" | "rotina";
+type Tab = "ficha" | "historico" | "medidas" | "vacinas" | "comandos" | "rotina" | "redes";
 const TABS: { key: Tab; label: string }[] = [
   { key: "ficha", label: "Ficha" },
   { key: "historico", label: "Histórico" },
@@ -27,6 +28,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "vacinas", label: "Vacinas" },
   { key: "comandos", label: "Comandos" },
   { key: "rotina", label: "Rotina" },
+  { key: "redes", label: "Redes sociais" },
 ];
 
 export default function PetPage() {
@@ -116,6 +118,8 @@ export default function PetPage() {
       {tab === "vacinas" && <VaccinationsTab petId={petId} />}
       {tab === "comandos" && <SkillsTab petId={petId} />}
       {tab === "rotina" && <RoutineTab petId={petId} />}
+      {/* API: a partner edits only ownerless pets it created (owner-controlled data) */}
+      {tab === "redes" && <PetSocial petId={petId} partnerId={partnerId} canEdit={!pet.ownerId && !!partnerId && pet.createdByPartnerId === partnerId} />}
 
       <DeceasedDialog
         petId={petId}

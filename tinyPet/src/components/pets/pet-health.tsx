@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AlertTriangle, BadgeCheck, Download, Pencil, Plus, Syringe, Trash2 } from "lucide-react";
-import { bodyMeasurementSchema, vaccinationSchema, LIFE_STAGE_LABEL, type LifeStage } from "@tinypet/shared";
+import { bodyMeasurementSchema, vaccinationSchema, LIFE_STAGE_LABEL, type LifeStage, gramsToKgInput, parseKgToGrams } from "@tinypet/shared";
 import { usePetMutation, usePetResource, type Pet } from "@/hooks/use-pets";
 import { Badge, Button, Empty, Input, Modal, Select, Spinner, Textarea } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/confirm";
@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
 
 type VacInput = z.infer<typeof vaccinationSchema>;
 type MeasInput = z.infer<typeof bodyMeasurementSchema>;
-type Vac = { id: string; kind: "VACCINE" | "DEWORMING"; name: string; appliedAt: string; nextDueAt: string | null; notes: string | null; partner?: { tradeName: string } | null };
+type Vac = { id: string; kind: "VACCINE" | "DEWORMING"; name: string; appliedAt: string; nextDueAt: string | null; notes: string | null; partner?: { tradeName: string } | null; measurement?: { id: string; weightG: number } | null };
+
 type Meas = { id: string; measuredAt: string; weightG: number; heightCm: number | string | null; lengthCm: number | string | null; neckCm: number | string | null; chestCm: number | string | null; abdomenCm: number | string | null; bodyScore: number | null; notes: string | null; vetVerified: boolean; partnerId: string | null; userId: string | null };
 type MeasData = { items: Meas[]; lifeStage: LifeStage | null; reference?: { minG: number; maxG: number } | null; alerts?: { type?: string; message: string }[]; bands?: StageBand[] };
 
@@ -32,8 +33,11 @@ export function PetHealth({ pet, readOnly = false }: { pet: Pet; readOnly?: bool
 
 function Vaccinations({ petId, deceased }: { petId: string; deceased: boolean }) {
   const q = usePetResource<Vac[]>(petId, "vaccinations");
-  const create = usePetMutation<VacInput>(petId, "vaccinations");
-  const update = usePetMutation<VacInput>(petId, "vaccinations", "PATCH");
+  // The optional weight becomes a measurement: refresh the weight chart too.
+  const create = usePetMutation<VacInput>(petId, "vaccinations", "POST", ["vaccinations", "measurements"]);
+  const update = usePetMutation<VacInput>(petId, "vaccinations", "PATCH", ["vaccinations", "measurements"]);
+  const [weightKg, setWeightKg] = useState("");
+  const weightG = parseKgToGrams(weightKg);
   const remove = usePetMutation(petId, "vaccinations", "DELETE");
   const { toast } = useToast();
   const [editing, setEditing] = useState<Vac | null | "new">(null);
@@ -42,16 +46,20 @@ function Vaccinations({ petId, deceased }: { petId: string; deceased: boolean })
 
   function openNew() {
     form.reset({ kind: "VACCINE", name: "", appliedAt: toDateKey(), nextDueAt: null, notes: null });
+    setWeightKg("");
     setEditing("new");
   }
   function openEdit(v: Vac) {
     form.reset({ kind: v.kind, name: v.name, appliedAt: v.appliedAt.slice(0, 10), nextDueAt: v.nextDueAt?.slice(0, 10) ?? null, notes: v.notes });
+    setWeightKg(gramsToKgInput(v.measurement?.weightG));
     setEditing(v);
   }
   async function submit(v: VacInput) {
+    if (weightG === undefined) return;
     try {
-      if (editing === "new") await create.mutateAsync({ body: v });
-      else if (editing) await update.mutateAsync({ path: `/${editing.id}`, body: v });
+      if (editing === "new") await create.mutateAsync({ body: { ...v, weightG: weightG ?? undefined } });
+      // on edit, an emptied field (null) removes the weight recorded with the dose
+      else if (editing) await update.mutateAsync({ path: `/${editing.id}`, body: { ...v, weightG: weightG ?? (editing.measurement ? null : undefined) } });
       toast("Registro salvo.", "success");
       setEditing(null);
     } catch (e) {
@@ -86,6 +94,7 @@ function Vaccinations({ petId, deceased }: { petId: string; deceased: boolean })
                 <span className="flex-1 font-medium">{v.name}</span>
                 <span className="text-xs text-[var(--muted)]">Aplicada em {fmtDay(v.appliedAt)}</span>
                 {v.nextDueAt && <span className={cn("text-xs", overdue ? "font-semibold text-red-600" : "text-[var(--muted)]")}>Próxima: {fmtDay(v.nextDueAt)}{overdue ? " (atrasada)" : ""}</span>}
+                {v.measurement && <span className="text-xs text-[var(--muted)]">Peso: {fmtWeight(v.measurement.weightG)}</span>}
                 {v.partner?.tradeName && <span className="text-xs text-[var(--muted)]">{v.partner.tradeName}</span>}
                 {!deceased && (
                   <span className="flex gap-1">
@@ -113,6 +122,16 @@ function Vaccinations({ petId, deceased }: { petId: string; deceased: boolean })
             <Input id="v-applied" type="date" label="Aplicada em" max={today} {...form.register("appliedAt")} error={form.formState.errors.appliedAt?.message} />
             <Input id="v-next" type="date" label="Próxima dose" {...form.register("nextDueAt", { setValueAs: (v) => v || null })} error={form.formState.errors.nextDueAt?.message} />
           </div>
+          <Input
+            id="v-weight"
+            label="Peso do pet (kg) — opcional"
+            inputMode="decimal"
+            placeholder="ex.: 8,5"
+            value={weightKg}
+            onChange={(e) => setWeightKg(e.target.value)}
+            error={weightG === undefined ? "Informe o peso em kg (ex.: 8,5)" : undefined}
+          />
+          <p className="-mt-2 text-xs text-[var(--muted)]">Se informado, entra no histórico de peso do pet na data da aplicação.</p>
           <Textarea id="v-notes" label="Observações" {...form.register("notes", { setValueAs: (v) => v || null })} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setEditing(null)}>

@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { RegisterInput } from "@tinypet/shared";
-import { API_BASE, api, getApiContext, onUnauthorized, setApiContext } from "./api";
+import { API_BASE, api, getApiContext, onSuspended, onUnauthorized, setApiContext } from "./api";
+import { Alert } from "react-native";
 import { PARTNER_KEY, getPref, getToken, setPref, setToken } from "./storage";
 import { queryClient } from "./query";
 import type { AuthPayload, Membership, User } from "./types";
@@ -112,9 +113,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     onUnauthorized(() => {
       void signOut();
     });
+    onSuspended((message) => {
+      void signOut();
+      Alert.alert("Conta suspensa", message);
+    });
     return () => {
       cancelled = true;
       onUnauthorized(null);
+      onSuspended(null);
     };
   }, [signOut]);
 

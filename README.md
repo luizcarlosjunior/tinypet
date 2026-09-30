@@ -7,7 +7,7 @@ Spec completa: `docs/tinyPet — Especificação do Produto (MVP).md`. Contrato 
 ## Estrutura
 
 ```
-tinyPet/                 ← repositório (pnpm workspace + turbo)
+tinyPet/                 ← repositório (Yarn workspaces + turbo)
 ├── tinyPet/             ← PROJETO WEB (@tinypet/web): Next.js 14 — site, área do tutor, painel do parceiro, admin e API REST /api/v1
 │   ├── app/ src/        ← páginas, rotas da API, server (src/server), cliente do Prisma (src/db)
 │   ├── prisma/          ← BANCO: schema.prisma + seed.ts (só a web acessa o banco)
@@ -28,21 +28,21 @@ tinyPet/                 ← repositório (pnpm workspace + turbo)
 **tinyPet (web + API + banco)**
 
 ```bash
-pnpm install                          # na raiz: instala os dois projetos + shared
+yarn install                          # na raiz: instala os dois projetos + shared
 cp tinyPet/.env.example tinyPet/.env  # ajuste se necessário
-pnpm db:up                            # MySQL 8 em 127.0.0.1:3307 (root/tinypet) — docker compose em tinyPet/
-pnpm db:push && pnpm db:seed          # cria tabelas e dados iniciais (o seed NÃO roda sozinho em `migrate reset`)
-pnpm dev:web                          # http://localhost:3033
+yarn db:up                            # MySQL 8 em 127.0.0.1:3307 (root/tinypet) — docker compose em tinyPet/
+yarn db:push && yarn db:seed          # cria tabelas e dados iniciais (o seed NÃO roda sozinho em `migrate reset`)
+yarn dev:web                          # http://localhost:3033
 ```
 
 **tinyPetApp (iOS/Android)** — precisa da web rodando
 
 ```bash
 cp tinyPetApp/.env.example tinyPetApp/.env   # EXPO_PUBLIC_API_URL com o IP da máquina
-pnpm dev:app                                 # Expo (build de desenvolvimento, ver abaixo)
+yarn dev:app                                 # Expo (build de desenvolvimento, ver abaixo)
 ```
 
-Tudo junto: `pnpm dev` (turbo). Os scripts `db:*` da raiz repassam para `tinyPet` (`pnpm --filter @tinypet/web db:push` etc.).
+Tudo junto: `yarn dev` (turbo). Os scripts `db:*` da raiz repassam para `tinyPet` (`yarn workspace @tinypet/web db:push` etc.).
 
 Logins de demonstração (senha `tinypet123`): `admin@tinypet.local`, `tutor@tinypet.local`, `parceiro@tinypet.local`.
 
@@ -52,17 +52,18 @@ Seed: dados de referência (espécies, raças, categorias, planos, features, bad
 
 - Produção exige `JWT_SECRET` e `NEXTAUTH_SECRET` fortes (≥ 32 caracteres, não placeholders) — o app não sobe sem eles.
 - Rate limit persistido na tabela `rate_limits` (login por e-mail e por IP, cadastro, códigos de verificação). IP: atrás do proxy reverso (nginx/Caddy) defina `TRUST_PROXY=1` — a API usa o primeiro IP de `X-Forwarded-For`, então o proxy deve sobrescrever o header (ver `docs/deploy.md`); sem isso o limite vale por chave (e-mail/usuário) apenas.
+- Auditoria de mídia (admin → Auditoria de mídia): denúncias de fotos/vídeos, exclusão real e sanções (conta 7/15/30 dias ou permanente, IP por 7 dias, bloqueio de denúncias). Regras públicas em `/regras-da-comunidade`.
 - CORS por allowlist: `NEXT_PUBLIC_APP_URL` + `CORS_ORIGINS` (localhost só em dev). Requisições com cookie e sem `Authorization: Bearer` que alteram estado precisam de `Origin` permitido e `Content-Type: application/json`.
 - App mobile: JWT de 30 dias com `tokenVersion`; `POST /api/v1/auth/logout` e a exclusão de conta invalidam todos os tokens do usuário.
 
 ## tinyPetApp (app iOS/Android)
 
-- O workspace usa `node-linker=hoisted` (`.npmrc`), exigido pelo Metro/Expo com pnpm. O `metro.config.js` observa a raiz do repositório para resolver `@tinypet/shared`.
+- Yarn workspaces instalam as dependências de todos os projetos em `node_modules` na raiz (hoisting), como o Metro/Expo espera. O `metro.config.js` observa a raiz do repositório para resolver `@tinypet/shared`.
 - Em dispositivo físico, defina `EXPO_PUBLIC_API_URL` com o IP da máquina (ex.: `http://192.168.0.10:3033`). No emulador Android use `http://10.0.2.2:3033`.
 - Em desenvolvimento sem S3, as URLs de mídia usam `NEXT_PUBLIC_APP_URL`. Para ver imagens em aparelho/emulador, rode a web com `NEXT_PUBLIC_APP_URL` apontando para o mesmo IP (ex.: `http://192.168.0.10:3033`). Em produção as mídias vêm do S3.
 - O app precisa de build de desenvolvimento (`npx expo run:ios` / `npx expo run:android` ou EAS) por causa do módulo nativo de vídeo; não roda no Expo Go.
 - iOS com Xcode 26: o plugin `plugins/with-fmt-xcode26.js` corrige a compilação do pod `fmt` do React Native 0.76.
-- Verificações: `pnpm --filter @tinypet/app typecheck` e `npx expo-doctor` em `tinyPetApp/`.
+- Verificações: `yarn workspace @tinypet/app typecheck` e `npx expo-doctor` em `tinyPetApp/`.
 - Builds de loja via EAS (`eas build`), ainda não configurado.
 
 ## Jobs
@@ -79,9 +80,11 @@ Variáveis: `S3_BUCKET`, `AWS_REGION` (ou `S3_REGION`; padrão `sa-east-1`), `AW
 
 Configuração do bucket:
 - **Permissões da API** (usuário IAM ou role): `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` no bucket.
-- **CORS do bucket**: permitir `PUT` da origem do site (`NEXT_PUBLIC_APP_URL`) com os cabeçalhos `Content-Type` e `Content-Disposition`.
+- **CORS do bucket**: permitir `PUT` (upload) e `GET` (botão "Baixar" do visualizador da galeria) da origem do site (`NEXT_PUBLIC_APP_URL`), com os cabeçalhos `Content-Type` e `Content-Disposition`. Sem o `GET`, "Baixar" abre o arquivo numa nova aba.
 - **Leitura pública** das mídias pelo `S3_PUBLIC_URL` (de preferência CloudFront com o bucket privado via OAC).
 - PDFs e vídeos são gravados com `Content-Disposition: attachment`.
+
+**Fotos da galeria** são recortadas no navegador (1:1, 16:9 ou 9:16) e convertidas para WebP com lado maior ≤ 1920 px antes do upload (`tinyPet/src/lib/image-webp.ts`): HEIC/HEIF é decodificado com `heic2any` e, onde o canvas não gera WebP (Safari), usa o codificador WASM `@jsquash/webp`.
 
 **Vídeos** são sempre convertidos **no dispositivo** (web e app) antes do envio: MP4 H.264 + AAC, 1080p ou 720p (1920×1080, 1280×720, 1080×1920 ou 720×1280 — 16:9 ou 9:16), vídeo ≤ 1 Mbps e áudio ≤ 128 kbps (`VIDEO_OUTPUT` em `@tinypet/shared`). Com o limite de 10 MB isso dá ~70 s. Fluxo:
 1. Converter o vídeo no dispositivo e escolher a capa (um quadro do vídeo por padrão, ou uma imagem recortada em 16:9/9:16).

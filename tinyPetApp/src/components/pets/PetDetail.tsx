@@ -15,8 +15,9 @@ import { RotinaTab } from "./RotinaTab";
 import { AlimentacaoTab } from "./AlimentacaoTab";
 import { ConquistasTab } from "./ConquistasTab";
 import { CompartilhamentoTab } from "./CompartilhamentoTab";
+import { RedesSociaisTab } from "./RedesSociaisTab";
 
-type TabKey = "ficha" | "galeria" | "historico" | "saude" | "comandos" | "rotina" | "alimentacao" | "conquistas" | "compartilhamento";
+type TabKey = "ficha" | "galeria" | "historico" | "saude" | "comandos" | "rotina" | "alimentacao" | "redes" | "conquistas" | "compartilhamento";
 const OWNER_TABS: { key: TabKey; label: string }[] = [
   { key: "ficha", label: "Ficha" },
   { key: "galeria", label: "Galeria" },
@@ -25,6 +26,7 @@ const OWNER_TABS: { key: TabKey; label: string }[] = [
   { key: "comandos", label: "Comandos" },
   { key: "rotina", label: "Rotina" },
   { key: "alimentacao", label: "Alimentação" },
+  { key: "redes", label: "Redes sociais" },
   { key: "conquistas", label: "Conquistas" },
   { key: "compartilhamento", label: "Compartilhamento" },
 ];
@@ -66,6 +68,7 @@ export function PetDetail({ petId, mode, partnerTypes = [], initialTab = "ficha"
         {tab === "comandos" ? <ComandosTab petId={pet.id} canEdit={canEdit || mode === "partner"} canValidate={canValidate} /> : null}
         {tab === "rotina" ? <RotinaTab petId={pet.id} canEdit={canEdit || mode === "partner"} isOwner={isOwner && !readOnly} canComplete={isOwner} partnerMode={mode === "partner"} /> : null}
         {tab === "alimentacao" && isOwner ? <AlimentacaoTab petId={pet.id} canEdit={canEdit} /> : null}
+        {tab === "redes" ? <RedesSociaisTab petId={pet.id} canEdit={mode === "partner" ? partnerOwnsProfile : !readOnly} /> : null}
         {tab === "conquistas" ? <ConquistasTab petId={pet.id} /> : null}
         {tab === "compartilhamento" && isOwner ? <CompartilhamentoTab pet={pet} /> : null}
       </View>

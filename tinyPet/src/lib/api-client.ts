@@ -27,6 +27,14 @@ export class ApiClientError extends Error {
   }
 }
 
+/** A suspended account (media-audit sanction) is signed out once and sent to the login page, which explains why. */
+let signingOut = false;
+function onApiError(code: string) {
+  if (code !== "ACCOUNT_SUSPENDED" || signingOut || typeof window === "undefined") return;
+  signingOut = true;
+  void import("next-auth/react").then(({ signOut }) => signOut({ callbackUrl: "/entrar?erro=suspensa" }));
+}
+
 /** Browser fetch wrapper for /api/v1. Uses the NextAuth cookie session; sends X-Partner-Id from local storage. */
 export async function api<T>(path: string, init?: RequestInit & { partnerId?: string | null; json?: unknown }): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -36,7 +44,10 @@ export async function api<T>(path: string, init?: RequestInit & { partnerId?: st
   const res = await fetch(`/api/v1${path}`, { ...init, headers, body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body, credentials: "include" });
   const body = (await res.json().catch(() => null)) as ApiResponse<T> | null;
   if (!body) throw new ApiClientError(res.status, "NETWORK", "Resposta inválida do servidor");
-  if (!body.ok) throw new ApiClientError(res.status, body.error.code, body.error.message, body.error.details);
+  if (!body.ok) {
+    onApiError(body.error.code);
+    throw new ApiClientError(res.status, body.error.code, body.error.message, body.error.details);
+  }
   return body.data;
 }
 
@@ -47,6 +58,9 @@ export async function apiList<T>(path: string, init?: RequestInit & { partnerId?
   const res = await fetch(`/api/v1${path}`, { ...init, headers, credentials: "include" });
   const body = (await res.json().catch(() => null)) as (ApiResponse<T> & { meta?: { page: number; pageSize: number; total: number } }) | null;
   if (!body) throw new ApiClientError(res.status, "NETWORK", "Resposta inválida do servidor");
-  if (!body.ok) throw new ApiClientError(res.status, body.error.code, body.error.message, body.error.details);
+  if (!body.ok) {
+    onApiError(body.error.code);
+    throw new ApiClientError(res.status, body.error.code, body.error.message, body.error.details);
+  }
   return { data: body.data, meta: body.meta };
 }

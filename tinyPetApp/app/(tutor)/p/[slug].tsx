@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { formatBRL } from "@tinypet/shared";
@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/auth-store";
 import { addressText, linksFor, openRoute } from "@/lib/nav";
 import { radius, spacing, useTheme } from "@/lib/theme";
 import type { CatalogItem } from "@/lib/types";
-import { Avatar, Badge, Button, ErrorState, ListItem, Loading, Screen, Section, Segmented, Text } from "@/components/ui";
+import { Avatar, Badge, Button, ErrorState, ListItem, Loading, Screen, Section, Segmented, Sheet, Text } from "@/components/ui";
+import { ReportMediaButton } from "@/components/media/ReportMedia";
 import { BackHeader } from "@/components/BackHeader";
 import { Stars, ReviewRow } from "@/components/Reviews";
 import { openExternal, openLocal, telUrl, whatsappUrl } from "@/lib/links";
@@ -23,6 +24,7 @@ export default function PartnerPage() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const q = usePublicPartner(slug);
   const [tab, setTab] = useState<"catalog" | "reviews" | "info">("catalog");
+  const [photo, setPhoto] = useState<{ id: string; url: string; caption?: string | null } | null>(null);
   const p = q.data;
   const items: CatalogItem[] = p?.items ?? p?.catalogItems ?? [];
   const address = p?.address ?? p?.addresses?.find((a) => a.isPrimary) ?? p?.addresses?.[0] ?? null;
@@ -53,7 +55,9 @@ export default function PartnerPage() {
             {p.venuePhotos?.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: spacing.md }}>
                 {p.venuePhotos.map((v) => (
-                  <Image key={v.id} source={{ uri: v.thumbUrl ?? v.url }} style={{ width: 140, height: 100, borderRadius: radius.md, backgroundColor: t.surfaceAlt }} contentFit="cover" accessibilityLabel={v.caption ?? "Foto do local"} />
+                  <Pressable key={v.id} onPress={() => setPhoto(v)} accessibilityRole="imagebutton" accessibilityLabel={v.caption ?? "Foto do local"}>
+                    <Image source={{ uri: v.thumbUrl ?? v.url }} style={{ width: 140, height: 100, borderRadius: radius.md, backgroundColor: t.surfaceAlt }} contentFit="cover" />
+                  </Pressable>
                 ))}
               </ScrollView>
             ) : null}
@@ -123,6 +127,16 @@ export default function PartnerPage() {
           </>
         ) : null}
       </Screen>
+      <Sheet visible={!!photo} onClose={() => setPhoto(null)} title={photo?.caption ?? "Foto do local"}>
+        {photo ? (
+          <View>
+            <Image source={{ uri: photo.url }} style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: radius.md, backgroundColor: t.surfaceAlt }} contentFit="contain" />
+            <View style={{ marginTop: spacing.sm, alignSelf: "flex-start" }}>
+              <ReportMediaButton url={photo.url} />
+            </View>
+          </View>
+        ) : null}
+      </Sheet>
     </>
   );
 }

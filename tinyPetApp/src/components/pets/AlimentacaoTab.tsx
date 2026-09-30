@@ -1,14 +1,15 @@
 import React, { useMemo, useState } from "react";
 import { Alert, View } from "react-native";
 import { useRouter } from "expo-router";
-import { formatBRL } from "@tinypet/shared";
+import { formatBRL, parseWeightToGrams, type WeightUnit } from "@tinypet/shared";
+import { Image } from "expo-image";
 import { useFoodMutations, useFoodSuggestions, useFoods } from "@/hooks/use-pets";
 import { useBrands } from "@/hooks/use-ref";
 import { errorMessage } from "@/lib/api";
 import { fmtDate, fmtDay } from "@/lib/format";
 import { spacing } from "@/lib/theme";
 import type { PetFood } from "@/lib/types";
-import { Avatar, Button, Card, Checkbox, Empty, ErrorState, Input, ListItem, Loading, Section, Select, Sheet, Text } from "@/components/ui";
+import { Avatar, Button, Card, Checkbox, Empty, ErrorState, Input, ListItem, Loading, Section, Select, Sheet, Text, WeightInput } from "@/components/ui";
 
 const TYPE_LABEL: Record<PetFood["type"], string> = { DRY: "Ração seca", WET: "Ração úmida", NATURAL: "Alimentação natural", TREAT: "Petisco", SUPPLEMENT: "Suplemento" };
 
@@ -20,13 +21,22 @@ export function AlimentacaoTab({ petId, canEdit }: { petId: string; canEdit: boo
   const sugg = useFoodSuggestions(petId, (foods.data?.length ?? 0) > 0);
   const { create, remove } = useFoodMutations(petId);
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState<{ type: PetFood["type"]; brandId: string | null; productLineId: string | null; brandOther: string; packageSizeG: string; dailyGrams: string; lastPurchaseAt: string; offersEnabled: boolean }>({ type: "DRY", brandId: null, productLineId: null, brandOther: "", packageSizeG: "", dailyGrams: "", lastPurchaseAt: "", offersEnabled: true });
+  const empty = { type: "DRY" as PetFood["type"], brandId: null as string | null, productLineId: null as string | null, flavorId: null as string | null, brandOther: "", packageSize: "", packageUnit: "kg" as WeightUnit, daily: "", dailyUnit: "g" as WeightUnit, lastPurchaseAt: "", offersEnabled: true };
+  const [f, setF] = useState(empty);
   const lines = useMemo(() => brands.data?.find((b) => b.id === f.brandId)?.lines ?? [], [brands.data, f.brandId]);
+  const line = lines.find((l) => l.id === f.productLineId);
+  const flavors = line?.flavors ?? [];
+  const preview = flavors.find((x) => x.id === f.flavorId)?.imageUrl ?? line?.imageUrl ?? null;
+  const packageSizeG = parseWeightToGrams(f.packageSize, f.packageUnit);
+  const dailyGrams = parseWeightToGrams(f.daily, f.dailyUnit);
+  const invalid = packageSizeG === undefined || dailyGrams === undefined;
 
   const save = async () => {
+    if (invalid) return;
     try {
-      await create.mutateAsync({ type: f.type, brandId: f.brandId, productLineId: f.productLineId, brandOther: f.brandOther || null, packageSizeG: f.packageSizeG ? Number(f.packageSizeG) : null, dailyGrams: f.dailyGrams ? Number(f.dailyGrams) : null, lastPurchaseAt: f.lastPurchaseAt || null, offersEnabled: f.offersEnabled });
+      await create.mutateAsync({ type: f.type, brandId: f.brandId, productLineId: f.productLineId, flavorId: f.flavorId, brandOther: f.brandOther || null, packageSizeG, dailyGrams, lastPurchaseAt: f.lastPurchaseAt || null, offersEnabled: f.offersEnabled });
       setOpen(false);
+      setF(empty);
     } catch (e) {
       Alert.alert("Erro", errorMessage(e));
     }
@@ -43,12 +53,14 @@ export function AlimentacaoTab({ petId, canEdit }: { petId: string; canEdit: boo
         {items.map((it) => {
           const brand = it.brand?.name ?? it.brandOther ?? "Marca não informada";
           const line = it.productLine?.name;
+          const img = it.flavor?.imageUrl ?? it.productLine?.imageUrl ?? null;
           const days = it.packageSizeG && it.dailyGrams ? Math.floor(it.packageSizeG / it.dailyGrams) : null;
           return (
             <ListItem
               key={it.id}
-              title={`${brand}${line ? ` · ${line}` : ""}`}
-              subtitle={[TYPE_LABEL[it.type], it.packageSizeG ? `${(it.packageSizeG / 1000).toLocaleString("pt-BR")} kg` : null, it.dailyGrams ? `${it.dailyGrams} g/dia` : null, runsOut(it.lastPurchaseAt, days) ? `acaba em ~${runsOut(it.lastPurchaseAt, days)}` : days ? `dura ~${days} dias` : null].filter(Boolean).join(" · ")}
+              left={img ? <Image source={{ uri: img }} style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: "#fff" }} contentFit="contain" /> : undefined}
+              title={`${brand}${line ? ` · ${line}` : ""}${it.flavor?.name ? ` · ${it.flavor.name}` : ""}`}
+              subtitle={[TYPE_LABEL[it.type], it.packageSizeG ? fmtGrams(it.packageSizeG) : null, it.dailyGrams ? `${fmtGrams(it.dailyGrams)}/dia` : null, runsOut(it.lastPurchaseAt, days) ? `acaba em ~${runsOut(it.lastPurchaseAt, days)}` : days ? `dura ~${days} dias` : null].filter(Boolean).join(" · ")}
               chevron={false}
               right={canEdit ? <Button title="Remover" variant="ghost" size="sm" onPress={() => remove.mutateAsync(it.id).catch((e) => Alert.alert("Erro", errorMessage(e)))} /> : undefined}
             />
@@ -86,18 +98,22 @@ export function AlimentacaoTab({ petId, canEdit }: { petId: string; canEdit: boo
 
       <Sheet visible={open} onClose={() => setOpen(false)} title="Novo alimento">
         <Select label="Tipo" value={f.type} onChange={(v) => setF({ ...f, type: (v ?? "DRY") as PetFood["type"] })} options={(Object.keys(TYPE_LABEL) as PetFood["type"][]).map((k) => ({ value: k, label: TYPE_LABEL[k] }))} />
-        <Select label="Marca" value={f.brandId} onChange={(v) => setF({ ...f, brandId: v, productLineId: null })} options={(brands.data ?? []).map((b) => ({ value: b.id, label: b.name }))} searchable allowClear placeholder="Selecionar marca" />
-        {lines.length ? <Select label="Linha / produto" value={f.productLineId} onChange={(v) => setF({ ...f, productLineId: v })} options={lines.map((l) => ({ value: l.id, label: l.name }))} allowClear /> : null}
+        <Select label="Marca" value={f.brandId} onChange={(v) => setF({ ...f, brandId: v, productLineId: null, flavorId: null })} options={(brands.data ?? []).map((b) => ({ value: b.id, label: b.name }))} searchable allowClear placeholder="Selecionar marca" />
+        {lines.length ? <Select label="Linha / produto" value={f.productLineId} onChange={(v) => setF({ ...f, productLineId: v, flavorId: null })} options={lines.map((l) => ({ value: l.id, label: l.name }))} allowClear /> : null}
+        {flavors.length ? <Select label="Sabor" value={f.flavorId} onChange={(v) => setF({ ...f, flavorId: v })} options={flavors.map((x) => ({ value: x.id, label: x.name }))} allowClear /> : null}
+        {preview ? <Image source={{ uri: preview }} style={{ width: "100%", height: 160, borderRadius: 12, backgroundColor: "#fff", marginBottom: spacing.md }} contentFit="contain" accessibilityLabel={`Embalagem de ${line?.name ?? "ração"}`} /> : null}
         {!f.brandId ? <Input label="Outra marca" value={f.brandOther} onChangeText={(v) => setF({ ...f, brandOther: v })} hint="Sugerimos ao admin para aprovação" /> : null}
-        <Input label="Tamanho da embalagem (g)" keyboardType="number-pad" value={f.packageSizeG} onChangeText={(v) => setF({ ...f, packageSizeG: v })} />
-        <Input label="Quantidade diária (g)" keyboardType="number-pad" value={f.dailyGrams} onChangeText={(v) => setF({ ...f, dailyGrams: v })} />
+        <WeightInput label="Tamanho da embalagem" value={f.packageSize} unit={f.packageUnit} onChange={(v, u) => setF({ ...f, packageSize: v, packageUnit: u })} />
+        <WeightInput label="Quantidade diária" value={f.daily} unit={f.dailyUnit} onChange={(v, u) => setF({ ...f, daily: v, dailyUnit: u })} />
         <Input label="Última compra" placeholder="AAAA-MM-DD" value={f.lastPurchaseAt} onChangeText={(v) => setF({ ...f, lastPurchaseAt: v })} />
         <Checkbox checked={f.offersEnabled} onChange={(v) => setF({ ...f, offersEnabled: v })} label="Receber ofertas desta marca" />
-        <Button title="Salvar" onPress={save} loading={create.isPending} style={{ marginTop: spacing.md }} />
+        <Button title="Salvar" onPress={save} loading={create.isPending} disabled={invalid} style={{ marginTop: spacing.md }} />
       </Sheet>
     </View>
   );
 }
+
+const fmtGrams = (g: number) => (g >= 1000 ? `${String(g / 1000).replace(".", ",")} kg` : `${g} g`);
 
 /** Estimated end of the package: last purchase + package / daily grams (dd/MM), or null. */
 function runsOut(lastPurchaseAt: string | null | undefined, days: number | null): string | null {

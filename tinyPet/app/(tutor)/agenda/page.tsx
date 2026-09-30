@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ChevronLeft, ChevronRight, List, Navigation, X } from "lucide-react";
 import { useCancelAppointment, useMyAppointments, useRescheduleAppointment, type Appointment } from "@/hooks/use-appointments";
@@ -148,9 +148,15 @@ function AppointmentDrawer({ a, onClose }: { a: Appointment; onClose: () => void
   const finished = ["COMPLETED", "CANCELED", "NO_SHOW"].includes(a.status);
   const hours = a.partner?.cancellationHours;
   const cutoffPassed = hours != null && new Date(a.startsAt).getTime() - Date.now() < hours * 3600_000;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
+  // Closes on ✕ / Escape only — not on an outside click.
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/40" onClick={onClose} role="dialog" aria-modal="true" aria-label="Detalhes da visita">
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/40" role="dialog" aria-modal="true" aria-label="Detalhes da visita">
       <aside className="h-full w-full max-w-md overflow-y-auto bg-[var(--card)] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>

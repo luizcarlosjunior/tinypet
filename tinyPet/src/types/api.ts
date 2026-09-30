@@ -86,7 +86,7 @@ export type PlanInfo = { planKey: string; limits: Record<string, PlanLimit>; usa
 
 export type Species = { id: Id; key: string; label: string; breeds: { id: Id; name: string; isMixed?: boolean; isOther?: boolean }[] };
 export type Category = { id: Id; key: string; label: string; subcategories: { id: Id; key: string; label: string; categoryId?: Id }[] };
-export type Brand = { id: Id; name: string; status?: string; lines: { id: Id; name: string; status?: string }[] };
+export type Brand = { id: Id; name: string; status?: string; lines: { id: Id; name: string; status?: string; imageUrl?: string | null; flavors?: { id: Id; name: string; imageUrl: string | null }[] }[] };
 
 export type PetSummary = {
   id: Id;
@@ -312,5 +312,5 @@ export type PetHistoryEvent = {
   source?: string;
 };
 export type Measurement = { id: Id; measuredAt: string; weightG: number; heightCm?: number | string | null; lengthCm?: number | string | null; neckCm?: number | string | null; chestCm?: number | string | null; abdomenCm?: number | string | null; bodyScore?: number | null; notes?: string | null; vetVerified?: boolean; partnerId?: Id | null };
-export type Vaccination = { id: Id; kind: "VACCINE" | "DEWORMING"; name: string; appliedAt: string; nextDueAt?: string | null; notes?: string | null; partnerId?: Id | null };
+export type Vaccination = { id: Id; kind: "VACCINE" | "DEWORMING"; name: string; appliedAt: string; nextDueAt?: string | null; notes?: string | null; partnerId?: Id | null; measurement?: { id: Id; weightG: number } | null };
 export type PetSkillRow = { id?: Id; skillId: Id; name: string; level: "LEARNING" | "SOMETIMES" | "MASTERED"; masteredAt?: string | null; validated: boolean; markedBy?: string | null };

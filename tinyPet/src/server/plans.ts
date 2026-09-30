@@ -41,19 +41,26 @@ export async function hasFeature(audience: Audience, id: string, featureKey: str
   return l ? l.enabled : false;
 }
 
+/** 402 for a feature the plan doesn't include, naming it ("Seu plano não inclui Galeria de fotos e vídeos…"). */
+export async function featureNotIncluded(featureKey: string, current: number, planKey: string) {
+  const feature = await prisma.feature.findUnique({ where: { key: featureKey }, select: { label: true } });
+  const what = feature?.label ? `o recurso “${feature.label}”` : "este recurso";
+  return Errors.planLimit({ featureKey, current, limit: 0, planKey }, `Seu plano não inclui ${what}. Faça upgrade para usar.`);
+}
+
 /** Throws PLAN_LIMIT (402) when `current` already reached the plan quantity. */
 export async function assertLimit(audience: Audience, id: string, featureKey: string, current: number) {
   const { planKey, limits } = await getLimits(audience, id);
   const l = limits[featureKey];
   if (!l) return; // unknown feature => not limited
-  if (!l.enabled) throw Errors.planLimit({ featureKey, current, limit: 0, planKey });
+  if (!l.enabled) throw await featureNotIncluded(featureKey, current, planKey);
   if (l.quantity != null && current >= l.quantity) throw Errors.planLimit({ featureKey, current, limit: l.quantity, planKey });
 }
 
 export async function assertFeature(audience: Audience, id: string, featureKey: string) {
   const { planKey, limits } = await getLimits(audience, id);
   const l = limits[featureKey];
-  if (l && !l.enabled) throw Errors.planLimit({ featureKey, current: 0, limit: 0, planKey });
+  if (l && !l.enabled) throw await featureNotIncluded(featureKey, 0, planKey);
 }
 
 /** Usage summary for the "plan" screen. */

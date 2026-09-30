@@ -12,6 +12,8 @@ import { prisma } from "@/db";
 import { Errors } from "./errors";
 import { ensureDefaultSubscription } from "./plans";
 import { rateLimit, clientIpFromHeaders } from "./api";
+import { ApiError } from "./errors";
+import { accountSuspendedError, assertNotSuspended, ipBlockedError, isIpBlocked, rememberIp } from "./sanctions";
 
 // ───────────────────────────── secrets ─────────────────────────────
 
@@ -55,7 +57,11 @@ export async function verifyPasswordLogin(emailRaw: string, password: string, ip
     return null;
   }
   const okPwd = await verify(user.passwordHash, password).catch(() => false);
-  return okPwd ? user : null;
+  if (!okPwd) return null;
+  // Only after a correct password, so the suspension state doesn't leak which e-mails exist.
+  assertNotSuspended(user);
+  await rememberIp(user.id, ip);
+  return user;
 }
 
 // ───────────────────────────── NextAuth ─────────────────────────────
@@ -115,12 +121,14 @@ const providers: NextAuthOptions["providers"] = [
     async authorize(creds, req) {
       if (!creds?.email || !creds.password) return null;
       const ip = clientIpFromHeaders((req?.headers ?? {}) as Record<string, string | string[] | undefined>);
+      if (await isIpBlocked(ip)) throw new Error(ipBlockedError().message);
       try {
         const user = await verifyPasswordLogin(creds.email, creds.password, ip);
         if (!user) return null;
         return { id: user.id, name: user.name, email: user.email, image: user.avatarUrl };
       } catch (e) {
         if (e instanceof Error && (e as { status?: number }).status === 429) throw new Error("Muitas tentativas. Tente novamente em alguns minutos.");
+        if (e instanceof ApiError && e.code === "ACCOUNT_SUSPENDED") throw new Error(e.message);
         throw e;
       }
     },
@@ -139,6 +147,13 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/entrar" },
   providers,
   callbacks: {
+    /** OAuth sign-in of a suspended account is refused (credentials login throws its own message). */
+    async signIn({ user }) {
+      if (!user?.id) return true;
+      const u = await prisma.user.findUnique({ where: { id: user.id }, select: { suspendedUntil: true } });
+      if (u?.suspendedUntil && u.suspendedUntil.getTime() > Date.now()) return "/entrar?erro=suspensa";
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) token.uid = user.id;
       return token;
@@ -178,42 +193,52 @@ export async function revokeMobileTokens(userId: string) {
   await prisma.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } });
 }
 
-async function userFromBearer(req: NextRequest): Promise<AuthUser | null> {
+type ResolvedUser = AuthUser & { suspendedUntil: Date | null };
+
+async function userFromBearer(req: NextRequest): Promise<ResolvedUser | null> {
   const h = req.headers.get("authorization");
   if (!h?.startsWith("Bearer ")) return null;
   try {
     const { payload } = await jwtVerify(h.slice(7), JWT_SECRET, { issuer: JWT_ISSUER, audience: JWT_AUDIENCE, algorithms: ["HS256"] });
     if (!payload.sub || payload.typ !== "mobile" || typeof payload.tv !== "number") return null;
-    const u = await prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, name: true, email: true, role: true, avatarUrl: true, deletedAt: true, tokenVersion: true } });
+    const u = await prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, name: true, email: true, role: true, avatarUrl: true, deletedAt: true, tokenVersion: true, suspendedUntil: true } });
     if (!u || u.deletedAt || u.tokenVersion !== payload.tv) return null;
-    return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl };
+    return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl, suspendedUntil: u.suspendedUntil };
   } catch {
     return null;
   }
 }
 
-async function userFromSession(): Promise<AuthUser | null> {
+async function userFromSession(): Promise<ResolvedUser | null> {
   const session = await getServerSession(authOptions);
   const id = (session?.user as { id?: string } | undefined)?.id;
   if (!id) return null;
-  const u = await prisma.user.findUnique({ where: { id }, select: { id: true, name: true, email: true, role: true, avatarUrl: true, deletedAt: true } });
+  const u = await prisma.user.findUnique({ where: { id }, select: { id: true, name: true, email: true, role: true, avatarUrl: true, deletedAt: true, suspendedUntil: true } });
   if (!u || u.deletedAt) return null;
-  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl };
+  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl, suspendedUntil: u.suspendedUntil };
 }
 
-/** Resolves the current user from Bearer JWT (mobile) or NextAuth cookie (web). */
-export async function getUser(req?: NextRequest): Promise<AuthUser | null> {
-  if (req) {
-    // A Bearer header means "mobile client": never fall back to the cookie session for it.
-    if (req.headers.get("authorization")?.startsWith("Bearer ")) return userFromBearer(req);
-  }
+async function resolveUser(req?: NextRequest): Promise<ResolvedUser | null> {
+  // A Bearer header means "mobile client": never fall back to the cookie session for it.
+  if (req?.headers.get("authorization")?.startsWith("Bearer ")) return userFromBearer(req);
   return userFromSession();
 }
 
+const isSuspended = (u: ResolvedUser) => !!u.suspendedUntil && u.suspendedUntil.getTime() > Date.now();
+const strip = ({ suspendedUntil: _s, ...u }: ResolvedUser): AuthUser => u;
+
+/** Resolves the current user from Bearer JWT (mobile) or NextAuth cookie (web). Suspended accounts resolve to null. */
+export async function getUser(req?: NextRequest): Promise<AuthUser | null> {
+  const u = await resolveUser(req);
+  return u && !isSuspended(u) ? strip(u) : null;
+}
+
+/** 401 without a session; 403 ACCOUNT_SUSPENDED (with the end date) for suspended accounts. */
 export async function requireUser(req?: NextRequest): Promise<AuthUser> {
-  const u = await getUser(req);
+  const u = await resolveUser(req);
   if (!u) throw Errors.unauthorized();
-  return u;
+  if (isSuspended(u)) throw accountSuspendedError(u.suspendedUntil!);
+  return strip(u);
 }
 
 export async function requireAdmin(req?: NextRequest): Promise<AuthUser> {

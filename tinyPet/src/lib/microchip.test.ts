@@ -32,3 +32,32 @@ describe("microchip", () => {
     for (const l of MICROCHIP_LOOKUPS) expect(l.url.startsWith("https://")).toBe(true);
   });
 });
+
+import { microchipParts, microchipProblem, petSchema as petSchemaForChip } from "@tinypet/shared";
+
+describe("microchip rules (ISO 11784/11785)", () => {
+  it("rejects numbers starting with 900 (factory/test chips)", () => {
+    expect(microchipProblem("900123456789012")).toBe("TEST_PREFIX");
+    expect(isValidMicrochip("900123456789012")).toBe(false);
+    const r = petSchemaForChip.safeParse({ name: "Rex", speciesKey: "dog", sex: "MALE", microchip: "900 123 456 789 012" });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues[0]?.message).toMatch(/900/);
+  });
+  it("tells letters from wrong length", () => {
+    expect(microchipProblem("98102000012345A")).toBe("NOT_NUMERIC");
+    expect(microchipProblem("98102000012345")).toBe("LENGTH");
+    expect(microchipProblem("")).toBe("EMPTY");
+    expect(microchipProblem("981020000123456")).toBeNull();
+  });
+  it("splits code and serial, naming known manufacturers and Brazil", () => {
+    expect(microchipParts("981020000123456")).toEqual({ code: "981", serial: "020000123456", kind: "MANUFACTURER", label: "Fabricante: Datamars (código secundário) (Datamars Microchips)" });
+    expect(microchipParts("977200000123456")?.label).toBe("Fabricante: Virbac (BackHome)");
+    expect(microchipParts("933000000123456")?.label).toBe("Fabricante: Avid Identification Systems (Avid FriendChip)");
+    expect(microchipParts("076123456789012")?.label).toBe("País: Brasil");
+    expect(microchipParts("840123456789012")?.label).toBe("País: Estados Unidos");
+    expect(microchipParts("032123456789012")?.label).toBe("País: Argentina");
+    expect(microchipParts("100123456789012")?.label).toBe("Código de país");
+    expect(microchipParts("963000012345678")?.label).toBe("Código de fabricante");
+    expect(microchipParts("12345")).toBeNull();
+  });
+});

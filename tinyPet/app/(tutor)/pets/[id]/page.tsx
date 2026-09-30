@@ -13,6 +13,7 @@ import { PetHealth } from "@/components/pets/pet-health";
 import { PetSkills } from "@/components/pets/pet-skills";
 import { PetRoutine } from "@/components/pets/pet-routine";
 import { PetFoods } from "@/components/pets/pet-foods";
+import { PetSocial } from "@/components/pets/pet-social";
 import { PetSharing } from "@/components/pets/pet-sharing";
 import { PetBadges } from "@/components/pets/pet-badges";
 import { BirthdayCard } from "@/components/pets/birthday-card";
@@ -28,6 +29,7 @@ const TABS = [
   ["comandos", "Comandos"],
   ["rotina", "Rotina"],
   ["alimentacao", "Alimentação"],
+  ["redes", "Redes sociais"],
   ["compartilhamento", "Compartilhamento"],
   ["conquistas", "Conquistas"],
 ] as const;
@@ -97,6 +99,7 @@ function PetDetail({ id }: { id: string }) {
         {tab === "comandos" && <PetSkills petId={p.id} deceased={deceased} readOnly={readOnly} />}
         {tab === "rotina" && <PetRoutine petId={p.id} deceased={deceased} readOnly={readOnly} />}
         {tab === "alimentacao" && <PetFoods petId={p.id} deceased={deceased} readOnly={readOnly} />}
+        {tab === "redes" && <PetSocial petId={p.id} canEdit={!readOnly} />}
         {tab === "compartilhamento" && <PetSharing petId={p.id} petName={p.name} deceased={deceased} />}
         {tab === "conquistas" && <PetBadges petId={p.id} />}
       </section>

@@ -3,6 +3,7 @@ import { mapsLinks, safeHref } from "@tinypet/shared";
 import { WEEKDAYS } from "@/lib/format";
 import { addressLine } from "@/lib/format";
 import { SOCIAL_LABEL, num, type PublicAddress, type PublicPartner } from "./types";
+import { ReportMediaButton } from "@/components/media/report-media";
 
 export function BusinessHours({ hours }: { hours: PublicPartner["businessHours"] }) {
   if (!hours?.length) return null;
@@ -113,7 +114,10 @@ export function VenuePhotos({ photos }: { photos: PublicPartner["venuePhotos"] }
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={safeHref(p.thumbUrl ?? p.url)} alt={p.caption ?? "Foto do estabelecimento"} loading="lazy" className="aspect-square w-full object-cover transition hover:scale-[1.02]" />
             </a>
-            {p.caption && <p className="mt-1 text-xs text-[var(--muted)]">{p.caption}</p>}
+            <div className="mt-1 flex items-start justify-between gap-2">
+              {p.caption ? <p className="text-xs text-[var(--muted)]">{p.caption}</p> : <span />}
+              <ReportMediaButton url={p.url} compact />
+            </div>
           </li>
         ))}
       </ul>

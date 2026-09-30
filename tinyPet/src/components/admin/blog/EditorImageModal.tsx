@@ -50,7 +50,7 @@ export function EditorImageModal({ open, onClose, onSelect }: { open: boolean; o
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-0 sm:p-4">
       <div role="dialog" aria-modal="true" aria-label="Inserir imagem" className="flex h-full w-full flex-col overflow-hidden bg-[var(--card)] p-4 sm:h-[85vh] sm:max-w-4xl sm:rounded-2xl sm:p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-start justify-between gap-2">
           <div>

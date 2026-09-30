@@ -175,6 +175,23 @@ export const VIDEO_DURATION_TOLERANCE_SECONDS = 0.5;
 /** Pet microchips follow ISO 11784/11785: exactly 15 digits. */
 export const MICROCHIP_DIGITS = 15;
 
+/** "Sobre o microchip" help shown next to the field (web and app). */
+export const MICROCHIP_INFO = {
+  intro: "O número do microchip (também chamado de transponder) segue o padrão internacional ISO 11784/11785 e tem 15 dígitos numéricos.",
+  parts: [
+    { title: "3 primeiros dígitos — fabricante ou país", text: "Identificam quem produziu o chip ou o país de origem. Ex.: 981 é o código de um fabricante homologado (Datamars); 076 é o código oficial do Brasil (embora a maioria use o código do fabricante)." },
+    { title: "Códigos de país (001 a 899)", text: "Seguem o padrão ISO 3166-1 numérico e são usados quando a autoridade do país regulamenta e distribui os códigos nacionalmente. Ex.: 076 Brasil, 840 Estados Unidos, 124 Canadá, 276 Alemanha, 250 França, 724 Espanha, 620 Portugal, 032 Argentina, 858 Uruguai." },
+    { title: "Códigos de fabricante (900 a 998)", text: "Registrados no ICAR. Ex.: 933 Avid, 941 Datamars/Felixcan, 953 Allflex/MSD, 956 Trovan, 972 Planet ID, 977 Virbac, 981 Datamars, 982 Allflex, 985 Destron Fearing, 990 RealTrace, 991 FDX-B genérico." },
+    { title: "12 dígitos seguintes — número de série", text: "É a identificação exclusiva do seu animal: essa combinação garante que nenhum outro animal no mundo tenha o mesmo número." },
+  ],
+  invalidTitle: "O que torna um microchip inválido?",
+  invalid: [
+    "Ter mais ou menos de 15 dígitos.",
+    "Conter letras ou caracteres especiais (deve ser só numérico).",
+    "Começar com 900: essa numeração é reservada para testes de fábrica e chips de teste, então o número pode estar repetido em outros animais pelo mundo.",
+  ],
+} as const;
+
 export type MicrochipLookup = { key: string; group: string; groupDescription: string; name: string; description?: string; url: string };
 
 /**
@@ -219,3 +236,124 @@ export const MICROCHIP_LOOKUPS: readonly MicrochipLookup[] = [
     url: "https://animalltag.com.br/pet/",
   },
 ];
+
+export type PetSocialNetworkKey = "INSTAGRAM" | "TIKTOK" | "YOUTUBE" | "FACEBOOK" | "X" | "THREADS" | "PINTEREST";
+
+export type PetSocialNetwork = {
+  key: PetSocialNetworkKey;
+  label: string;
+  /** Hosts accepted when the user pastes a profile URL (without "www."). */
+  hosts: readonly string[];
+  /** Short-link hosts that cannot be resolved offline (the user must paste the profile link or the @). */
+  shortHosts?: readonly string[];
+  /** Allowed username, already lowercased and without "@". */
+  pattern: RegExp;
+  /** Profile URL paths prefix the username with "@" (TikTok, YouTube, Threads). */
+  atInPath: boolean;
+  /** First path segments that are not profiles (posts, pages, settings…). */
+  reserved: readonly string[];
+  /** Base used to rebuild the profile URL from the stored username. */
+  profileBase: string;
+  placeholder: string;
+};
+
+/**
+ * Pet social networks. Only the username is stored; the profile URL is rebuilt with `petSocialProfileUrl()`.
+ * Users may paste either the @username or a profile URL — `parsePetSocialUsername()` extracts the username.
+ */
+export const PET_SOCIAL_NETWORKS: readonly PetSocialNetwork[] = [
+  {
+    key: "INSTAGRAM",
+    label: "Instagram",
+    hosts: ["instagram.com", "m.instagram.com", "instagr.am"],
+    pattern: /^[a-z0-9._]{1,30}$/,
+    atInPath: false,
+    reserved: ["p", "reel", "reels", "tv", "explore", "accounts", "direct", "stories"],
+    profileBase: "https://www.instagram.com/",
+    placeholder: "@rex.dog ou instagram.com/rex.dog",
+  },
+  {
+    key: "TIKTOK",
+    label: "TikTok",
+    hosts: ["tiktok.com", "m.tiktok.com"],
+    shortHosts: ["vm.tiktok.com", "vt.tiktok.com"],
+    pattern: /^[a-z0-9._]{2,24}$/,
+    atInPath: true,
+    reserved: ["video", "discover", "tag", "music", "search", "foryou", "following", "live"],
+    profileBase: "https://www.tiktok.com/@",
+    placeholder: "@rexdog ou tiktok.com/@rexdog",
+  },
+  {
+    key: "YOUTUBE",
+    label: "YouTube",
+    hosts: ["youtube.com", "m.youtube.com"],
+    shortHosts: ["youtu.be"],
+    pattern: /^[a-z0-9._-]{3,30}$/,
+    atInPath: true,
+    reserved: ["watch", "shorts", "channel", "c", "user", "playlist", "results", "feed", "live", "embed"],
+    profileBase: "https://www.youtube.com/@",
+    placeholder: "@canaldorex ou youtube.com/@canaldorex",
+  },
+  {
+    key: "FACEBOOK",
+    label: "Facebook",
+    hosts: ["facebook.com", "m.facebook.com", "web.facebook.com", "fb.com"],
+    shortHosts: ["fb.me", "fb.watch"],
+    pattern: /^[a-z0-9.]{5,50}$/,
+    atInPath: false,
+    reserved: ["profile.php", "people", "pages", "groups", "watch", "share", "photo", "photo.php", "events", "story.php", "reel", "permalink.php", "marketplace", "gaming"],
+    profileBase: "https://www.facebook.com/",
+    placeholder: "rex.dog ou facebook.com/rex.dog",
+  },
+  {
+    key: "X",
+    label: "X (Twitter)",
+    hosts: ["x.com", "twitter.com", "mobile.twitter.com", "mobile.x.com"],
+    shortHosts: ["t.co"],
+    pattern: /^[a-z0-9_]{1,15}$/,
+    atInPath: false,
+    reserved: ["home", "i", "intent", "search", "hashtag", "share", "explore", "settings", "messages", "notifications", "compose"],
+    profileBase: "https://x.com/",
+    placeholder: "@rexdog ou x.com/rexdog",
+  },
+  {
+    key: "THREADS",
+    label: "Threads",
+    hosts: ["threads.net", "threads.com"],
+    pattern: /^[a-z0-9._]{1,30}$/,
+    atInPath: true,
+    reserved: ["search", "activity", "settings"],
+    profileBase: "https://www.threads.com/@",
+    placeholder: "@rex.dog ou threads.com/@rex.dog",
+  },
+  {
+    key: "PINTEREST",
+    label: "Pinterest",
+    hosts: ["pinterest.com", "br.pinterest.com", "pinterest.com.br"],
+    shortHosts: ["pin.it"],
+    pattern: /^[a-z0-9_]{3,30}$/,
+    atInPath: false,
+    reserved: ["pin", "search", "ideas", "today", "settings", "business"],
+    profileBase: "https://www.pinterest.com/",
+    placeholder: "rexdog ou pinterest.com/rexdog",
+  },
+];
+
+export type MediaReportReasonKey = "NUDITY_SEXUAL" | "VIOLENCE_CRUELTY" | "HATE_HARASSMENT" | "SPAM_SCAM" | "PERSONAL_DATA" | "NOT_PET_RELATED" | "OTHER";
+
+/** Community-rules reasons a user can pick when reporting a photo or video (see /regras-da-comunidade). */
+export const MEDIA_REPORT_REASONS: readonly { key: MediaReportReasonKey; label: string; description: string }[] = [
+  { key: "NUDITY_SEXUAL", label: "Nudez ou conteúdo sexual", description: "Nudez, atos sexuais ou conteúdo sexualizado." },
+  { key: "VIOLENCE_CRUELTY", label: "Violência ou maus-tratos", description: "Violência, sangue, animais feridos ou maltratados." },
+  { key: "HATE_HARASSMENT", label: "Ódio ou assédio", description: "Discurso de ódio, ofensas, ameaças ou perseguição." },
+  { key: "SPAM_SCAM", label: "Spam ou golpe", description: "Propaganda enganosa, golpes, venda ilegal de animais." },
+  { key: "PERSONAL_DATA", label: "Dados pessoais expostos", description: "Documentos, endereços, telefones ou rostos de terceiros sem consentimento." },
+  { key: "NOT_PET_RELATED", label: "Fora do tema", description: "Conteúdo sem relação com pets ou com o serviço." },
+  { key: "OTHER", label: "Outro motivo", description: "Descreva o problema." },
+];
+
+/** Sanction lengths offered to admins after a media audit. */
+export const SANCTION_DURATIONS = [7, 15, 30, "PERMANENT"] as const;
+export type SanctionDuration = (typeof SANCTION_DURATIONS)[number];
+/** IP blocks always last 7 days. */
+export const IP_BLOCK_DAYS = 7;

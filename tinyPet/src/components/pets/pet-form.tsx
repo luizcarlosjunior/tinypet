@@ -39,7 +39,7 @@ const empty = (v: unknown) => (v === "" ? null : v);
 /** `readOnly`: shared accounts see the registration but can't change it (fields disabled, no photo upload / save). */
 export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel, readOnly = false }: { pet?: Pet | null; onSubmit: (v: PetInput) => void; onCancel?: () => void; loading?: boolean; submitLabel?: string; readOnly?: boolean }) {
   const species = useSpecies();
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<PetInput>({ resolver: zodResolver(petSchema), defaultValues: toInput(pet) });
+  const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<PetInput>({ resolver: zodResolver(petSchema), defaultValues: toInput(pet) });
   const speciesKey = watch("speciesKey");
   const breedId = watch("breedId");
   const avatarUrl = watch("avatarUrl");
@@ -51,6 +51,15 @@ export function PetForm({ pet, onSubmit, onCancel, loading, submitLabel, readOnl
   useEffect(() => {
     if (breedId && breeds.length && !breeds.some((b) => b.id === breedId)) setValue("breedId", null);
   }, [speciesKey, breedId, breeds, setValue]);
+
+  // Species/breed options arrive after the form mounts: a native <select> registered before its <option>s exist shows
+  // the first option ("Não informada") while the form keeps the saved id. Re-apply the values once the options render.
+  const optionsReady = !!species.data?.length;
+  useEffect(() => {
+    if (!optionsReady) return;
+    setValue("speciesKey", getValues("speciesKey"));
+    setValue("breedId", getValues("breedId") ?? null);
+  }, [optionsReady, breeds.length, getValues, setValue]);
 
   return (
     <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit(onSubmit)} className="space-y-4" noValidate>

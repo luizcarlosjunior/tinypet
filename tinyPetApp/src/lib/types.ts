@@ -39,7 +39,7 @@ export type AuthPayload = { token: string; user: User; memberships: Membership[]
 export type Species = { id?: string; key: string; label: string; breeds?: Breed[] };
 export type Breed = { id: string; name: string; isMixed?: boolean; isOther?: boolean };
 export type OwnerTerm = { id: string; label: string; isDefault?: boolean };
-export type Brand = { id: string; name: string; lines?: { id: string; name: string }[] };
+export type Brand = { id: string; name: string; lines?: { id: string; name: string; imageUrl?: string | null; flavors?: { id: string; name: string; imageUrl: string | null }[] }[] };
 
 export type Pet = {
   id: string;
@@ -113,6 +113,8 @@ export type UsernameAvailability = { available: boolean; reason?: string };
 export type PetMedia = {
   id: string;
   kind: "IMAGE" | "VIDEO";
+  /** Null for items added by a partner. */
+  uploadedByUserId?: string | null;
   url: string;
   thumbUrl?: string | null;
   width?: number | null;
@@ -145,6 +147,8 @@ export type Vaccination = {
   nextDueAt?: string | null;
   notes?: string | null;
   partner?: { tradeName: string } | null;
+  /** Weight taken at the dose (recorded as a measurement). */
+  measurement?: { id: string; weightG: number } | null;
 };
 
 export type Measurement = {
@@ -192,7 +196,7 @@ export type SkillComparison = {
   note?: string | null;
 };
 
-export type TaskRule = { freq: "daily" | "weekly"; days?: number[]; times?: string[] };
+export type TaskRule = { freq: "daily" | "weekly" | "monthly"; days?: number[]; dayOfMonth?: number; times?: string[] };
 export type PetTask = {
   id: string;
   title: string;
@@ -202,12 +206,19 @@ export type PetTask = {
   status: "ACTIVE" | "PROPOSED" | "PAUSED" | "DONE" | string;
   /** Derived by useTasks from `today[]` of GET /pets/:id/tasks. */
   completedToday?: boolean;
-  /** Derived by useTasks from `completions[0]`. */
+  /** "Não deu hoje" with a reason (derived from `today[]`): doesn't break the streak. */
+  skippedToday?: boolean;
+  skipNote?: string | null;
+  /** From GET /me/home tasksToday. */
+  skipped?: boolean;
+  /** Due on `date` (listed in `today[]`). */
+  dueToday?: boolean;
+  /** Derived by useTasks from the latest DONE completion. */
   lastCompletedAt?: string | null;
   /** Derived by useTasks from `proposedByPartner`. */
   proposedBy?: { tradeName: string } | null;
   proposedByPartner?: { id: string; tradeName: string } | null;
-  completions?: { forDate: string; completedAt: string; user?: { id: string; name: string } | null }[];
+  completions?: { forDate: string; completedAt: string; status?: "DONE" | "SKIPPED"; note?: string | null; user?: { id: string; name: string } | null }[];
   /** tasksForDate rows (GET /me/home `tasksToday`, `today[]`): completion state for `forDate`. */
   forDate?: string;
   completed?: boolean;
@@ -221,8 +232,10 @@ export type PetFood = {
   type: "DRY" | "WET" | "NATURAL" | "TREAT" | "SUPPLEMENT";
   brand?: { id: string; name: string } | null;
   brandId?: string | null;
-  productLine?: { id: string; name: string } | null;
+  productLine?: { id: string; name: string; imageUrl?: string | null } | null;
   productLineId?: string | null;
+  flavor?: { id: string; name: string; imageUrl?: string | null } | null;
+  flavorId?: string | null;
   brandOther?: string | null;
   packageSizeG?: number | null;
   dailyGrams?: number | null;

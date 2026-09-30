@@ -3,7 +3,7 @@ import { prisma } from "@/db";
 import { handler, ok, parseBody, requireUser } from "@/server";
 
 export const GET = handler(async () => {
-  const brands = await prisma.brand.findMany({ where: { status: "APPROVED" }, orderBy: { name: "asc" }, include: { lines: { where: { status: "APPROVED" }, orderBy: { name: "asc" } } } });
+  const brands = await prisma.brand.findMany({ where: { status: "APPROVED" }, orderBy: { name: "asc" }, include: { lines: { where: { status: "APPROVED" }, orderBy: { name: "asc" }, include: { flavors: { where: { status: "APPROVED" }, orderBy: { name: "asc" }, select: { id: true, name: true, imageUrl: true } } } } } });
   return ok(brands);
 });
 

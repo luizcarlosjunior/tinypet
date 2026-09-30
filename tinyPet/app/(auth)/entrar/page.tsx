@@ -21,13 +21,14 @@ function EntrarForm() {
   const sp = useSearchParams();
   const router = useRouter();
   const next = safeNext(sp.get("next") ?? sp.get("callbackUrl"));
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(sp.get("erro") === "suspensa" ? "Sua conta está suspensa por violar as regras da comunidade. Entre em contato com o suporte se achar que foi um engano." : null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
   async function onSubmit(v: LoginInput) {
     setError(null);
     const r = await signIn("credentials", { email: v.email, password: v.password, redirect: false });
-    if (r?.error) return setError("E-mail ou senha incorretos.");
+    // authorize() throws pt-BR messages for suspended accounts, blocked IPs and rate limits; wrong credentials → "CredentialsSignin".
+    if (r?.error) return setError(r.error === "CredentialsSignin" ? "E-mail ou senha incorretos." : r.error);
     router.push(next);
     router.refresh();
   }

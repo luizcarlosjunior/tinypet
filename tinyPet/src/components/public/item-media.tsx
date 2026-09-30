@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ImageOff } from "lucide-react";
 import type { PublicItemMedia } from "./types";
 import { cn } from "@/lib/utils";
+import { ReportMediaButton } from "@/components/media/report-media";
 import { safeHref } from "@tinypet/shared";
 
 export function ItemMedia({ media, name }: { media: PublicItemMedia[]; name: string }) {
@@ -26,6 +27,9 @@ export function ItemMedia({ media, name }: { media: PublicItemMedia[]; name: str
           // eslint-disable-next-line @next/next/no-img-element
           <img src={safeHref(current.url)} alt={name} className="aspect-square w-full object-cover" />
         )}
+      </div>
+      <div className="mt-1 flex justify-end">
+        <ReportMediaButton url={current.url} kind={current.kind === "VIDEO" ? "VIDEO" : "IMAGE"} />
       </div>
       {sorted.length > 1 && (
         <ul className="mt-2 flex gap-2 overflow-x-auto" aria-label="Mais fotos">

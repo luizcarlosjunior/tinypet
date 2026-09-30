@@ -1,4 +1,4 @@
-import type { LifeStage } from "./constants";
+import { PET_SOCIAL_NETWORKS, type LifeStage, type PetSocialNetwork, type PetSocialNetworkKey } from "./constants";
 
 export function slugify(input: string): string {
   return input
@@ -236,9 +236,68 @@ export function normalizeMicrochip(value: string | null | undefined): string {
   return (value ?? "").replace(/[\s.\-]/g, "");
 }
 
-/** ISO 11784/11785 microchip: exactly 15 digits. */
+export type MicrochipProblem = "EMPTY" | "NOT_NUMERIC" | "LENGTH" | "TEST_PREFIX";
+
+/** pt-BR message for each invalid-chip case. */
+export const MICROCHIP_PROBLEM_MESSAGE: Record<MicrochipProblem, string> = {
+  EMPTY: "Informe o número do microchip",
+  NOT_NUMERIC: "O microchip tem só números (sem letras ou caracteres especiais)",
+  LENGTH: "O microchip deve ter 15 dígitos",
+  TEST_PREFIX: "Números iniciados em 900 são reservados para testes de fábrica e podem se repetir em outros animais",
+};
+
+/** Why a chip number is invalid (ISO 11784/11785: 15 digits, numeric only; 900… are factory/test chips), or null. */
+export function microchipProblem(value: string | null | undefined): MicrochipProblem | null {
+  const v = normalizeMicrochip(value);
+  if (!v) return "EMPTY";
+  if (!/^\d+$/.test(v)) return "NOT_NUMERIC";
+  if (v.length !== 15) return "LENGTH";
+  if (v.startsWith("900")) return "TEST_PREFIX";
+  return null;
+}
+
+/** ISO 11784/11785 microchip: exactly 15 digits, not starting with 900 (test chips). */
 export function isValidMicrochip(value: string | null | undefined): boolean {
-  return /^\d{15}$/.test(normalizeMicrochip(value));
+  return microchipProblem(value) === null;
+}
+
+/** Main ICAR manufacturer codes (900–998) with their brands, shown next to the number. */
+export const MICROCHIP_MANUFACTURERS: Record<string, { name: string; brands: string }> = {
+  "933": { name: "Avid Identification Systems", brands: "Avid FriendChip" },
+  "941": { name: "Datamars / Felixcan", brands: "Petlink, Datamars, Felixcan" },
+  "953": { name: "Allflex / Merck Animal Health (MSD)", brands: "Allflex, HomeAgain, Destron Fearing" },
+  "956": { name: "Trovan Ltd.", brands: "Trovan" },
+  "972": { name: "Planet ID GmbH", brands: "Planet-ID" },
+  "977": { name: "Virbac", brands: "BackHome" },
+  "981": { name: "Datamars (código secundário)", brands: "Datamars Microchips" },
+  "982": { name: "Allflex", brands: "Identificação pecuária e pets" },
+  "985": { name: "Destron Fearing / Digital Angel", brands: "Lifechip, HomeAgain" },
+  "990": { name: "RealTrace", brands: "Petscan, RealTrace" },
+  "991": { name: "FDX-B Generic / ICAR Approved", brands: "Diversas marcas sob licença" },
+};
+/** Country codes (ISO 3166 numeric) shown next to the number. */
+export const MICROCHIP_COUNTRIES: Record<string, string> = {
+  "032": "Argentina",
+  "076": "Brasil",
+  "124": "Canadá",
+  "250": "França",
+  "276": "Alemanha",
+  "620": "Portugal",
+  "724": "Espanha",
+  "840": "Estados Unidos",
+  "858": "Uruguai",
+};
+
+/** Splits a valid 15-digit number: 3-digit manufacturer/country code + 12-digit unique serial. */
+export function microchipParts(value: string | null | undefined): { code: string; serial: string; kind: "COUNTRY" | "MANUFACTURER"; label: string } | null {
+  const v = normalizeMicrochip(value);
+  if (!/^\d{15}$/.test(v)) return null;
+  const code = v.slice(0, 3);
+  const n = Number(code);
+  const kind = n >= 900 ? "MANUFACTURER" : "COUNTRY";
+  const m = MICROCHIP_MANUFACTURERS[code];
+  const label = kind === "COUNTRY" ? (MICROCHIP_COUNTRIES[code] ? `País: ${MICROCHIP_COUNTRIES[code]}` : "Código de país") : m ? `Fabricante: ${m.name} (${m.brands})` : "Código de fabricante";
+  return { code, serial: v.slice(3), kind, label };
 }
 
 // ───────── usernames (@handle) ─────────
@@ -260,3 +319,88 @@ export function usernameProblem(username: string): UsernameProblem | null {
 }
 
 export const USERNAME_HINT = "3 a 30 caracteres: letras minúsculas, números, ponto ou sublinhado (sem começar/terminar com . ou _ e sem ..).";
+
+export function petSocialNetwork(key: PetSocialNetworkKey): PetSocialNetwork {
+  return PET_SOCIAL_NETWORKS.find((n) => n.key === key)!;
+}
+
+const stripWww = (host: string) => host.toLowerCase().replace(/^www\./, "");
+
+/**
+ * Extracts the username from what the user typed for a pet social network: "@rex", "rex" or a profile URL
+ * ("https://www.instagram.com/rex/?igsh=…", "tiktok.com/@rex"). Returns the lowercased username without "@",
+ * or a pt-BR error message. Only the username is stored; `petSocialProfileUrl()` rebuilds the link.
+ */
+export function parsePetSocialUsername(key: PetSocialNetworkKey, input: string): { ok: true; username: string } | { ok: false; message: string } {
+  const net = petSocialNetwork(key);
+  const raw = input.trim();
+  if (!raw) return { ok: false, message: `Informe o usuário do ${net.label}` };
+  let candidate = raw;
+  // A URL has a scheme or a path; "rex.dog" alone is a username (Instagram allows dots).
+  const looksLikeUrl = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || /^[^\s/@]+\.[^\s/]+\//.test(raw);
+  if (looksLikeUrl) {
+    let url: URL;
+    try {
+      url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+    } catch {
+      return { ok: false, message: "Link inválido" };
+    }
+    const host = stripWww(url.hostname);
+    if (net.shortHosts?.includes(host)) return { ok: false, message: `Links curtos não são aceitos. Cole o link do perfil do ${net.label} ou o @usuário` };
+    if (!net.hosts.includes(host)) {
+      const other = PET_SOCIAL_NETWORKS.find((n) => n.hosts.includes(host) || n.shortHosts?.includes(host));
+      return { ok: false, message: other ? `Este link é do ${other.label}, não do ${net.label}` : `Este link não é do ${net.label}` };
+    }
+    const first = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
+    if (!first) return { ok: false, message: `O link não tem o usuário do ${net.label}` };
+    if (net.reserved.includes(first.toLowerCase())) return { ok: false, message: `Cole o link do perfil do ${net.label}, não de uma publicação ou página` };
+    if (net.atInPath && !first.startsWith("@")) return { ok: false, message: `Cole o link do perfil do ${net.label} (com @ no endereço)` };
+    candidate = first;
+  }
+  const username = candidate.replace(/^@/, "").toLowerCase();
+  if (!net.pattern.test(username) || username.startsWith(".") || username.endsWith(".") || username.includes("..")) {
+    return { ok: false, message: `Usuário do ${net.label} inválido` };
+  }
+  return { ok: true, username };
+}
+
+/** Public profile URL for a stored pet social username. */
+export function petSocialProfileUrl(key: PetSocialNetworkKey, username: string): string {
+  return `${petSocialNetwork(key).profileBase}${encodeURIComponent(username)}`;
+}
+
+/** Weight typed in kg ("8,5" or "8.5") → grams. "" → null (not informed); invalid or > 1000 kg → undefined. */
+export function parseKgToGrams(v: string): number | null | undefined {
+  const t = v.trim().replace(",", ".");
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 && n <= 1000 ? Math.round(n * 1000) : undefined;
+}
+
+/** Grams → kg input value with a decimal comma ("8,5"); empty when not set. */
+export function gramsToKgInput(g: number | null | undefined): string {
+  return g ? String(g / 1000).replace(".", ",") : "";
+}
+
+export type WeightUnit = "kg" | "g";
+
+/** Typed weight → grams: kg accepts decimals ("2,5" → 2500), g must be a whole number. "" → null; invalid → undefined. */
+export function parseWeightToGrams(value: string, unit: WeightUnit): number | null | undefined {
+  const t = value.trim().replace(",", ".");
+  if (!t) return null;
+  if (unit === "g") return /^\d+$/.test(t) && Number(t) > 0 ? Number(t) : undefined;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 && n <= 1000 ? Math.round(n * 1000) : undefined;
+}
+
+/** Grams → input value in the given unit ("2,5" kg / "2500" g); empty when not set. */
+export function gramsToInput(g: number | null | undefined, unit: WeightUnit): string {
+  if (!g) return "";
+  return unit === "g" ? String(g) : String(g / 1000).replace(".", ",");
+}
+
+/** Best unit to show a stored weight: kg when it is a whole-ish kilo amount (≥ 1 kg), else g. */
+export function preferredWeightUnit(g: number | null | undefined, fallback: WeightUnit): WeightUnit {
+  if (!g) return fallback;
+  return g >= 1000 ? "kg" : "g";
+}

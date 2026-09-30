@@ -68,6 +68,7 @@ export default function InicioPage() {
                       <label htmlFor={`task-${t.id}`} className={`flex-1 text-sm ${done ? "text-[var(--muted)] line-through" : ""}`}>
                         {t.title}
                         {petName && <span className="ml-2 text-xs text-[var(--muted)]">{petName}</span>}
+                        {t.skipped && <span className="block text-xs text-amber-700 dark:text-amber-400">Não feita hoje: {t.skipNote}</span>}
                       </label>
                       {(t.time ?? t.times?.[0]) && <span className="text-xs text-[var(--muted)]">{t.time ?? t.times?.join(", ")}</span>}
                     </li>
